@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Image, type ImageStyle } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -8,7 +7,8 @@ import { colors, radius, spacing } from '../theme';
 import type { Vault } from '../types';
 import { PriceTag, Stars } from './ui';
 
-export function VaultCover({ vault, style, emojiSize = 40 }: { vault: Vault; style?: StyleProp<ViewStyle>; emojiSize?: number }) {
+/** Cover image when the seller uploaded one, otherwise a typographic monogram. */
+export function VaultCover({ vault, style, monogramSize = 40 }: { vault: Vault; style?: StyleProp<ViewStyle>; monogramSize?: number }) {
   if (vault.coverUrl) {
     return (
       <Image
@@ -19,10 +19,14 @@ export function VaultCover({ vault, style, emojiSize = 40 }: { vault: Vault; sty
       />
     );
   }
+  const initials = vault.title
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
   return (
-    <View style={[styles.cover, { backgroundColor: vault.accentColor }, style]}>
-      <View style={styles.coverGlow} />
-      <Text style={{ fontSize: emojiSize }}>{vault.emoji}</Text>
+    <View style={[styles.cover, styles.monogram, style]}>
+      <Text style={[styles.monogramText, { fontSize: monogramSize }]}>{initials}</Text>
     </View>
   );
 }
@@ -33,9 +37,9 @@ export function VaultTile({ vault, width = 260 }: { vault: Vault; width?: number
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/vault/[id]', params: { id: vault.id } })}
-      style={({ pressed }) => [styles.tile, { width }, pressed && { opacity: 0.85 }]}
+      style={({ pressed }) => [styles.tile, { width }, pressed && { opacity: 0.7 }]}
     >
-      <VaultCover vault={vault} style={{ height: 140, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg }} />
+      <VaultCover vault={vault} style={{ height: 140 }} />
       <View style={styles.tileBody}>
         <View style={styles.tileTop}>
           <Text style={styles.tileTitle} numberOfLines={1}>
@@ -48,10 +52,7 @@ export function VaultTile({ vault, width = 260 }: { vault: Vault; width?: number
         </Text>
         <View style={styles.tileMeta}>
           <Stars rating={vault.ratingAvg} count={vault.ratingCount} size={12} />
-          <View style={styles.metaItem}>
-            <Ionicons name="download-outline" size={13} color={colors.muted} />
-            <Text style={styles.metaText}>{formatCount(vault.downloads)}</Text>
-          </View>
+          <Text style={styles.metaText}>{formatCount(vault.downloads)} downloads</Text>
         </View>
       </View>
     </Pressable>
@@ -64,9 +65,9 @@ export function VaultRow({ vault, onPress, right }: { vault: Vault; onPress?: ()
   return (
     <Pressable
       onPress={onPress ?? (() => router.push({ pathname: '/vault/[id]', params: { id: vault.id } }))}
-      style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}
+      style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
     >
-      <VaultCover vault={vault} style={styles.rowCover} emojiSize={26} />
+      <VaultCover vault={vault} style={styles.rowCover} monogramSize={20} />
       <View style={{ flex: 1, gap: 3 }}>
         <Text style={styles.rowTitle} numberOfLines={1}>
           {vault.title}
@@ -78,7 +79,7 @@ export function VaultRow({ vault, onPress, right }: { vault: Vault; onPress?: ()
           <Stars rating={vault.ratingAvg} count={vault.ratingCount} size={11} />
           {vault.seller ? (
             <Text style={styles.metaText} numberOfLines={1}>
-              by {vault.seller.displayName}
+              {vault.seller.displayName}
             </Text>
           ) : null}
         </View>
@@ -90,15 +91,8 @@ export function VaultRow({ vault, onPress, right }: { vault: Vault; onPress?: ()
 
 const styles = StyleSheet.create({
   cover: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  coverGlow: {
-    position: 'absolute',
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    top: -60,
-    right: -50,
-  },
+  monogram: { backgroundColor: colors.surfaceRaised },
+  monogramText: { color: colors.text, fontWeight: '700', letterSpacing: -1 },
   tile: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -108,22 +102,19 @@ const styles = StyleSheet.create({
   },
   tileBody: { padding: spacing.md, gap: 6 },
   tileTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  tileTitle: { flex: 1, fontSize: 16, fontWeight: '800', color: colors.text },
+  tileTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.text },
   tileTagline: { fontSize: 13, color: colors.muted, lineHeight: 18, minHeight: 36 },
   tileMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  metaText: { fontSize: 12, color: colors.muted, fontWeight: '500', flexShrink: 1 },
+  metaText: { fontSize: 12, color: colors.muted, flexShrink: 1 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  rowCover: { width: 64, height: 64, borderRadius: radius.md },
-  rowTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
+  rowCover: { width: 56, height: 56, borderRadius: radius.md },
+  rowTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
   rowTagline: { fontSize: 12, color: colors.muted, lineHeight: 16 },
 });

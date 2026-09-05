@@ -10,7 +10,7 @@ import { api } from '../../src/lib/api';
 import { MAX_VAULT_ZIP_BYTES, MIN_PRICE_CENTS, PLATFORM_FEE_PERCENT } from '../../src/lib/config';
 import { formatBytes, formatPrice, parsePriceToCents, parseTags } from '../../src/lib/format';
 import { useAuth } from '../../src/store/auth';
-import { ACCENTS, colors, EMOJIS, radius, spacing } from '../../src/theme';
+import { colors, radius, spacing } from '../../src/theme';
 import { CATEGORIES, type CategorySlug, type Vault, type VaultInput } from '../../src/types';
 
 export default function ListingFormScreen() {
@@ -32,8 +32,6 @@ export default function ListingFormScreen() {
   const [pluginsText, setPluginsText] = useState('');
   const [noteCount, setNoteCount] = useState('');
   const [version, setVersion] = useState('1.0');
-  const [emoji, setEmoji] = useState(EMOJIS[0]);
-  const [accent, setAccent] = useState(ACCENTS[0]);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [filePath, setFilePath] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -60,8 +58,6 @@ export default function ListingFormScreen() {
         setPluginsText(v.plugins.join(', '));
         setNoteCount(v.noteCount ? String(v.noteCount) : '');
         setVersion(v.version);
-        setEmoji(v.emoji);
-        setAccent(v.accentColor);
         setCoverUrl(v.coverUrl ?? null);
         setFilePath(v.filePath ?? null);
         setFileName(v.filePath ? v.filePath.split('/').pop() ?? 'vault.zip' : null);
@@ -142,8 +138,6 @@ export default function ListingFormScreen() {
         category,
         tags: parseTags(tagsText),
         priceCents,
-        accentColor: accent,
-        emoji,
         plugins: parseTags(pluginsText).map((p) => p.replace(/\b\w/g, (c) => c.toUpperCase())),
         noteCount: Number(noteCount) || 0,
         version: version.trim() || '1.0',
@@ -202,7 +196,7 @@ export default function ListingFormScreen() {
             <Text style={styles.label}>Category</Text>
             <View style={styles.chips}>
               {CATEGORIES.map((c) => (
-                <Chip key={c.slug} label={c.label} emoji={c.emoji} selected={category === c.slug} onPress={() => setCategory(c.slug)} />
+                <Chip key={c.slug} label={c.label} icon={c.icon} selected={category === c.slug} onPress={() => setCategory(c.slug)} />
               ))}
             </View>
           </View>
@@ -245,38 +239,31 @@ export default function ListingFormScreen() {
           </View>
         </Card>
 
-        <SectionTitle>Appearance</SectionTitle>
+        <SectionTitle>Cover image</SectionTitle>
         <Card style={{ gap: spacing.md }}>
           <Pressable onPress={pickCover} style={styles.coverPicker}>
             {coverUrl ? (
               <Image source={{ uri: coverUrl }} style={styles.coverImage} contentFit="cover" />
             ) : (
-              <View style={[styles.coverImage, { backgroundColor: accent, alignItems: 'center', justifyContent: 'center' }]}>
-                <Text style={{ fontSize: 44 }}>{emoji}</Text>
+              <View style={[styles.coverImage, styles.coverPlaceholder]}>
+                <Text style={styles.coverMonogram}>
+                  {title
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((w) => w[0]?.toUpperCase() ?? '')
+                    .join('') || 'AB'}
+                </Text>
               </View>
             )}
             <View style={styles.coverOverlay}>
-              <Ionicons name="image-outline" size={16} color="#fff" />
+              <Ionicons name="image-outline" size={16} color={colors.text} />
               <Text style={styles.coverOverlayText}>{uploadingCover ? 'Uploading...' : coverUrl ? 'Change cover' : 'Add cover image (optional)'}</Text>
             </View>
           </Pressable>
+          <Text style={styles.help}>Without a cover, listings show a monogram of the title.</Text>
           {coverUrl ? (
             <Button title="Remove cover" small variant="ghost" onPress={() => setCoverUrl(null)} />
           ) : null}
-          <Text style={styles.label}>Emoji</Text>
-          <View style={styles.chips}>
-            {EMOJIS.map((e) => (
-              <Pressable key={e} onPress={() => setEmoji(e)} style={[styles.emoji, emoji === e && styles.emojiSelected]}>
-                <Text style={{ fontSize: 20 }}>{e}</Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={styles.label}>Accent colour</Text>
-          <View style={styles.chips}>
-            {ACCENTS.map((c) => (
-              <Pressable key={c} onPress={() => setAccent(c)} style={[styles.swatch, { backgroundColor: c }, accent === c && styles.swatchSelected]} />
-            ))}
-          </View>
         </Card>
 
         <View style={styles.actions}>
@@ -303,9 +290,11 @@ const styles = StyleSheet.create({
   switchTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },
   payout: { backgroundColor: colors.successSoft, padding: spacing.md, borderRadius: radius.md },
   payoutText: { color: colors.text, fontSize: 13, lineHeight: 18 },
-  payoutStrong: { color: colors.success, fontWeight: '800' },
+  payoutStrong: { color: colors.success, fontWeight: '700' },
   coverPicker: { borderRadius: radius.md, overflow: 'hidden' },
   coverImage: { width: '100%', height: 160 },
+  coverPlaceholder: { backgroundColor: colors.surfaceRaised, alignItems: 'center', justifyContent: 'center' },
+  coverMonogram: { color: colors.text, fontSize: 44, fontWeight: '700', letterSpacing: -1 },
   coverOverlay: {
     position: 'absolute',
     bottom: 0,
@@ -315,13 +304,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: colors.background,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
     paddingVertical: 8,
   },
-  coverOverlayText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  emoji: { width: 42, height: 42, borderRadius: radius.md, backgroundColor: colors.surfaceRaised, alignItems: 'center', justifyContent: 'center' },
-  emojiSelected: { borderWidth: 2, borderColor: colors.accent },
-  swatch: { width: 34, height: 34, borderRadius: 17 },
-  swatchSelected: { borderWidth: 3, borderColor: '#fff' },
+  coverOverlayText: { color: colors.text, fontWeight: '600', fontSize: 13 },
   actions: { marginTop: spacing.xl, gap: spacing.sm },
 });

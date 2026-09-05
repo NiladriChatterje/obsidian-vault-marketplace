@@ -105,9 +105,9 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 48 },
-  title: { fontSize: 28, fontWeight: '900', color: colors.text, marginBottom: spacing.md },
+  title: { fontSize: 28, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm },
-  name: { fontSize: 20, fontWeight: '800', color: colors.text },
+  name: { fontSize: 20, fontWeight: '700', color: colors.text },
   handle: { color: colors.muted, fontSize: 14 },
   email: { color: colors.faint, fontSize: 12, marginTop: 2 },
   badge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primarySoft, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill },

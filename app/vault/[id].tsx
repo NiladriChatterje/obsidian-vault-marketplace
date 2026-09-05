@@ -110,7 +110,7 @@ export default function VaultDetailScreen() {
     <View style={styles.flex}>
       <Stack.Screen options={{ title: v.title }} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <VaultCover vault={v} style={styles.hero} emojiSize={64} />
+        <VaultCover vault={v} style={styles.hero} monogramSize={56} />
 
         <View style={styles.titleRow}>
           <Text style={styles.title}>{v.title}</Text>
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: 140 },
   hero: { height: 200, borderRadius: radius.xl },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md, marginTop: spacing.lg },
-  title: { flex: 1, fontSize: 26, fontWeight: '900', color: colors.text, lineHeight: 30 },
+  title: { flex: 1, fontSize: 26, fontWeight: '700', color: colors.text, lineHeight: 30 },
   tagline: { fontSize: 15, color: colors.muted, lineHeight: 22, marginTop: spacing.sm },
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: spacing.md },
   meta: { fontSize: 13, color: colors.muted, fontWeight: '500' },
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     alignItems: 'center',
   },
-  statValue: { color: colors.text, fontWeight: '800', fontSize: 14 },
+  statValue: { color: colors.text, fontWeight: '700', fontSize: 14 },
   statLabel: { color: colors.faint, fontSize: 11, marginTop: 2 },
   description: { color: colors.text, fontSize: 15, lineHeight: 23 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },

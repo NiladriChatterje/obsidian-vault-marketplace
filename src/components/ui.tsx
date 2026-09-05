@@ -29,11 +29,11 @@ interface ButtonProps {
 
 export function Button({ title, onPress, variant = 'primary', loading, disabled, icon, small, style }: ButtonProps) {
   const palette = {
-    primary: { bg: colors.primary, fg: '#fff', border: colors.primary },
-    secondary: { bg: colors.surfaceRaised, fg: colors.text, border: colors.border },
-    ghost: { bg: 'transparent', fg: colors.accent, border: 'transparent' },
-    danger: { bg: colors.dangerSoft, fg: colors.danger, border: 'transparent' },
-    success: { bg: colors.success, fg: '#0B1F17', border: colors.success },
+    primary: { bg: colors.primary, fg: colors.onPrimary, border: colors.primary },
+    secondary: { bg: 'transparent', fg: colors.text, border: colors.border },
+    ghost: { bg: 'transparent', fg: colors.muted, border: 'transparent' },
+    danger: { bg: 'transparent', fg: colors.muted, border: colors.border },
+    success: { bg: colors.primary, fg: colors.onPrimary, border: colors.primary },
   }[variant];
   const off = disabled || loading;
   return (
@@ -90,10 +90,9 @@ interface ChipProps {
   selected?: boolean;
   onPress?: () => void;
   icon?: keyof typeof Ionicons.glyphMap;
-  emoji?: string;
 }
 
-export function Chip({ label, selected, onPress, icon, emoji }: ChipProps) {
+export function Chip({ label, selected, onPress, icon }: ChipProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -102,9 +101,8 @@ export function Chip({ label, selected, onPress, icon, emoji }: ChipProps) {
       accessibilityState={{ selected: !!selected }}
       style={[styles.chip, selected && styles.chipSelected]}
     >
-      {emoji ? <Text style={{ fontSize: 13 }}>{emoji}</Text> : null}
-      {icon ? <Ionicons name={icon} size={13} color={selected ? '#fff' : colors.muted} /> : null}
-      <Text style={[styles.chipText, selected && { color: '#fff' }]}>{label}</Text>
+      {icon ? <Ionicons name={icon} size={13} color={selected ? colors.onPrimary : colors.muted} /> : null}
+      <Text style={[styles.chipText, selected && { color: colors.onPrimary }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -165,11 +163,7 @@ export function Avatar({ name, url, size = 36 }: { name: string; url?: string | 
 export function PriceTag({ cents, currency, large }: { cents: number; currency: string; large?: boolean }) {
   const free = cents === 0;
   const text = free ? 'Free' : new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(cents / 100);
-  return (
-    <View style={[styles.price, free && { backgroundColor: colors.successSoft }, large && styles.priceLarge]}>
-      <Text style={[styles.priceText, free && { color: colors.success }, large && { fontSize: 18 }]}>{text}</Text>
-    </View>
-  );
+  return <Text style={[styles.priceText, free && { color: colors.muted }, large && { fontSize: 20 }]}>{text}</Text>;
 }
 
 interface EmptyProps {
@@ -240,7 +234,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     marginBottom: spacing.md,
   },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   sectionAction: { fontSize: 14, fontWeight: '600', color: colors.accent },
   chip: {
     flexDirection: 'row',
@@ -254,7 +248,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { fontSize: 14, fontWeight: '600', color: colors.text },
+  chipText: { fontSize: 14, fontWeight: '500', color: colors.text },
   label: { fontSize: 13, fontWeight: '600', color: colors.muted },
   hint: { fontSize: 12, color: colors.faint },
   error: { fontSize: 12, color: colors.danger },
@@ -271,35 +265,29 @@ const styles = StyleSheet.create({
   inputMultiline: { minHeight: 110, textAlignVertical: 'top' },
   stars: { flexDirection: 'row', alignItems: 'center', gap: 1 },
   starText: { color: colors.muted, marginLeft: 4, fontWeight: '600' },
-  avatar: { backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: colors.accent, fontWeight: '800' },
-  price: {
-    backgroundColor: colors.primarySoft,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.sm,
-    alignSelf: 'flex-start',
-  },
-  priceLarge: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.md },
-  priceText: { color: colors.accent, fontWeight: '800', fontSize: 14 },
+  avatar: { backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: colors.text, fontWeight: '700' },
+  priceText: { color: colors.text, fontWeight: '700', fontSize: 14 },
   empty: { alignItems: 'center', paddingVertical: spacing.xxl * 1.5, paddingHorizontal: spacing.xl },
   emptyIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.primarySoft,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,
   },
-  emptyTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: spacing.xs, textAlign: 'center' },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: spacing.xs, textAlign: 'center' },
   emptyMessage: { fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 20 },
   loading: { paddingVertical: spacing.xxl, alignItems: 'center' },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.dangerSoft,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: spacing.md,
     borderRadius: radius.md,
     marginVertical: spacing.md,

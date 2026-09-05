@@ -52,8 +52,6 @@ create table if not exists public.vaults (
   price_cents integer not null default 0 check (price_cents = 0 or price_cents >= 199),
   currency text not null default 'USD',
   cover_url text,
-  accent_color text not null default '#8B5CF6',
-  emoji text not null default '🧠',
   screenshots text[] not null default '{}',
   plugins text[] not null default '{}',
   note_count integer not null default 0,

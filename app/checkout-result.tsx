@@ -36,6 +36,6 @@ export default function CheckoutResultScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
-  title: { fontSize: 24, fontWeight: '900', color: colors.text, textAlign: 'center' },
+  title: { fontSize: 24, fontWeight: '700', color: colors.text, textAlign: 'center' },
   text: { color: colors.muted, fontSize: 15, textAlign: 'center', lineHeight: 22 },
 });

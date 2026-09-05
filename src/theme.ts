@@ -1,39 +1,29 @@
-/** Dark, Obsidian-flavoured palette. */
+/**
+ * Monochrome palette. Everything is a shade of one neutral; hierarchy comes
+ * from contrast and weight, not hue. Semantic tokens are kept so call sites
+ * stay readable, but they resolve to greys as well.
+ */
 export const colors = {
-  background: '#0F0E17',
-  surface: '#191826',
-  surfaceRaised: '#232135',
-  border: '#2E2C44',
-  text: '#F2F1FA',
-  muted: '#9C99B8',
-  faint: '#6B6887',
-  primary: '#8B5CF6',
-  primarySoft: 'rgba(139, 92, 246, 0.16)',
-  accent: '#C084FC',
-  success: '#34D399',
-  successSoft: 'rgba(52, 211, 153, 0.16)',
-  warning: '#FBBF24',
-  warningSoft: 'rgba(251, 191, 36, 0.16)',
-  danger: '#F87171',
-  dangerSoft: 'rgba(248, 113, 113, 0.16)',
-  star: '#FBBF24',
+  background: '#0B0B0C',
+  surface: '#141416',
+  surfaceRaised: '#1C1C1F',
+  border: '#26262A',
+  text: '#F4F4F5',
+  muted: '#9A9AA1',
+  faint: '#5F5F66',
+  primary: '#F4F4F5',
+  primarySoft: '#1C1C1F',
+  accent: '#F4F4F5',
+  success: '#D4D4D8',
+  successSoft: '#1C1C1F',
+  warning: '#A1A1AA',
+  warningSoft: '#1C1C1F',
+  danger: '#A1A1AA',
+  dangerSoft: '#1C1C1F',
+  star: '#F4F4F5',
+  onPrimary: '#0B0B0C',
 };
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 
-export const radius = { sm: 8, md: 12, lg: 16, xl: 22, pill: 999 };
-
-export const ACCENTS = [
-  '#8B5CF6',
-  '#EC4899',
-  '#F59E0B',
-  '#10B981',
-  '#3B82F6',
-  '#EF4444',
-  '#14B8A6',
-  '#F97316',
-  '#6366F1',
-  '#84CC16',
-];
-
-export const EMOJIS = ['🧠', '📚', '🗂️', '🚀', '🎓', '✍️', '💻', '🔬', '🌱', '💼', '🧩', '🎨', '🗺️', '⚡', '🔥', '🪴'];
+export const radius = { sm: 4, md: 6, lg: 8, xl: 10, pill: 999 };

@@ -94,7 +94,7 @@ export default function LibraryScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: { padding: spacing.lg, paddingBottom: spacing.sm },
-  title: { fontSize: 28, fontWeight: '900', color: colors.text },
+  title: { fontSize: 28, fontWeight: '700', color: colors.text },
   subtitle: { color: colors.muted, fontSize: 14, marginTop: 2 },
   list: { padding: spacing.lg, paddingTop: spacing.sm, paddingBottom: 48 },
 });

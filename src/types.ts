@@ -1,15 +1,17 @@
 export const CATEGORIES = [
-  { slug: 'pkm', label: 'PKM Systems', emoji: '🧠' },
-  { slug: 'productivity', label: 'Productivity', emoji: '✅' },
-  { slug: 'students', label: 'Students', emoji: '🎓' },
-  { slug: 'research', label: 'Research', emoji: '🔬' },
-  { slug: 'writing', label: 'Writing', emoji: '✍️' },
-  { slug: 'developers', label: 'Developers', emoji: '💻' },
-  { slug: 'business', label: 'Business', emoji: '💼' },
-  { slug: 'life', label: 'Life & Journaling', emoji: '🌱' },
-  { slug: 'templates', label: 'Template Packs', emoji: '🧩' },
-  { slug: 'themes', label: 'Themes & Setups', emoji: '🎨' },
+  { slug: 'pkm', label: 'PKM Systems', icon: 'git-network-outline' },
+  { slug: 'productivity', label: 'Productivity', icon: 'checkbox-outline' },
+  { slug: 'students', label: 'Students', icon: 'school-outline' },
+  { slug: 'research', label: 'Research', icon: 'flask-outline' },
+  { slug: 'writing', label: 'Writing', icon: 'pencil-outline' },
+  { slug: 'developers', label: 'Developers', icon: 'code-slash-outline' },
+  { slug: 'business', label: 'Business', icon: 'briefcase-outline' },
+  { slug: 'life', label: 'Life & Journaling', icon: 'leaf-outline' },
+  { slug: 'templates', label: 'Template Packs', icon: 'copy-outline' },
+  { slug: 'themes', label: 'Themes & Setups', icon: 'color-palette-outline' },
 ] as const;
+
+export type CategoryIcon = (typeof CATEGORIES)[number]['icon'];
 
 export type CategorySlug = (typeof CATEGORIES)[number]['slug'];
 
@@ -46,8 +48,6 @@ export interface Vault {
   priceCents: number;
   currency: string;
   coverUrl?: string | null;
-  accentColor: string;
-  emoji: string;
   screenshots: string[];
   plugins: string[];
   noteCount: number;
@@ -72,8 +72,6 @@ export type VaultInput = Pick<
   | 'category'
   | 'tags'
   | 'priceCents'
-  | 'accentColor'
-  | 'emoji'
   | 'plugins'
   | 'noteCount'
   | 'version'

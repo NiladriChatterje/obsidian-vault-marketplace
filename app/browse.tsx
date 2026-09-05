@@ -65,7 +65,7 @@ export default function BrowseScreen() {
           <Chip
             key={c.slug}
             label={c.label}
-            emoji={c.emoji}
+            icon={c.icon}
             selected={category === c.slug}
             onPress={() => setCategory(category === c.slug ? undefined : c.slug)}
           />

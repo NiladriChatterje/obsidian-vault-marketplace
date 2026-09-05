@@ -47,7 +47,6 @@ export default function AuthScreen() {
           <Pressable onPress={() => router.back()} style={styles.close} accessibilityLabel="Close">
             <Ionicons name="close" size={22} color={colors.text} />
           </Pressable>
-          <Text style={styles.logo}>🗄️</Text>
           <Text style={styles.title}>{mode === 'in' ? 'Welcome back' : 'Create your account'}</Text>
           <Text style={styles.subtitle}>
             {mode === 'in' ? 'Sign in to access your library and listings.' : 'Buy, review and sell Obsidian vaults.'}
@@ -55,10 +54,10 @@ export default function AuthScreen() {
 
           <View style={styles.segment}>
             <Pressable onPress={() => setMode('in')} style={[styles.segmentItem, mode === 'in' && styles.segmentActive]}>
-              <Text style={[styles.segmentText, mode === 'in' && { color: '#fff' }]}>Sign in</Text>
+              <Text style={[styles.segmentText, mode === 'in' && { color: colors.onPrimary }]}>Sign in</Text>
             </Pressable>
             <Pressable onPress={() => setMode('up')} style={[styles.segmentItem, mode === 'up' && styles.segmentActive]}>
-              <Text style={[styles.segmentText, mode === 'up' && { color: '#fff' }]}>Sign up</Text>
+              <Text style={[styles.segmentText, mode === 'up' && { color: colors.onPrimary }]}>Sign up</Text>
             </Pressable>
           </View>
 
@@ -93,8 +92,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl, paddingBottom: 40 },
   close: { alignSelf: 'flex-end', width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  logo: { fontSize: 48, textAlign: 'center', marginTop: spacing.md },
-  title: { fontSize: 26, fontWeight: '900', color: colors.text, textAlign: 'center', marginTop: spacing.md },
+  title: { fontSize: 26, fontWeight: '700', color: colors.text, textAlign: 'center', marginTop: spacing.md },
   subtitle: { color: colors.muted, fontSize: 14, textAlign: 'center', marginTop: spacing.xs, marginBottom: spacing.xl },
   segment: { flexDirection: 'row', backgroundColor: colors.surface, borderRadius: radius.md, padding: 4, marginBottom: spacing.xl, borderWidth: 1, borderColor: colors.border },
   segmentItem: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: radius.sm },

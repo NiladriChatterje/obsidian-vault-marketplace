@@ -56,10 +56,10 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 48 },
   header: { alignItems: 'center', gap: 4, paddingVertical: spacing.lg },
-  name: { fontSize: 22, fontWeight: '900', color: colors.text, marginTop: spacing.sm },
+  name: { fontSize: 22, fontWeight: '700', color: colors.text, marginTop: spacing.sm },
   handle: { color: colors.muted, fontSize: 14 },
   bio: { color: colors.text, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: spacing.sm },
   stats: { flexDirection: 'row', gap: spacing.xl, marginTop: spacing.md },
   stat: { color: colors.muted, fontSize: 14 },
-  statValue: { color: colors.text, fontWeight: '800' },
+  statValue: { color: colors.text, fontWeight: '700' },
 });

@@ -178,7 +178,7 @@ function Perk({ icon, title, body }: { icon: React.ComponentProps<typeof Ionicon
 
 function StatCard({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <View style={[styles.statCard, accent && { backgroundColor: colors.primarySoft, borderColor: 'rgba(139,92,246,0.35)' }]}>
+    <View style={[styles.statCard, accent && { borderColor: colors.text }]}>
       <Text style={styles.statLabel}>{label}</Text>
       <Text style={[styles.statValue, accent && { color: colors.accent }]}>{value}</Text>
     </View>
@@ -201,7 +201,7 @@ function StatusPill({ status }: { status: VaultStatus }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 48 },
-  title: { fontSize: 28, fontWeight: '900', color: colors.text },
+  title: { fontSize: 28, fontWeight: '700', color: colors.text },
   subtitle: { color: colors.muted, fontSize: 14, marginTop: 2 },
   fine: { color: colors.faint, fontSize: 12, textAlign: 'center' },
   perkIcon: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   statLabel: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  statValue: { color: colors.text, fontSize: 22, fontWeight: '900', marginTop: 4 },
+  statValue: { color: colors.text, fontSize: 22, fontWeight: '700', marginTop: 4 },
   listing: { gap: spacing.sm },
   listingActions: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.xs },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },

@@ -88,7 +88,7 @@ export default function ExploreScreen() {
               onPress={() => router.push({ pathname: '/browse', params: { category: c.slug } })}
               style={({ pressed }) => [styles.category, pressed && { opacity: 0.8 }]}
             >
-              <Text style={{ fontSize: 20 }}>{c.emoji}</Text>
+              <Ionicons name={c.icon} size={18} color={colors.muted} />
               <Text style={styles.categoryText}>{c.label}</Text>
             </Pressable>
           ))}
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 48 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  brand: { fontSize: 28, fontWeight: '900', color: colors.text, letterSpacing: -0.5 },
+  brand: { fontSize: 28, fontWeight: '700', color: colors.text, letterSpacing: -0.5 },
   brandSub: { fontSize: 14, color: colors.muted, marginTop: 2 },
   search: {
     marginTop: spacing.lg,
@@ -198,8 +198,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.35)',
+    borderColor: colors.border,
   },
-  sellTitle: { color: colors.text, fontWeight: '800', fontSize: 16 },
+  sellTitle: { color: colors.text, fontWeight: '700', fontSize: 16 },
   sellText: { color: colors.muted, fontSize: 13, marginTop: 2, lineHeight: 18 },
 });
