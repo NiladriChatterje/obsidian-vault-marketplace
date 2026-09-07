@@ -29,7 +29,7 @@ export const cfg = {
     serviceKey: env('SUPABASE_SERVICE_ROLE_KEY'),
   },
 
-  feePercent: Number(env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT', env('PLATFORM_FEE_PERCENT', '15'))),
+  feePercent: Number(env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT', env('PLATFORM_FEE_PERCENT', '10'))),
   /** Signs short-lived download links. Falls back to the Razorpay secret so nothing extra is required. */
   downloadSecret: env('DOWNLOAD_SECRET') || env('RAZORPAY_SECRET_KEY') || 'dev-download-secret',
   /** Comma-separated http(s) origins buyers may be redirected to after checkout. Empty = any. */

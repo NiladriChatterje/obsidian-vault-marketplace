@@ -7,6 +7,7 @@ import { VaultRow, VaultTile } from '../../src/components/VaultCard';
 import { ErrorBox, Loading, SectionTitle } from '../../src/components/ui';
 import { useAsync } from '../../src/hooks/useAsync';
 import { api } from '../../src/lib/api';
+import { PLATFORM_FEE_PERCENT } from '../../src/lib/config';
 import { useAuth } from '../../src/store/auth';
 import { colors, radius, spacing } from '../../src/theme';
 import { CATEGORIES } from '../../src/types';
@@ -136,7 +137,7 @@ export default function ExploreScreen() {
         <Pressable onPress={() => router.push('/sell')} style={styles.sellCta}>
           <View style={{ flex: 1 }}>
             <Text style={styles.sellTitle}>Built a vault you love?</Text>
-            <Text style={styles.sellText}>Sell it here. You keep 85% of every sale, paid out by Razorpay.</Text>
+            <Text style={styles.sellText}>Sell it here. You keep {100 - PLATFORM_FEE_PERCENT}% of every sale, paid out by Razorpay.</Text>
           </View>
           <Ionicons name="arrow-forward-circle" size={32} color={colors.accent} />
         </Pressable>

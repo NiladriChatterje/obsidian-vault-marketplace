@@ -13,7 +13,7 @@ A two-sided marketplace for Obsidian vaults, built with Expo (React Native) and 
 
 | Stream | How |
 | --- | --- |
-| Commission | 15% of every paid sale (`PLATFORM_FEE_PERCENT`), kept back when the seller's share is transferred via Razorpay Route. Sellers keep 85%. |
+| Commission | 10% of every paid sale (`PLATFORM_FEE_PERCENT`), kept back when the seller's share is transferred via Razorpay Route. Sellers keep 90%. |
 | Featured placement | The `featured` flag drives the home carousel. Sell slots to sellers weekly. |
 | Seller Pro (future) | Analytics, coupons, early-access releases for a monthly fee. |
 

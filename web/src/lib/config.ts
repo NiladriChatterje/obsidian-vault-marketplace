@@ -12,7 +12,7 @@ export const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? ''
 export const IS_DEMO = !SUPABASE_URL || !SUPABASE_ANON_KEY;
 
 /** Platform commission on every paid sale, in percent. Enforced by the payment server (server/). */
-export const PLATFORM_FEE_PERCENT = Number(process.env.EXPO_PUBLIC_PLATFORM_FEE_PERCENT ?? 15);
+export const PLATFORM_FEE_PERCENT = Number(process.env.EXPO_PUBLIC_PLATFORM_FEE_PERCENT ?? 10);
 
 /** Default currency for listings. Razorpay settles in INR. */
 export const DEFAULT_CURRENCY = 'INR';
