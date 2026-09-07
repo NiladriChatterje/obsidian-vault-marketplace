@@ -1,13 +1,15 @@
 // Creates a Stripe Checkout session for a paid vault.
 // Destination charge: buyer pays the platform, Stripe forwards the seller's share
 // to their connected account and keeps PLATFORM_FEE_PERCENT for us.
-import { PLATFORM_FEE_PERCENT, corsHeaders, json, stripe, userClient } from '../_shared/stripe.ts';
+import { PLATFORM_FEE_PERCENT, corsHeaders, json, resolveRedirectOrigin, stripe, userClient } from '../_shared/stripe.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
-    const { vaultId, redirectScheme = 'vaultmarket' } = await req.json();
+    const body = await req.json();
+    const { vaultId } = body;
     if (!vaultId) return json({ error: 'vaultId is required' }, 400);
+    const origin = resolveRedirectOrigin(body);
 
     const sb = userClient(req);
     const { data: auth } = await sb.auth.getUser();
@@ -52,8 +54,8 @@ Deno.serve(async (req) => {
         transfer_data: { destination: seller.stripe_account_id },
       },
       metadata: { vault_id: vault.id, buyer_id: user.id, fee_cents: String(fee) },
-      success_url: `${redirectScheme}://checkout-result?status=success&vault=${vault.id}`,
-      cancel_url: `${redirectScheme}://checkout-result?status=cancelled&vault=${vault.id}`,
+      success_url: `${origin}/checkout-result?status=success&vault=${vault.id}`,
+      cancel_url: `${origin}/checkout-result?status=cancelled&vault=${vault.id}`,
     });
 
     return json({ url: session.url, sessionId: session.id });

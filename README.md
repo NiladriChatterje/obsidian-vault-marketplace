@@ -37,6 +37,34 @@ npm run typecheck   # tsc --noEmit
 npx expo-doctor
 ```
 
+## Website (Next.js)
+
+`web/` is the same marketplace as a website: sellers list vaults at their price, buyers pay through Stripe Checkout, then download the zip or connect the vault to an AI assistant over MCP. It reuses the app's data layer (`src/lib`, `src/store`, `src/types`) directly; four tiny shims in `web/shims/` stand in for the React Native modules that layer touches, wired up in `web/next.config.ts`.
+
+```bash
+cd web
+npm install
+npm run dev        # http://localhost:3000, demo mode until the repo-root .env has Supabase keys
+npm run build
+```
+
+The site reads the repo-root `.env`. Two extra keys matter for it:
+
+| Key | Purpose |
+| --- | --- |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only. Lets `web/app/api/mcp` resolve access tokens and stream vault zips. |
+| `EXPO_PUBLIC_REDIRECT_ORIGIN` | Optional. Where Stripe sends buyers back (defaults to the browser origin). Also list it in the `ALLOWED_REDIRECT_ORIGINS` function secret. |
+
+### MCP access
+
+Every buyer gets a personal token at `/connect` (only its SHA-256 hash is stored, table `mcp_tokens`, migration `0002`). Point any Model Context Protocol client at `https://<site>/api/mcp` with `Authorization: Bearer <token>`:
+
+```bash
+claude mcp add --transport http vault-market https://<site>/api/mcp --header "Authorization: Bearer vm_..."
+```
+
+Tools: `list_vaults`, `list_notes`, `read_note`, `search_notes`. The server unzips the purchased vault in memory (text files only) and caches it per process. In demo mode the endpoint accepts `vm_demo_token` and serves synthetic notes for the sample vaults.
+
 ## Going live
 
 1. **Supabase project.** Create one, then apply the schema:
@@ -54,7 +82,7 @@ npx expo-doctor
    supabase functions deploy stripe-webhook --no-verify-jwt
    ```
    Point a Stripe webhook at the `stripe-webhook` function URL with events `checkout.session.completed`, `checkout.session.async_payment_succeeded`, and `account.updated`.
-4. **Deep links.** The scheme `vaultmarket://` is already configured. Stripe redirects to `vaultmarket://checkout-result` and `vaultmarket://sell` after checkout and onboarding.
+4. **Redirects.** The scheme `vaultmarket://` is already configured. Stripe redirects to `vaultmarket://checkout-result` and `vaultmarket://sell` after checkout and onboarding; the website passes its own origin instead (`/checkout-result`, `/sell`).
 5. **Assets.** Replace the placeholder icon and splash in `assets/`.
 
 ## How the money flows
@@ -88,8 +116,13 @@ src/
   store/auth.tsx         Session + profile context
   components/            UI kit, vault cards
 supabase/
-  migrations/0001_init.sql
+  migrations/0001_init.sql, 0002_mcp_tokens.sql
   functions/create-checkout, stripe-webhook, connect-onboarding
+web/
+  app/                   Next.js pages: explore, browse, vault, library, sell, connect (MCP), auth
+  app/api/mcp/route.ts   MCP endpoint (Streamable HTTP) over purchased vaults
+  lib/mcp-server.ts      Token lookup, zip unpacking, MCP tools
+  shims/                 Browser stand-ins for the RN modules the shared data layer imports
 ```
 
 ## Launch checklist

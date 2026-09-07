@@ -1,11 +1,11 @@
 // Marks the caller as a seller and returns a Stripe Express onboarding link.
 // Safe to call repeatedly: reuses the existing connected account.
-import { adminClient, corsHeaders, json, stripe, userClient } from '../_shared/stripe.ts';
+import { adminClient, corsHeaders, json, resolveRedirectOrigin, stripe, userClient } from '../_shared/stripe.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
-    const { redirectScheme = 'vaultmarket' } = await req.json().catch(() => ({}));
+    const origin = resolveRedirectOrigin(await req.json().catch(() => ({})));
     const sb = userClient(req);
     const { data: auth } = await sb.auth.getUser();
     const user = auth.user;
@@ -34,8 +34,8 @@ Deno.serve(async (req) => {
     const link = await stripe.accountLinks.create({
       account: accountId,
       type: 'account_onboarding',
-      return_url: `${redirectScheme}://sell?onboarding=done`,
-      refresh_url: `${redirectScheme}://sell?onboarding=refresh`,
+      return_url: `${origin}/sell?onboarding=done`,
+      refresh_url: `${origin}/sell?onboarding=refresh`,
     });
 
     return json({ url: link.url, onboarded: false });

@@ -19,6 +19,16 @@ export const MIN_PRICE_CENTS = 199;
 
 export const APP_SCHEME = 'vaultmarket';
 
+/**
+ * Where Stripe sends the user after Checkout / Connect onboarding.
+ * Native builds use the deep-link scheme; the Next.js site (web/) sets
+ * EXPO_PUBLIC_REDIRECT_ORIGIN to its own https origin, falling back to the
+ * browser's location when running in a browser.
+ */
+export const REDIRECT_ORIGIN: string =
+  process.env.EXPO_PUBLIC_REDIRECT_ORIGIN ||
+  (typeof location !== 'undefined' && /^https?:/.test(location.origin ?? '') ? location.origin : `${APP_SCHEME}:/`);
+
 export const STORAGE_BUCKETS = {
   covers: 'vault-covers',
   files: 'vault-files',

@@ -31,3 +31,20 @@ export function json(body: unknown, status = 200): Response {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 }
+
+/**
+ * Resolves where Stripe should redirect afterwards. Accepts the legacy
+ * `redirectScheme` (deep link) or a full `redirectOrigin` such as
+ * `https://vault.market`. http(s) origins must be listed in the
+ * ALLOWED_REDIRECT_ORIGINS secret (comma separated) when it is set.
+ */
+export function resolveRedirectOrigin(body: { redirectOrigin?: string; redirectScheme?: string }): string {
+  const origin = body.redirectOrigin ?? `${body.redirectScheme ?? 'vaultmarket'}:/`;
+  if (/^https?:\/\//.test(origin)) {
+    const allowed = (Deno.env.get('ALLOWED_REDIRECT_ORIGINS') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    if (allowed.length && !allowed.includes(origin)) throw new Error('Redirect origin is not allowed');
+    return origin.replace(/\/$/, '');
+  }
+  if (!/^[a-z][a-z0-9+.-]*:\/$/.test(origin)) throw new Error('Invalid redirect origin');
+  return origin;
+}

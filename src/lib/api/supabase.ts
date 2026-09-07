@@ -1,6 +1,6 @@
 import { File } from 'expo-file-system';
 import type { Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
-import { APP_SCHEME, STORAGE_BUCKETS } from '../config';
+import { REDIRECT_ORIGIN, STORAGE_BUCKETS } from '../config';
 import { requireSupabase } from '../supabase';
 import type { AuthUser, Backend } from './types';
 
@@ -241,7 +241,7 @@ export const supabaseBackend: Backend = {
   },
   async createCheckout(vaultId) {
     const { data, error } = await requireSupabase().functions.invoke('create-checkout', {
-      body: { vaultId, redirectScheme: APP_SCHEME },
+      body: { vaultId, redirectOrigin: REDIRECT_ORIGIN },
     });
     if (error) throw new Error(error.message);
     if (!data?.url) throw new Error('Checkout could not be started.');
@@ -337,7 +337,7 @@ export const supabaseBackend: Backend = {
   },
   async becomeSeller() {
     const { data, error } = await requireSupabase().functions.invoke('connect-onboarding', {
-      body: { redirectScheme: APP_SCHEME },
+      body: { redirectOrigin: REDIRECT_ORIGIN },
     });
     if (error) throw new Error(error.message);
     return { onboardingUrl: (data?.url as string | undefined) ?? null };
