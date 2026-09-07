@@ -9,7 +9,9 @@
 import cors from '@fastify/cors';
 import formbody from '@fastify/formbody';
 import Fastify from 'fastify';
+import { SANITY_API_TOKEN, SANITY_DATASET, SANITY_ENABLED, SANITY_PROJECT_ID } from '../../src/lib/sanity/index.ts';
 import { IS_DEMO, cfg } from './config.ts';
+import catalogRoutes from './routes/catalog.ts';
 import checkoutRoutes from './routes/checkout.ts';
 import payoutRoutes from './routes/payouts.ts';
 import webhookRoutes from './routes/webhook.ts';
@@ -26,8 +28,10 @@ app.get('/health', async () => ({
   merchantId: cfg.razorpay.merchantId || null,
   route: cfg.razorpay.route,
   webhookConfigured: !!cfg.razorpay.webhookSecret,
+  catalog: SANITY_ENABLED ? { source: 'sanity', projectId: SANITY_PROJECT_ID, dataset: SANITY_DATASET, canWrite: !!SANITY_API_TOKEN } : { source: 'none' },
 }));
 
+await app.register(catalogRoutes); // own scope: multipart parser for zip uploads
 await app.register(checkoutRoutes);
 await app.register(payoutRoutes);
 await app.register(webhookRoutes); // own plugin scope: keeps the raw JSON body for signature checks

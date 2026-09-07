@@ -61,6 +61,36 @@ function summary(p: Profile) {
   return { id: p.id, username: p.username, displayName: p.displayName, avatarUrl: p.avatarUrl };
 }
 
+/**
+ * Purchase bookkeeping exposed for the Sanity-backed catalog wrapper: vaults may
+ * not exist in local seed data, so ownership is tracked by id alone.
+ */
+export const demoStore = {
+  async user() {
+    return (await load()).user;
+  },
+  async owns(vaultId: string): Promise<boolean> {
+    const s = await load();
+    return !!s.user && s.purchases.some((p) => p.vaultId === vaultId && p.buyerId === s.user!.id);
+  },
+  async grant(vaultId: string, amountCents: number): Promise<void> {
+    const s = await load();
+    const u = requireUser(s);
+    if (s.purchases.some((p) => p.vaultId === vaultId && p.buyerId === u.id)) return;
+    const fee = Math.round((amountCents * PLATFORM_FEE_PERCENT) / 100);
+    s.purchases.push({ id: uid(), vaultId, buyerId: u.id, amountCents, feeCents: fee, createdAt: new Date().toISOString() });
+    await persist();
+  },
+  async purchases(): Promise<Purchase[]> {
+    const s = await load();
+    return s.user ? s.purchases.filter((p) => p.buyerId === s.user!.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : [];
+  },
+  async profile() {
+    const s = await load();
+    return s.user ? s.profiles.find((p) => p.id === s.user!.id) ?? null : null;
+  },
+};
+
 export const demoBackend: Backend = {
   isDemo: true,
 
@@ -172,6 +202,12 @@ export const demoBackend: Backend = {
   async getReviews(vaultId) {
     const s = await load();
     return s.reviews.filter((r) => r.vaultId === vaultId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  async getVaultNotes() {
+    return [];
+  },
+  async getNote() {
+    throw new Error('Notes are only available with the Sanity catalog.');
   },
   async addReview(vaultId, rating, body) {
     const s = await load();

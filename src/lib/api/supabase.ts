@@ -217,6 +217,12 @@ export const supabaseBackend: Backend = {
     if (error) throw new Error(error.message);
     return (data ?? []).map(toReview);
   },
+  async getVaultNotes() {
+    return [];
+  },
+  async getNote() {
+    throw new Error('Notes are only available with the Sanity catalog.');
+  },
   async addReview(vaultId, rating, body) {
     const userId = await currentUserId();
     const { data, error } = await requireSupabase()

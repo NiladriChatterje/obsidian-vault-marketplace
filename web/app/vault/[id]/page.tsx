@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Cover, ErrorBox, Loading, Price, Stars } from '@/components/ui';
+import { VaultContents } from '@/components/VaultContents';
 import { errorMessage } from '@/lib/web';
 import { useAsync } from '@shared/hooks/useAsync';
 import { api } from '@shared/lib/api';
@@ -133,6 +134,8 @@ export default function VaultPage() {
           <h2 style={{ marginBottom: 8 }}>About this vault</h2>
           <p className="prose">{v.description}</p>
         </section>
+
+        <VaultContents vaultId={v.id} owned={owned || isMine} />
 
         {v.plugins.length ? (
           <section>

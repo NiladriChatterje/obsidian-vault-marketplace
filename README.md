@@ -1,6 +1,6 @@
 # Vault Market
 
-A two-sided marketplace for Obsidian vaults, built with Expo (React Native) and TypeScript. Sellers upload a zipped vault, set a price in INR, and get paid through Razorpay Route. Buyers browse by category, plugin and tag, buy or grab free vaults, and download them into Obsidian.
+A two-sided marketplace for Obsidian vaults, built with Expo (React Native) and TypeScript. Sellers upload a zipped vault, set a price in INR, and get paid through Razorpay Route. Listings and every note inside a vault live in Sanity; Supabase handles accounts and purchases. Buyers browse by category, plugin and tag, buy or grab free vaults, and download them into Obsidian.
 
 ## Why this idea
 
@@ -32,6 +32,30 @@ npx expo start
 
 With the Supabase keys empty in `.env`, the app runs in **demo mode**: 8 sample vaults, fake auth (any email works), and instant purchases stored on the device. Every screen is usable in Expo Go. If the payment server is running (below), tapping Buy in demo mode still opens a real Razorpay **test** checkout so the flow can be tried end to end.
 
+## Content: Sanity
+
+An Obsidian vault is a folder of markdown files, so that is how it is stored. `sanity-studio/` holds the schema:
+
+| Document | What it holds |
+| --- | --- |
+| `vault` | The listing: title, slug, tagline, markdown description, category, tags, seller ref, cover URL, price (minor units), currency, status, plugins, version, `entryNote` (start-here path), note count, size, downloads and rating. |
+| `note` | One `.md` file: `path` inside the vault, title, folder, full `content`, parsed `frontmatter` (JSON), tags (frontmatter + inline `#tags`), `links` (wikilink targets), `isPreview` (readable before purchase), size. References its vault. |
+| `attachment` | Any non-markdown file (images, PDFs, `.obsidian` config) as a Sanity file asset with its path. |
+| `seller` | Public profile mirrored from Supabase (`userId`, username, display name, bio). |
+
+Uploading a zip does the conversion: the server unpacks it, strips the common root folder, parses each note, and writes `note`/`attachment` documents tagged with a bundle id. Saving the listing attaches the bundle to the vault and removes the previous contents. Downloads are zipped back together from Sanity on demand, so the original archive is never stored.
+
+**Access rules.** Note bodies are paid content, so the dataset should be **private** (`npx sanity dataset visibility set production private` in `sanity-studio/`). The app and site never call Sanity; they call the payment server, which holds `SANITY_API_TOKEN`, serves listings and note metadata publicly, and returns a note body only if it is a preview or the caller owns the vault (purchase row or seller). The MCP route uses the same shared module. `EXPO_PUBLIC_CATALOG_SOURCE=local` switches the app back to the built-in demo data.
+
+```bash
+cd sanity-studio
+npx sanity login          # once
+npm run dev               # Studio on http://localhost:3333
+node ../server/scripts/seed-sanity.ts   # sample sellers, vaults and notes (needs SANITY_API_TOKEN)
+```
+
+Studio structure: Vaults → each vault → Listing / Notes / Attachments, plus Sellers and "Unattached uploads" (bundles that were uploaded but never saved to a listing).
+
 ## Payment server (Fastify)
 
 `server/` is a small Node service that owns everything needing the Razorpay secret. The app and the site call it with the buyer's Supabase token.
@@ -44,6 +68,12 @@ With the Supabase keys empty in `.env`, the app runs in **demo mode**: 8 sample 
 | `GET /checkout/:orderId/status` | Order status for polling. |
 | `POST /webhooks/razorpay` | Verifies `X-Razorpay-Signature` over the raw body and settles or fails the order (`payment.captured`, `order.paid`, `payment.failed`). Idempotent with the callback. |
 | `POST /payouts`, `GET /payouts/status` | Seller onboarding to Razorpay Route (linked account, stakeholder, product, bank details) and activation sync. |
+| `GET /vaults`, `GET /vaults/:id`, `GET /sellers/:id/vaults` | Public catalog from Sanity (filters: `category`, `q`, `sort`, `featured`, `free`, `ids`). |
+| `GET /vaults/:id/notes`, `GET /vaults/:id/notes/*`, `GET /vaults/:id/search` | Note index (public), note body and search (preview or owners only). |
+| `GET /vaults/:id/access`, `POST /vaults/:id/claim`, `GET /me/library` | Ownership check, free-vault claim, the buyer's library. |
+| `GET /vaults/:id/download-link` → `GET /downloads/:token` | Five-minute signed link; the zip is built from the vault's notes and attachments. |
+| `POST /vaults`, `POST /vaults/:id/status`, `DELETE /vaults/:id`, `GET /me/vaults`, `GET /me/stats` | Seller listing management, written to Sanity. |
+| `POST /uploads/vault-zip` | Multipart zip → `note`/`attachment` documents; returns the bundle id the listing form saves as `filePath`. |
 
 ```bash
 cd server
@@ -52,7 +82,7 @@ npm run dev        # http://localhost:4000, reads the repo-root .env
 curl localhost:4000/health
 ```
 
-Runs on plain Node 22.18+ (TypeScript type stripping, no build step). Without Supabase keys it runs in demo mode: orders are kept in memory and purchases are granted by the client.
+Runs on plain Node 22.18+ (TypeScript type stripping, no build step); the shared Sanity module in `src/lib/sanity/` is imported directly. Without Supabase keys it runs in demo mode: orders are kept in memory, purchases are granted by the client, and the client identifies itself with an `x-demo-user` header (never expose demo mode publicly).
 
 ## Docker
 
@@ -106,7 +136,8 @@ Tools: `list_vaults`, `list_notes`, `read_note`, `search_notes`. The server unzi
    supabase link --project-ref <ref>
    supabase db push
    ```
-   This creates `profiles`, `vaults`, `purchases`, `reviews`, the RPC helpers, row-level security, and two storage buckets (`vault-covers` public, `vault-files` private with 200 MB limit).
+   After migration 0005 Supabase holds `profiles`, `purchases`, `orders`, `reviews`, `mcp_tokens`, row-level security, and the public `vault-covers` bucket. Vault ids in those tables are Sanity document ids.
+1. **Sanity.** Log in once (`npx sanity login` in `sanity-studio/`), create an Editor token at sanity.io/manage → API → Tokens, put it in `.env` as `SANITY_API_TOKEN`, make the dataset private, and optionally seed it (`node server/scripts/seed-sanity.ts`). Deploy the Studio with `npm run deploy` in `sanity-studio/`.
 2. **App env.** Copy `.env.example` to `.env` and set the Supabase URL and anon key. Restart Expo.
 3. **Razorpay.** Create a Razorpay account (KYC as an individual or business), ask support to enable **Route** on it, and put the key id / secret from Settings → API Keys into `.env` (`RAZORPAY_CLIENT_KEY`, `RAZORPAY_SECRET_KEY`, `MERCHANT_ID`). Deploy `server/` somewhere public (any Node host), set `EXPO_PUBLIC_API_URL` to its URL, and in the Razorpay dashboard add a webhook pointing at `<api>/webhooks/razorpay` with events `payment.captured`, `order.paid`, `payment.failed`; put the secret you choose there into `RAZORPAY_WEBHOOK_SECRET`. Set `RAZORPAY_ROUTE=off` to sell before Route is enabled (the platform then settles sellers manually).
 4. **Redirects.** After checkout the server redirects to `<redirectOrigin>/checkout-result?status=success|failed|cancelled&vault=…&payment=pay_…`. The site passes its own origin; the app passes `vaultmarket:/`, so the in-app browser sheet closes on `vaultmarket://checkout-result`. Restrict accepted origins with `ALLOWED_REDIRECT_ORIGINS`.
@@ -143,18 +174,25 @@ app/
 src/
   lib/api/types.ts       Backend interface the UI depends on
   lib/api/demo.ts        In-memory backend with seed data
-  lib/api/supabase.ts    Production backend
+  lib/api/supabase.ts    Production backend (auth, reviews, uploads of covers)
+  lib/api/catalog.ts     Points listings/notes/library at the payment server (Sanity)
+  lib/sanity/            Shared GROQ queries, mappers, markdown parsing, writes (server-side only)
   lib/config.ts          Env, fee percent, INR minimum price, demo flag
   lib/payouts.ts         Payout form fields + validation shared by app and web
   store/auth.tsx         Session + profile context
   components/            UI kit, vault cards
+sanity-studio/
+  schemaTypes/           vault, note, attachment, seller
+  structure.ts           Vaults → notes/attachments desk structure
 supabase/
-  migrations/0001_init.sql, 0002_mcp_tokens.sql, 0003_razorpay.sql, 0004_orders.sql
+  migrations/0001_init.sql … 0005_sanity_catalog.sql
 server/
   src/index.ts           Fastify bootstrap
   src/routes/checkout.ts Orders, hosted Checkout.js page, signature callback, status
   src/routes/webhook.ts  Razorpay webhook (raw-body HMAC)
   src/routes/payouts.ts  Route linked-account onboarding
+  src/routes/catalog.ts  Sanity catalog, notes, uploads, downloads, seller CRUD
+  scripts/seed-sanity.ts Seeds sample vaults + notes into Sanity
   src/orders.ts          Order + purchase bookkeeping (Supabase or in-memory demo)
 web/
   app/                   Next.js pages: explore, browse, vault, library, sell, connect (MCP), auth

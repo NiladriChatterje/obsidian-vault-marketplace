@@ -30,6 +30,14 @@ export const APP_SCHEME = 'vaultmarket';
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
 
 /**
+ * Where listings and notes come from. 'sanity' routes the catalog through the
+ * payment server (which reads the private Sanity dataset); 'local' keeps the
+ * built-in demo data / Supabase tables. Defaults to sanity whenever a server is configured.
+ */
+export const CATALOG_SOURCE: 'sanity' | 'local' =
+  process.env.EXPO_PUBLIC_CATALOG_SOURCE === 'local' || !API_URL ? 'local' : 'sanity';
+
+/**
  * Where the payment server sends the buyer after checkout.
  * Native builds use the deep-link scheme; the Next.js site (web/) sets
  * EXPO_PUBLIC_REDIRECT_ORIGIN to its own https origin, falling back to the

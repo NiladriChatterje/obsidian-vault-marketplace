@@ -12,6 +12,7 @@ import { getOrder, markOrderFailed, saveOrder, settleOrder, type Order } from '.
 import { razorpay, razorpayError, verifyPaymentSignature } from '../razorpay.ts';
 import { resolveReturnOrigin, returnUrl } from '../redirect.ts';
 import { admin, userFromRequest } from '../supabase.ts';
+import { SANITY_ENABLED, getVault } from '../../../src/lib/sanity/index.ts';
 
 interface CheckoutBody {
   vaultId: string;
@@ -66,22 +67,19 @@ export default async function checkoutRoutes(app: FastifyInstance) {
         const user = await userFromRequest(req);
         if (!user) return reply.code(401).send({ error: 'Not signed in' });
 
-        const { data: vault, error } = await admin()
-          .from('vaults')
-          .select('id, title, price_cents, currency, status, seller_id, seller:profiles!vaults_seller_id_fkey(razorpay_account_id, payouts_enabled)')
-          .eq('id', vaultId)
-          .maybeSingle();
-        if (error) throw new Error(error.message);
-        if (!vault) return reply.code(404).send({ error: 'Vault not found' });
-        if (vault.status !== 'published') return reply.code(400).send({ error: 'Vault is not available' });
-        if (vault.price_cents <= 0) return reply.code(400).send({ error: 'This vault is free; use claim_free_vault' });
-        if (vault.seller_id === user.id) return reply.code(400).send({ error: 'You already own this vault' });
+        if (!SANITY_ENABLED) return reply.code(501).send({ error: 'Catalog is not configured' });
+        const v = await getVault(vaultId);
+        if (!v) return reply.code(404).send({ error: 'Vault not found' });
+        if (v.status !== 'published') return reply.code(400).send({ error: 'Vault is not available' });
+        if (v.priceCents <= 0) return reply.code(400).send({ error: 'This vault is free; claim it instead' });
+        if (v.sellerId === user.id) return reply.code(400).send({ error: 'You already own this vault' });
 
         const { data: owned } = await admin().from('purchases').select('id').eq('vault_id', vaultId).eq('buyer_id', user.id).maybeSingle();
         if (owned) return reply.code(400).send({ error: 'You already own this vault' });
 
+        const vault = { id: v.id, title: v.title, price_cents: v.priceCents, currency: v.currency };
         const fee = platformFee(vault.price_cents);
-        const seller = Array.isArray(vault.seller) ? vault.seller[0] : vault.seller;
+        const { data: seller } = await admin().from('profiles').select('razorpay_account_id, payouts_enabled').eq('id', v.sellerId).maybeSingle();
         if (cfg.razorpay.route) {
           if (!seller?.razorpay_account_id || !seller.payouts_enabled) {
             return reply.code(400).send({ error: 'This seller has not finished payout setup yet' });

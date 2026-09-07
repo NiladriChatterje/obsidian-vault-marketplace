@@ -8,6 +8,8 @@ import type {
   SellerStats,
   Vault,
   VaultInput,
+  VaultNote,
+  VaultNoteContent,
   VaultStatus,
 } from '../../types';
 
@@ -42,6 +44,10 @@ export interface Backend {
   getVault(id: string): Promise<Vault | null>;
   getSellerVaults(sellerId: string): Promise<Vault[]>;
   getReviews(vaultId: string): Promise<Review[]>;
+  /** Files inside the vault (metadata only). Empty when the catalog has no note index. */
+  getVaultNotes(vaultId: string): Promise<VaultNote[]>;
+  /** One note's markdown. Preview notes are public; the rest need ownership. */
+  getNote(vaultId: string, path: string): Promise<VaultNoteContent>;
   addReview(vaultId: string, rating: number, body: string): Promise<Review>;
 
   // Buying

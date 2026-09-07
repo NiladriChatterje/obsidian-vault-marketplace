@@ -41,7 +41,8 @@
       "expo-file-system": [
         "./shims/expo-file-system.ts"
       ]
-    }
+    },
+    "allowImportingTsExtensions": true
   },
   "include": [
     "next-env.d.ts",

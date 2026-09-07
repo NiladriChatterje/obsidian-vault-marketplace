@@ -10,7 +10,7 @@ web/.next
 android
 ios
 assets
-server
 supabase
 app
+sanity-studio
 *.md

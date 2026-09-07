@@ -72,8 +72,10 @@ export interface Vault {
   noteCount: number;
   sizeBytes: number;
   version: string;
-  /** Private storage path of the vault zip. */
+  /** Id of the upload bundle whose notes make up this vault (was: storage path of the zip). */
   filePath?: string | null;
+  /** Path of the note buyers should open first, e.g. "Home.md". */
+  entryNote?: string | null;
   status: VaultStatus;
   downloads: number;
   ratingAvg: number;
@@ -98,9 +100,27 @@ export type VaultInput = Pick<
   coverUrl?: string | null;
   screenshots?: string[];
   filePath?: string | null;
+  entryNote?: string | null;
   sizeBytes?: number;
   status?: VaultStatus;
 };
+
+/** One markdown file inside a vault (metadata only; the body is fetched separately). */
+export interface VaultNote {
+  path: string;
+  title: string;
+  folder: string;
+  /** Readable before purchase. */
+  isPreview: boolean;
+  sizeBytes: number;
+  tags: string[];
+  links: string[];
+}
+
+export interface VaultNoteContent extends VaultNote {
+  content: string;
+  frontmatter: Record<string, unknown>;
+}
 
 export interface Purchase {
   id: string;

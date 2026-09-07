@@ -2,9 +2,10 @@
  * Server side of MCP access. Runs only inside app/api/mcp (Node runtime).
  *
  * A bearer token identifies the buyer; the tools then operate on the vaults
- * that buyer owns (purchases + their own listings). Vault zips are pulled from
- * the private `vault-files` bucket with the service role key, unpacked in
- * memory and cached per process.
+ * that buyer owns (purchases + their own listings). Vault contents come from
+ * Sanity through the shared catalog module (the dataset is private; this code
+ * holds SANITY_API_TOKEN). Without Sanity it falls back to the legacy zip in
+ * Supabase storage, and in demo mode to synthetic notes.
  */
 import { McpServer } from '@modelcontextprotocol/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -13,28 +14,19 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { STORAGE_BUCKETS } from '@shared/lib/config';
 import { DEMO_VAULTS } from '@shared/lib/demo-data';
+import * as sanityCatalog from '@shared/lib/sanity/index.ts';
+import type { Vault } from '@shared/types';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
 export const IS_DEMO = !SUPABASE_URL || !process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const USE_SANITY = sanityCatalog.SANITY_ENABLED;
 
 const TEXT_EXT = /\.(md|markdown|canvas|txt|base|csv|json)$/i;
 const MAX_NOTE_BYTES = 2 * 1024 * 1024;
 const CACHE_LIMIT = 8;
 
-interface OwnedVault {
-  id: string;
-  title: string;
-  tagline: string;
-  description: string;
-  version: string;
-  noteCount: number;
-  plugins: string[];
-  tags: string[];
-  filePath: string | null;
-  updatedAt: string;
-}
-
+type OwnedVault = Pick<Vault, 'id' | 'title' | 'tagline' | 'description' | 'version' | 'noteCount' | 'plugins' | 'tags' | 'filePath' | 'updatedAt' | 'entryNote'>;
 type Notes = Map<string, string>;
 
 let admin: SupabaseClient | null = null;
@@ -62,30 +54,27 @@ export async function resolveUser(token: string): Promise<string | null> {
 
 /* ---------- vault access ---------- */
 
-async function ownedVaults(userId: string): Promise<OwnedVault[]> {
-  if (IS_DEMO) {
-    return DEMO_VAULTS.filter((v) => v.status === 'published').map((v) => ({
-      id: v.id,
-      title: v.title,
-      tagline: v.tagline,
-      description: v.description,
-      version: v.version,
-      noteCount: v.noteCount,
-      plugins: v.plugins,
-      tags: v.tags,
-      filePath: null,
-      updatedAt: v.updatedAt,
-    }));
-  }
-  const sb = adminClient();
-  const { data: purchases, error } = await sb.from('purchases').select('vault_id').eq('buyer_id', userId);
+async function purchasedVaultIds(userId: string): Promise<string[]> {
+  const { data, error } = await adminClient().from('purchases').select('vault_id').eq('buyer_id', userId);
   if (error) throw new Error(error.message);
-  const ids = new Set((purchases ?? []).map((p: { vault_id: string }) => p.vault_id));
-  const { data: vaults, error: vErr } = await sb
+  return (data ?? []).map((p: { vault_id: string }) => p.vault_id);
+}
+
+async function ownedVaults(userId: string): Promise<OwnedVault[]> {
+  if (USE_SANITY) {
+    if (IS_DEMO) return sanityCatalog.listVaults({ limit: 100 }); // demo purchases live in the browser
+    const [bought, mine] = await Promise.all([purchasedVaultIds(userId).then(sanityCatalog.getVaultsByIds), sanityCatalog.getSellerVaults(userId, true)]);
+    const seen = new Set<string>();
+    return [...bought, ...mine].filter((v) => (seen.has(v.id) ? false : (seen.add(v.id), true)));
+  }
+  if (IS_DEMO) return DEMO_VAULTS.filter((v) => v.status === 'published');
+  // Legacy: vaults table + zip in storage.
+  const ids = new Set(await purchasedVaultIds(userId));
+  const { data: vaults, error } = await adminClient()
     .from('vaults')
     .select('id, title, tagline, description, version, note_count, plugins, tags, file_path, updated_at, seller_id')
     .or(`seller_id.eq.${userId}${ids.size ? `,id.in.(${[...ids].join(',')})` : ''}`);
-  if (vErr) throw new Error(vErr.message);
+  if (error) throw new Error(error.message);
   return (vaults ?? []).map((r: Record<string, any>) => ({
     id: r.id,
     title: r.title,
@@ -97,6 +86,7 @@ async function ownedVaults(userId: string): Promise<OwnedVault[]> {
     tags: r.tags ?? [],
     filePath: r.file_path,
     updatedAt: r.updated_at,
+    entryNote: null,
   }));
 }
 
@@ -111,20 +101,24 @@ const cache = new Map<string, Notes>();
 function demoNotes(v: OwnedVault): Notes {
   const notes: Notes = new Map();
   notes.set('Home.md', `# ${v.title}\n\n> ${v.tagline}\n\n${v.description}\n\n## Start here\n- [[Getting started]]\n- [[Templates/Daily note]]\n- [[About this vault]]\n`);
-  notes.set('About this vault.md', `# About this vault\n\n- Version: ${v.version}\n- Plugins: ${v.plugins.join(', ') || 'none'}\n- Tags: ${v.tags.map((t) => `#${t}`).join(' ')}\n\nThis is demo content served by Vault Market in demo mode. Buy or upload a real vault to see its notes here.\n`);
-  notes.set('Getting started.md', `# Getting started\n\n1. Unzip the vault into your Obsidian vaults folder.\n2. Open it in Obsidian and enable the plugins listed in [[About this vault]].\n3. Read [[Home]] and follow the links.\n`);
-  notes.set('Templates/Daily note.md', `---\ntags: [daily]\n---\n# {{date}}\n\n## Focus\n- \n\n## Log\n- \n\n## Review\n- \n`);
+  notes.set('About this vault.md', `# About this vault\n\n- Version: ${v.version}\n- Plugins: ${v.plugins.join(', ') || 'none'}\n- Tags: ${v.tags.map((t) => `#${t}`).join(' ')}\n\nThis is demo content served by Vault Market in demo mode.\n`);
+  notes.set('Getting started.md', `# Getting started\n\n1. Unzip the vault into your Obsidian vaults folder.\n2. Enable the plugins listed in [[About this vault]].\n3. Read [[Home]] and follow the links.\n`);
+  notes.set('Templates/Daily note.md', `---\ntags: [daily]\n---\n# {{date}}\n\n## Focus\n- \n\n## Log\n- \n`);
   return notes;
 }
 
-/** Text files of a vault, keyed by path inside the vault (top-level zip folder stripped). */
+/** Text files of a vault, keyed by path inside the vault. */
 async function loadNotes(v: OwnedVault): Promise<Notes> {
   const key = `${v.id}:${v.updatedAt}`;
   const hit = cache.get(key);
   if (hit) return hit;
 
   let notes: Notes;
-  if (IS_DEMO || !v.filePath) {
+  if (USE_SANITY) {
+    const rows = await sanityCatalog.getAllNoteContents(v.id);
+    notes = new Map(rows.map((r) => [r.path, r.content ?? '']));
+    if (!notes.size && IS_DEMO) notes = demoNotes(v);
+  } else if (IS_DEMO || !v.filePath) {
     notes = demoNotes(v);
   } else {
     const { data, error } = await adminClient().storage.from(STORAGE_BUCKETS.files).download(v.filePath);
@@ -132,14 +126,9 @@ async function loadNotes(v: OwnedVault): Promise<Notes> {
     const files = unzipSync(new Uint8Array(await data.arrayBuffer()), {
       filter: (f) => TEXT_EXT.test(f.name) && f.originalSize <= MAX_NOTE_BYTES && !/(^|\/)(\.obsidian|\.trash|__MACOSX|node_modules)\//.test(f.name) && !/(^|\/)\./.test(f.name),
     });
-    const paths = Object.keys(files);
-    const first = paths[0]?.split('/')[0];
-    const stripRoot = !!first && paths.length > 0 && paths.every((p) => p.startsWith(`${first}/`));
+    const strip = sanityCatalog.stripCommonRoot(Object.keys(files));
     const decoder = new TextDecoder('utf-8');
-    notes = new Map();
-    for (const p of paths) {
-      notes.set(stripRoot ? p.slice(first.length + 1) : p, decoder.decode(files[p]));
-    }
+    notes = new Map(Object.entries(files).map(([p, bytes]) => [strip(p), decoder.decode(bytes)]));
   }
 
   if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value!);
@@ -159,20 +148,20 @@ function fail(e: unknown) {
 
 /** One server per request, bound to the authenticated buyer. */
 export function buildServer(userId: string): McpServer {
-  const server = new McpServer({ name: 'vault-market', version: '1.0.0' });
+  const server = new McpServer({ name: 'vault-market', version: '1.1.0' });
 
   server.registerTool(
     'list_vaults',
     {
       title: 'List owned vaults',
-      description: 'Lists the Obsidian vaults this user has bought or published on Vault Market, with their ids.',
+      description: 'Lists the Obsidian vaults this user has bought or published on Vault Market, with their ids and start-here note.',
       inputSchema: z.object({}),
     },
     async () => {
       try {
         const vaults = await ownedVaults(userId);
         if (!vaults.length) return text('No vaults yet. Buy or grab a free vault on Vault Market first.');
-        return text(vaults.map((v) => `- ${v.title} (id: ${v.id}, v${v.version}, ~${v.noteCount} notes)\n  ${v.tagline}`).join('\n'));
+        return text(vaults.map((v) => `- ${v.title} (id: ${v.id}, v${v.version}, ~${v.noteCount} notes${v.entryNote ? `, start: ${v.entryNote}` : ''})\n  ${v.tagline}`).join('\n'));
       } catch (e) {
         return fail(e);
       }
@@ -206,7 +195,7 @@ export function buildServer(userId: string): McpServer {
     'read_note',
     {
       title: 'Read a note',
-      description: 'Returns the full text of one note by path.',
+      description: 'Returns the full markdown of one note by path.',
       inputSchema: z.object({
         vault_id: z.string(),
         path: z.string().describe('Path from list_notes, e.g. "Templates/Daily note.md"'),

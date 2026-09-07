@@ -1,0 +1,4 @@
+{
+  "type": "module",
+  "description": "Makes Node treat this shared folder as ESM (imported by server/ and web/ at runtime)."
+}
