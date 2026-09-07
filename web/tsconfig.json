@@ -24,37 +24,9 @@
     ],
     "paths": {
       "@/*": [
-        "./*"
-      ],
-      "@shared/*": [
-        "../src/*"
-      ],
-      "react-native": [
-        "./shims/react-native.ts"
-      ],
-      "react-native-url-polyfill/auto": [
-        "./shims/empty.ts"
-      ],
-      "@react-native-async-storage/async-storage": [
-        "./shims/async-storage.ts"
-      ],
-      "expo-file-system": [
-        "./shims/expo-file-system.ts"
-      ],
-      "react": [
-        "./node_modules/@types/react"
-      ],
-      "react/*": [
-        "./node_modules/@types/react/*"
-      ],
-      "@supabase/supabase-js": [
-        "./node_modules/@supabase/supabase-js/dist/index.d.cts"
-      ],
-      "@sanity/client": [
-        "./node_modules/@sanity/client/dist/index.d.ts"
+        "./src/*"
       ]
-    },
-    "allowImportingTsExtensions": true
+    }
   },
   "include": [
     "next-env.d.ts",

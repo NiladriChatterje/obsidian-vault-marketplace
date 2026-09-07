@@ -10,9 +10,9 @@ import { config as loadEnv } from 'dotenv';
 import path from 'node:path';
 loadEnv({ path: path.resolve(import.meta.dirname, '../../.env'), quiet: true });
 
-const { DEMO_SELLERS, DEMO_VAULTS } = await import('../../src/lib/demo-data.ts');
-const { parseNote } = await import('../../src/lib/sanity/markdown.ts');
-const { requireWriteToken, sanity, useSanityClientFactory, SANITY_DATASET, SANITY_PROJECT_ID } = await import('../../src/lib/sanity/client.ts');
+const { DEMO_SELLERS, DEMO_VAULTS } = await import('../src/demo-data.ts');
+const { parseNote } = await import('../src/sanity/markdown.ts');
+const { requireWriteToken, sanity, useSanityClientFactory, SANITY_DATASET, SANITY_PROJECT_ID } = await import('../src/sanity/client.ts');
 const { createClient } = await import('@sanity/client');
 
 useSanityClientFactory(createClient);

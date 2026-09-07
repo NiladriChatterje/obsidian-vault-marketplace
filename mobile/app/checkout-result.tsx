@@ -3,8 +3,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button } from '../../src/components/ui';
-import { colors, spacing } from '../../src/theme';
+import { Button } from '../src/components/ui';
+import { colors, spacing } from '../src/theme';
 
 /** Deep-link target the payment server redirects to after a Razorpay order settles, fails or is cancelled. */
 export default function CheckoutResultScreen() {

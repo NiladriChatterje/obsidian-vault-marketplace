@@ -4,10 +4,10 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Avatar, Button, Card, EmptyState, Input, SectionTitle } from '../../../src/components/ui';
-import { api } from '../../../src/lib/api';
-import { useAuth } from '../../../src/store/auth';
-import { colors, radius, spacing } from '../../../src/theme';
+import { Avatar, Button, Card, EmptyState, Input, SectionTitle } from '../../src/components/ui';
+import { api } from '../../src/lib/api';
+import { useAuth } from '../../src/store/auth';
+import { colors, radius, spacing } from '../../src/theme';
 
 export default function ProfileScreen() {
   const router = useRouter();

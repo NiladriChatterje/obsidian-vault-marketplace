@@ -12,7 +12,7 @@ import { getOrder, markOrderFailed, saveOrder, settleOrder, type Order } from '.
 import { razorpay, razorpayError, verifyPaymentSignature } from '../razorpay.ts';
 import { resolveReturnOrigin, returnUrl } from '../redirect.ts';
 import { admin, userFromRequest } from '../supabase.ts';
-import { SANITY_ENABLED, getVault } from '../../../src/lib/sanity/index.ts';
+import { SANITY_ENABLED, getVault } from '../sanity/index.ts';
 
 interface CheckoutBody {
   vaultId: string;

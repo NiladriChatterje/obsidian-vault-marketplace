@@ -6,9 +6,7 @@
 # in .env requires `docker compose build web`. Server values are read at runtime.
 services:
   api:
-    build:
-      context: .
-      dockerfile: server/Dockerfile
+    build: ./server
     env_file: .env
     environment:
       API_PORT: 4000
@@ -18,8 +16,7 @@ services:
 
   web:
     build:
-      context: .
-      dockerfile: web/Dockerfile
+      context: ./web
       args:
         EXPO_PUBLIC_SUPABASE_URL: ${EXPO_PUBLIC_SUPABASE_URL:-}
         EXPO_PUBLIC_SUPABASE_ANON_KEY: ${EXPO_PUBLIC_SUPABASE_ANON_KEY:-}

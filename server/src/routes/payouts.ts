@@ -28,10 +28,21 @@ const str = { type: 'string', minLength: 1 } as const;
 const detailsSchema = {
   type: 'object',
   required: ['legalName', 'phone', 'pan', 'street', 'city', 'state', 'postalCode', 'accountNumber', 'ifsc', 'beneficiaryName'],
-  properties: Object.fromEntries(
-    ['legalName', 'phone', 'pan', 'street', 'city', 'state', 'postalCode', 'accountNumber', 'ifsc', 'beneficiaryName'].map((k) => [k, str])
-  ),
+  properties: {
+    ...Object.fromEntries(['legalName', 'pan', 'street', 'city', 'state', 'postalCode', 'accountNumber', 'ifsc', 'beneficiaryName'].map((k) => [k, str])),
+    // Country code is mandatory: E.164 with an optional space/dash formatting already stripped by the client.
+    phone: { type: 'string', pattern: '^\\+[1-9][0-9]{7,14}$' },
+  },
 };
+
+/**
+ * Razorpay linked accounts expect the national number for Indian sellers
+ * (10 digits) and digits without "+" otherwise.
+ */
+function razorpayPhone(e164: string): string {
+  const digits = e164.replace(/\D/g, '');
+  return digits.startsWith('91') && digits.length === 12 ? digits.slice(2) : digits;
+}
 
 export default async function payoutRoutes(app: FastifyInstance) {
   app.post<{ Body: { details: PayoutDetails } }>(
@@ -73,7 +84,7 @@ async function onboard(user: AuthUser, details?: PayoutDetails): Promise<{ statu
 
   if (!accountId) {
     if (!details) return { status: 'none', requirements: [] };
-    const phone = details.phone.replace(/\D/g, '').slice(-10);
+    const phone = razorpayPhone(details.phone);
     const pan = details.pan.toUpperCase();
 
     const account = (await razorpay.accounts.create({

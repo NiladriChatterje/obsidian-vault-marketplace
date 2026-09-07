@@ -1,8 +1,8 @@
 /**
  * Vault Market payment server (Fastify).
- * Owns everything that needs the Razorpay secret: creating orders, hosting the
- * checkout page, verifying payment signatures, receiving webhooks, and
- * onboarding sellers to Razorpay Route.
+ * Owns everything with a secret: Razorpay orders, the hosted checkout page,
+ * payment signatures and webhooks, seller onboarding to Razorpay Route, the
+ * Sanity-backed vault catalog, and the MCP endpoint over purchased vaults.
  *
  *   npm run dev      # reads ../.env, restarts on change
  */
@@ -11,10 +11,11 @@ import cors from '@fastify/cors';
 import formbody from '@fastify/formbody';
 import Fastify from 'fastify';
 import { createClient } from '@sanity/client';
-import { SANITY_API_TOKEN, SANITY_DATASET, SANITY_ENABLED, SANITY_PROJECT_ID, useSanityClientFactory } from '../../src/lib/sanity/index.ts';
+import { SANITY_API_TOKEN, SANITY_DATASET, SANITY_ENABLED, SANITY_PROJECT_ID, useSanityClientFactory } from './sanity/index.ts';
 import { IS_DEMO, cfg } from './config.ts';
 import catalogRoutes from './routes/catalog.ts';
 import checkoutRoutes from './routes/checkout.ts';
+import mcpRoutes from './routes/mcp.ts';
 import payoutRoutes from './routes/payouts.ts';
 import webhookRoutes from './routes/webhook.ts';
 
@@ -39,6 +40,7 @@ await app.register(catalogRoutes); // own scope: multipart parser for zip upload
 await app.register(checkoutRoutes);
 await app.register(payoutRoutes);
 await app.register(webhookRoutes); // own plugin scope: keeps the raw JSON body for signature checks
+await app.register(mcpRoutes); // own plugin scope: raw JSON for the MCP SDK
 
 app.setErrorHandler((err: Error & { statusCode?: number }, req, reply) => {
   req.log.error(err);

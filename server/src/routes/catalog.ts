@@ -21,8 +21,8 @@
 import multipart from '@fastify/multipart';
 import type { FastifyInstance } from 'fastify';
 import { unzipSync } from 'fflate';
-import type { CategorySlug, SortMode, VaultInput, VaultStatus } from '../../../src/types.ts';
-import * as catalog from '../../../src/lib/sanity/index.ts';
+import type { CategorySlug, SortMode, VaultInput, VaultStatus } from '../types.ts';
+import * as catalog from '../sanity/index.ts';
 import { ownsVault, requester, requireRequester, sellerProfile } from '../access.ts';
 import { IS_DEMO, cfg, platformFee } from '../config.ts';
 import { buildVaultZip, signDownload, verifyDownload } from '../download.ts';

@@ -3,13 +3,13 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { VaultRow, VaultTile } from '../../../src/components/VaultCard';
-import { ErrorBox, Loading, SectionTitle } from '../../../src/components/ui';
-import { useAsync } from '../../../src/hooks/useAsync';
-import { api } from '../../../src/lib/api';
-import { useAuth } from '../../../src/store/auth';
-import { colors, radius, spacing } from '../../../src/theme';
-import { CATEGORIES } from '../../../src/types';
+import { VaultRow, VaultTile } from '../../src/components/VaultCard';
+import { ErrorBox, Loading, SectionTitle } from '../../src/components/ui';
+import { useAsync } from '../../src/hooks/useAsync';
+import { api } from '../../src/lib/api';
+import { useAuth } from '../../src/store/auth';
+import { colors, radius, spacing } from '../../src/theme';
+import { CATEGORIES } from '../../src/types';
 
 export default function ExploreScreen() {
   const router = useRouter();

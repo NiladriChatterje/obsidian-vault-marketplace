@@ -30,7 +30,7 @@ cd mobile && npm install --legacy-peer-deps
 npm start                        # expo start, reading ../.env
 ```
 
-`mobile/`, `web/`, `server/`, `sanity-studio/` and `supabase/` are independent projects with their own `package.json`; there is no root install. `src/` at the repo root is plain shared TypeScript with no dependencies of its own: each consumer resolves the packages it imports (`mobile/metro.config.js` and `mobile/tsconfig.json`, `web/next.config.ts` aliases, and the Sanity module receives its client via `useSanityClientFactory`).
+`mobile/`, `web/`, `server/`, `sanity-studio/` and `supabase/` are independent projects with their own `package.json` and no shared code folder; there is no root install. The app and the site each carry their own copy of the small data layer (types, config, formatting, the `Backend` interface and its demo/Supabase/server-catalog implementations), so a change to the API contract is made in `mobile/src` and `web/src` alike.
 
 With the Supabase keys empty in `.env`, the app runs in **demo mode**: 8 sample vaults, fake auth (any email works), and instant purchases stored on the device. Every screen is usable in Expo Go. If the payment server is running (below), tapping Buy in demo mode still opens a real Razorpay **test** checkout so the flow can be tried end to end.
 
@@ -76,6 +76,7 @@ Studio structure: Vaults → each vault → Listing / Notes / Attachments, plus 
 | `GET /vaults/:id/download-link` → `GET /downloads/:token` | Five-minute signed link; the zip is built from the vault's notes and attachments. |
 | `POST /vaults`, `POST /vaults/:id/status`, `DELETE /vaults/:id`, `GET /me/vaults`, `GET /me/stats` | Seller listing management, written to Sanity. |
 | `POST /uploads/vault-zip` | Multipart zip → `note`/`attachment` documents; returns the bundle id the listing form saves as `filePath`. |
+| `/mcp` | Model Context Protocol endpoint (Streamable HTTP) over the caller's purchased vaults. |
 
 ```bash
 cd server
@@ -84,7 +85,7 @@ npm run dev        # http://localhost:4000, reads the repo-root .env
 curl localhost:4000/health
 ```
 
-Runs on plain Node 22.18+ (TypeScript type stripping, no build step); the shared Sanity module in `src/lib/sanity/` is imported directly. Without Supabase keys it runs in demo mode: orders are kept in memory, purchases are granted by the client, and the client identifies itself with an `x-demo-user` header (never expose demo mode publicly).
+Runs on plain Node 22.18+ (TypeScript type stripping, no build step). Without Supabase keys it runs in demo mode: orders are kept in memory, purchases are granted by the client, and the client identifies itself with an `x-demo-user` header (never expose demo mode publicly).
 
 ## Docker
 
@@ -95,7 +96,7 @@ docker compose up --build      # web on :3000, api on :4000
 docker compose logs -f api
 ```
 
-`server/Dockerfile` runs the TypeScript sources directly on Node 24 (no build step). `web/Dockerfile` uses the repo root as build context because the site imports `../src`, builds Next.js in standalone mode, and inlines the `EXPO_PUBLIC_*` values as build args (compose passes them from `.env`). Rebuild the web image after changing those; server values are read at runtime. The Expo app is not containerised: run it with `npm start` in `mobile/` against the running api.
+`server/Dockerfile` runs the TypeScript sources directly on Node 24 (no build step). `web/Dockerfile` builds Next.js in standalone mode and inlines the `EXPO_PUBLIC_*` values as build args (compose passes them from `.env`). Each image builds from its own folder. Rebuild the web image after changing those; server values are read at runtime. The Expo app is not containerised: run it with `npm start` in `mobile/` against the running api.
 
 ```bash
 cd mobile
@@ -105,7 +106,7 @@ npx expo-doctor
 
 ## Website (Next.js)
 
-`web/` is the same marketplace as a website: sellers list vaults at their price, buyers pay through Razorpay Checkout (via the payment server), then download the zip or connect the vault to an AI assistant over MCP. It reuses the app's data layer (`src/lib`, `src/store`, `src/types`) directly; four tiny shims in `web/shims/` stand in for the React Native modules that layer touches, wired up in `web/next.config.ts`.
+`web/` is the same marketplace as a website: sellers list vaults at their price, buyers pay through Razorpay Checkout (via the payment server), then download the zip or connect the vault to an AI assistant over MCP. It is a plain Next.js project under `web/src/` with a browser-native copy of the app's data layer and no server-side secrets.
 
 ```bash
 cd web
@@ -114,23 +115,22 @@ npm run dev        # http://localhost:3000, demo mode until the repo-root .env h
 npm run build
 ```
 
-The site reads the repo-root `.env`. Two extra keys matter for it:
+The site reads the repo-root `.env` (and its own `web/.env*` files). Keys that matter for it:
 
 | Key | Purpose |
 | --- | --- |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-only. Lets `web/app/api/mcp` resolve access tokens and stream vault zips. |
+| `EXPO_PUBLIC_API_URL` | Base URL of the payment server (`server/`); every data call from the browser goes there. |
 | `EXPO_PUBLIC_REDIRECT_ORIGIN` | Optional. Where the payment server sends buyers back (defaults to the browser origin). Also list it in `ALLOWED_REDIRECT_ORIGINS`. |
-| `EXPO_PUBLIC_API_URL` | Base URL of the payment server (`server/`). |
 
 ### MCP access
 
-Every buyer gets a personal token at `/connect` (only its SHA-256 hash is stored, table `mcp_tokens`, migration `0002`). Point any Model Context Protocol client at `https://<site>/api/mcp` with `Authorization: Bearer <token>`:
+Every buyer gets a personal token at `/connect` (only its SHA-256 hash is stored, table `mcp_tokens`, migration `0002`). The endpoint is served by the payment server. Point any Model Context Protocol client at `https://<api>/mcp` with `Authorization: Bearer <token>`:
 
 ```bash
-claude mcp add --transport http vault-market https://<site>/api/mcp --header "Authorization: Bearer vm_..."
+claude mcp add --transport http vault-market https://<api>/mcp --header "Authorization: Bearer vm_..."
 ```
 
-Tools: `list_vaults`, `list_notes`, `read_note`, `search_notes`. The server unzips the purchased vault in memory (text files only) and caches it per process. In demo mode the endpoint accepts `vm_demo_token` and serves synthetic notes for the sample vaults.
+Tools: `list_vaults`, `list_notes`, `read_note`, `search_notes`, all reading the vault's notes from Sanity. In demo mode the endpoint accepts `vm_demo_token`.
 
 ## Going live
 
@@ -157,52 +157,33 @@ Free vaults skip Razorpay: `claim_free_vault` inserts the purchase row directly 
 
 ### Seller onboarding
 
-Sellers fill in one form (`/sell/payouts` on both app and web): legal name, phone, PAN, address, bank account, IFSC. `POST /payouts` on the server creates a Razorpay **linked account** (`POST /v2/accounts`), a stakeholder, requests the `route` product and attaches the settlement bank details. Razorpay reviews the account; `profiles.payouts_enabled` flips to true once `activation_status` is `activated` (the function re-syncs it whenever the Sell screen opens). Until then the seller can list free vaults but paid checkout is refused server-side.
+Sellers fill in one form (`/sell/payouts` on both app and web): legal name, mobile number with country code (E.164, e.g. +91…), PAN, address, bank account, IFSC. `POST /payouts` on the server creates a Razorpay **linked account** (`POST /v2/accounts`), a stakeholder, requests the `route` product and attaches the settlement bank details. Razorpay reviews the account; `profiles.payouts_enabled` flips to true once `activation_status` is `activated` (the function re-syncs it whenever the Sell screen opens). Until then the seller can list free vaults but paid checkout is refused server-side.
 
 ## Project layout
 
 ```
-mobile/                  Expo app (app/ routes, assets, app.json, metro.config.js)
-app/
-  (tabs)/index.tsx       Explore: search, featured, categories, trending, free, new
-  (tabs)/library.tsx     Everything the user owns, with download
-  (tabs)/sell.tsx        Seller pitch, payout status, dashboard, listings
-  sell/payouts.tsx       Razorpay linked-account (KYC + bank) form
-  (tabs)/profile.tsx     Account, public profile, sign out
-  browse.tsx             Search and filter results
-  vault/[id].tsx         Listing detail, buy/get/download, reviews
-  seller/[id].tsx        Public seller page
-  sell/[id].tsx          Create or edit a listing (id = "new")
-  auth.tsx               Sign in / sign up modal
-  checkout-result.tsx    Deep-link target after Razorpay checkout
-src/                     Shared by mobile, web and server (no dependencies of its own)
-  lib/api/types.ts       Backend interface the UI depends on
-  lib/api/demo.ts        In-memory backend with seed data
-  lib/api/supabase.ts    Production backend (auth, reviews, uploads of covers)
-  lib/api/catalog.ts     Points listings/notes/library at the payment server (Sanity)
-  lib/sanity/            Shared GROQ queries, mappers, markdown parsing, writes (server-side only)
-  lib/config.ts          Env, fee percent, INR minimum price, demo flag
-  lib/payouts.ts         Payout form fields + validation shared by app and web
-  store/auth.tsx         Session + profile context
-  components/            UI kit, vault cards
-sanity-studio/
-  schemaTypes/           vault, note, attachment, seller
-  structure.ts           Vaults → notes/attachments desk structure
-supabase/
-  migrations/0001_init.sql … 0005_sanity_catalog.sql
-server/
-  src/index.ts           Fastify bootstrap
-  src/routes/checkout.ts Orders, hosted Checkout.js page, signature callback, status
-  src/routes/webhook.ts  Razorpay webhook (raw-body HMAC)
-  src/routes/payouts.ts  Route linked-account onboarding
-  src/routes/catalog.ts  Sanity catalog, notes, uploads, downloads, seller CRUD
-  scripts/seed-sanity.ts Seeds sample vaults + notes into Sanity
-  src/orders.ts          Order + purchase bookkeeping (Supabase or in-memory demo)
-web/
-  app/                   Next.js pages: explore, browse, vault, library, sell, connect (MCP), auth
-  app/api/mcp/route.ts   MCP endpoint (Streamable HTTP) over purchased vaults
-  lib/mcp-server.ts      Token lookup, zip unpacking, MCP tools
-  shims/                 Browser stand-ins for the RN modules the shared data layer imports
+mobile/                    Expo app (own package.json)
+  app/                     Screens: (tabs)/, vault/[id], seller/[id], sell/[id], sell/payouts, auth, checkout-result
+  src/types.ts             Domain types
+  src/lib/api/             Backend interface + demo / Supabase / server-catalog implementations
+  src/lib/config.ts        Env, fee percent, INR minimum price, demo flag
+  src/lib/payouts.ts       Payout form fields + validation
+  src/store, hooks, components, theme
+web/                       Next.js site (own package.json), no server-side secrets
+  src/app/                 Pages: explore, browse, vault, library, sell, sell/payouts, connect (MCP), auth
+  src/components/          UI kit, VaultContents
+  src/lib/                 Browser copy of the data layer + mcp-token.ts, web.ts
+server/                    Fastify (own package.json)
+  src/routes/checkout.ts   Razorpay orders, hosted Checkout.js page, signature callback
+  src/routes/webhook.ts    Razorpay webhook (raw-body HMAC)
+  src/routes/payouts.ts    Route linked-account onboarding
+  src/routes/catalog.ts    Sanity catalog, notes, uploads, downloads, seller CRUD
+  src/routes/mcp.ts        MCP endpoint over purchased vaults
+  src/sanity/              GROQ queries, mappers, markdown parsing, writes
+  src/orders.ts            Order + purchase bookkeeping (Supabase or in-memory demo)
+  scripts/seed-sanity.ts   Seeds sample vaults + notes into Sanity
+sanity-studio/             Studio: schemaTypes/ (vault, note, attachment, seller), structure.ts
+supabase/                  migrations/0001_init.sql … 0005_sanity_catalog.sql
 ```
 
 ## Launch checklist

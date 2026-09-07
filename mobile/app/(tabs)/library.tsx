@@ -2,12 +2,12 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { Alert, FlatList, Linking, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { VaultRow } from '../../../src/components/VaultCard';
-import { Button, EmptyState, ErrorBox, Loading } from '../../../src/components/ui';
-import { useAsync } from '../../../src/hooks/useAsync';
-import { api } from '../../../src/lib/api';
-import { useAuth } from '../../../src/store/auth';
-import { colors, spacing } from '../../../src/theme';
+import { VaultRow } from '../../src/components/VaultCard';
+import { Button, EmptyState, ErrorBox, Loading } from '../../src/components/ui';
+import { useAsync } from '../../src/hooks/useAsync';
+import { api } from '../../src/lib/api';
+import { useAuth } from '../../src/store/auth';
+import { colors, spacing } from '../../src/theme';
 
 export default function LibraryScreen() {
   const router = useRouter();

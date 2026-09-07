@@ -6,7 +6,7 @@
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { zipSync } from 'fflate';
-import { SANITY_API_TOKEN, getAllNoteContents, incrementDownloads, listAttachments } from '../../src/lib/sanity/index.ts';
+import { SANITY_API_TOKEN, getAllNoteContents, incrementDownloads, listAttachments } from './sanity/index.ts';
 import { cfg } from './config.ts';
 
 const secret = () => cfg.downloadSecret;

@@ -5,7 +5,7 @@
  * so the server trusts demo callers for content reads. Never run demo mode publicly.
  */
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import type { Vault } from '../../src/types.ts';
+import type { Vault } from './types.ts';
 import { IS_DEMO } from './config.ts';
 import { admin, userFromRequest, type AuthUser } from './supabase.ts';
 
