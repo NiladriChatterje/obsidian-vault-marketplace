@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { Footer } from '@/components/Footer';
 import { Nav } from '@/components/Nav';
 import { Providers } from './providers';
 import './globals.css';
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <Providers>
           <Nav />
           <main className="container">{children}</main>
+          <Footer />
         </Providers>
       </body>
     </html>

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { Field, Loading } from '@/components/ui';
@@ -86,6 +87,12 @@ function AuthForm() {
           <button className="btn block" disabled={busy}>
             {busy ? 'Please wait…' : mode === 'in' ? 'Sign in' : 'Create account'}
           </button>
+          {mode === 'up' ? (
+            <p className="help center">
+              By creating an account you accept our <Link href="/terms">Terms</Link>, <Link href="/privacy">Privacy Policy</Link> and{' '}
+              <Link href="/refunds">Refund Policy</Link>.
+            </p>
+          ) : null}
         </form>
       </div>
     </div>

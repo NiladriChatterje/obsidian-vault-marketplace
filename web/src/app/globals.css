@@ -19,6 +19,9 @@ html, body { margin: 0; padding: 0; }
 body {
   background: var(--bg);
   color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -31,7 +34,7 @@ h2 { font-size: 20px; }
 h3 { font-size: 16px; }
 p { margin: 0; }
 
-.container { max-width: 1080px; margin: 0 auto; padding: 24px 20px 64px; }
+.container { max-width: 1080px; margin: 0 auto; padding: 24px 20px 64px; width: 100%; flex: 1; }
 .narrow { max-width: 640px; }
 .stack { display: flex; flex-direction: column; gap: 12px; }
 .row { display: flex; align-items: center; gap: 8px; }
@@ -139,6 +142,24 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
 .switch { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
 .review { border-top: 1px solid var(--border); padding-top: 12px; }
 .center { text-align: center; }
+
+/* footer */
+.site-footer { border-top: 1px solid var(--border); margin-top: auto; }
+.site-footer-inner {
+  max-width: 1080px; margin: 0 auto; padding: 20px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.site-footer a:hover { color: var(--text); }
+
+/* legal pages */
+.legal { max-width: 720px; margin: 0 auto; }
+.legal h1 { margin-bottom: 4px; }
+.legal h2 { font-size: 18px; margin: 28px 0 8px; }
+.legal h3 { font-size: 15px; margin: 18px 0 4px; color: var(--muted); }
+.legal p { margin-bottom: 12px; line-height: 1.65; }
+.legal ul { margin: 0 0 12px; padding-left: 20px; }
+.legal li { margin-bottom: 8px; line-height: 1.6; }
+.legal a { text-decoration: underline; text-underline-offset: 2px; }
 
 @media (max-width: 800px) {
   .detail { grid-template-columns: 1fr; }
