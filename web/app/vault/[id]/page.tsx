@@ -45,8 +45,8 @@ export default function VaultPage() {
         await api.claimFreeVault(v.id);
       } else {
         const { url } = await api.createCheckout(v.id);
-        if (!isDemo) {
-          // Stripe Checkout brings the buyer back to /checkout-result.
+        if (/^https?:/.test(url)) {
+          // The payment server's checkout page brings the buyer back to /checkout-result.
           window.location.assign(url);
           return;
         }
@@ -223,7 +223,7 @@ export default function VaultPage() {
               {busy ? 'Working…' : v.priceCents === 0 ? 'Get for free' : `Buy for ${new Intl.NumberFormat(undefined, { style: 'currency', currency: v.currency }).format(v.priceCents / 100)}`}
             </button>
             <p className="help">
-              {v.priceCents === 0 ? 'Free vaults are added to your library instantly.' : 'Secure payment by Stripe. Personal, non-transferable license. Download and MCP access forever.'}
+              {v.priceCents === 0 ? 'Free vaults are added to your library instantly.' : 'Secure payment by Razorpay (UPI, cards, netbanking). Personal, non-transferable license. Download and MCP access forever.'}
             </p>
           </>
         )}

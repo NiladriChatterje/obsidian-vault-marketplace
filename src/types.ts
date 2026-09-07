@@ -28,10 +28,29 @@ export interface Profile {
   avatarUrl?: string | null;
   bio?: string | null;
   isSeller: boolean;
-  stripeAccountId?: string | null;
-  stripeOnboarded: boolean;
+  /** Razorpay Route linked account (acc_...). */
+  razorpayAccountId?: string | null;
+  /** True once Razorpay has activated the linked account for settlements. */
+  payoutsEnabled: boolean;
   createdAt: string;
 }
+
+/** KYC + bank details a seller submits once to receive Razorpay Route payouts. */
+export interface PayoutDetails {
+  legalName: string;
+  phone: string;
+  pan: string;
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  accountNumber: string;
+  ifsc: string;
+  beneficiaryName: string;
+}
+
+/** 'none' = not a seller yet, 'pending' = under Razorpay review, 'activated' = payouts flowing. */
+export type PayoutStatus = 'none' | 'pending' | 'activated';
 
 export type SellerSummary = Pick<Profile, 'id' | 'username' | 'displayName' | 'avatarUrl'>;
 

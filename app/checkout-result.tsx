@@ -6,21 +6,24 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../src/components/ui';
 import { colors, spacing } from '../src/theme';
 
-/** Deep-link target for Stripe's success_url / cancel_url. */
+/** Deep-link target the payment server redirects to after a Razorpay order settles, fails or is cancelled. */
 export default function CheckoutResultScreen() {
   const router = useRouter();
   const { status, vault } = useLocalSearchParams<{ status?: string; vault?: string }>();
   const ok = status === 'success';
+  const failed = status === 'failed';
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.body}>
         <Ionicons name={ok ? 'checkmark-circle' : 'close-circle'} size={72} color={ok ? colors.success : colors.muted} />
-        <Text style={styles.title}>{ok ? 'Payment received' : 'Checkout cancelled'}</Text>
+        <Text style={styles.title}>{ok ? 'Payment received' : failed ? 'Payment not verified' : 'Checkout cancelled'}</Text>
         <Text style={styles.text}>
           {ok
             ? 'Your vault is being added to your library. This usually takes a second or two.'
-            : 'No charge was made. You can come back to the vault any time.'}
+            : failed
+              ? 'The payment could not be verified. Any amount debited is refunded automatically by Razorpay.'
+              : 'No charge was made. You can come back to the vault any time.'}
         </Text>
         <View style={{ gap: spacing.sm, alignSelf: 'stretch', marginTop: spacing.xl }}>
           {vault ? (

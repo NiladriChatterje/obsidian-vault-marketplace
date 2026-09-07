@@ -136,7 +136,7 @@ export default function ExploreScreen() {
         <Pressable onPress={() => router.push('/sell')} style={styles.sellCta}>
           <View style={{ flex: 1 }}>
             <Text style={styles.sellTitle}>Built a vault you love?</Text>
-            <Text style={styles.sellText}>Sell it here. You keep 85% of every sale, paid out by Stripe.</Text>
+            <Text style={styles.sellText}>Sell it here. You keep 85% of every sale, paid out by Razorpay.</Text>
           </View>
           <Ionicons name="arrow-forward-circle" size={32} color={colors.accent} />
         </Pressable>

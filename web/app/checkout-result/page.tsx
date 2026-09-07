@@ -7,7 +7,7 @@ import { Loading } from '@/components/ui';
 import { api } from '@shared/lib/api';
 import { useAuth } from '@shared/store/auth';
 
-/** Stripe's success_url / cancel_url on the web. */
+/** Landing page after the payment server settles (or fails/cancels) a Razorpay order. */
 export default function CheckoutResultPage() {
   return (
     <Suspense fallback={<Loading />}>
@@ -18,8 +18,12 @@ export default function CheckoutResultPage() {
 
 function CheckoutResult() {
   const params = useSearchParams();
-  const ok = params.get('status') === 'success';
+  const status = params.get('status');
+  const ok = status === 'success';
+  const failed = status === 'failed';
   const vaultId = params.get('vault');
+  const paymentId = params.get('payment');
+  const appScheme = params.get('app');
   const { user, loading } = useAuth();
   const [state, setState] = useState<'checking' | 'ready' | 'pending'>('checking');
 
@@ -49,9 +53,12 @@ function CheckoutResult() {
   return (
     <div className="narrow center stack" style={{ margin: '40px auto', gap: 16 }}>
       <div style={{ fontSize: 56 }}>{ok ? '✓' : '×'}</div>
-      <h1>{ok ? 'Payment received' : 'Checkout cancelled'}</h1>
+      <h1>{ok ? 'Payment received' : failed ? 'Payment could not be verified' : 'Checkout cancelled'}</h1>
+      {paymentId ? <p className="mono muted">Payment {paymentId}</p> : null}
       <p className="muted">
-        {!ok
+        {failed
+          ? 'The payment signature did not check out or the payment was not captured. If money left your account it will be refunded automatically by Razorpay; contact support with the payment id.'
+          : !ok
           ? 'No charge was made. You can come back to the vault any time.'
           : state === 'checking'
             ? 'Adding the vault to your library. This usually takes a second or two…'
@@ -60,6 +67,11 @@ function CheckoutResult() {
               : 'Your purchase is confirmed and will appear in your library shortly. Sign in on this device if you have not already.'}
       </p>
       <div className="row" style={{ justifyContent: 'center' }}>
+        {appScheme ? (
+          <a href={`${appScheme}://checkout-result?status=${ok ? 'success' : 'cancelled'}${vaultId ? `&vault=${vaultId}` : ''}`} className="btn">
+            Return to the app
+          </a>
+        ) : null}
         {vaultId ? (
           <Link href={`/vault/${vaultId}`} className="btn">
             {ok ? 'Open vault' : 'Back to vault'}

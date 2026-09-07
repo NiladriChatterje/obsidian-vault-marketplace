@@ -27,7 +27,7 @@ export default function ListingFormScreen() {
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<CategorySlug>('pkm');
   const [isPaid, setIsPaid] = useState(true);
-  const [priceText, setPriceText] = useState('19');
+  const [priceText, setPriceText] = useState('499');
   const [tagsText, setTagsText] = useState('');
   const [pluginsText, setPluginsText] = useState('');
   const [noteCount, setNoteCount] = useState('');
@@ -53,7 +53,7 @@ export default function ListingFormScreen() {
         setDescription(v.description);
         setCategory(v.category);
         setIsPaid(v.priceCents > 0);
-        setPriceText(v.priceCents > 0 ? (v.priceCents / 100).toFixed(2) : '19');
+        setPriceText(v.priceCents > 0 ? (v.priceCents / 100).toFixed(2) : '499');
         setTagsText(v.tags.join(', '));
         setPluginsText(v.plugins.join(', '));
         setNoteCount(v.noteCount ? String(v.noteCount) : '');
@@ -213,11 +213,11 @@ export default function ListingFormScreen() {
           </View>
           {isPaid ? (
             <>
-              <Input label="Price (USD)" value={priceText} onChangeText={setPriceText} keyboardType="decimal-pad" placeholder="19.00" error={priceError} />
+              <Input label="Price (INR)" value={priceText} onChangeText={setPriceText} keyboardType="decimal-pad" placeholder="499" error={priceError} />
               {priceCents && !priceError ? (
                 <View style={styles.payout}>
                   <Text style={styles.payoutText}>
-                    You receive <Text style={styles.payoutStrong}>{formatPrice(youKeep)}</Text> per sale after the {PLATFORM_FEE_PERCENT}% platform fee. Stripe processing fees apply.
+                    You receive <Text style={styles.payoutStrong}>{formatPrice(youKeep)}</Text> per sale after the {PLATFORM_FEE_PERCENT}% platform fee. Razorpay processing fees apply.
                   </Text>
                 </View>
               ) : null}

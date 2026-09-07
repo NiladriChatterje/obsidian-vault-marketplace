@@ -1,6 +1,6 @@
 import { File } from 'expo-file-system';
-import type { Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
-import { REDIRECT_ORIGIN, STORAGE_BUCKETS } from '../config';
+import type { PayoutStatus, Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
+import { API_URL, REDIRECT_ORIGIN, STORAGE_BUCKETS } from '../config';
 import { requireSupabase } from '../supabase';
 import type { AuthUser, Backend } from './types';
 
@@ -16,8 +16,8 @@ function toProfile(r: Row): Profile {
     avatarUrl: r.avatar_url,
     bio: r.bio,
     isSeller: !!r.is_seller,
-    stripeAccountId: r.stripe_account_id,
-    stripeOnboarded: !!r.stripe_onboarded,
+    razorpayAccountId: r.razorpay_account_id,
+    payoutsEnabled: !!r.payouts_enabled,
     createdAt: r.created_at,
   };
 }
@@ -103,6 +103,22 @@ async function readBytes(localUri: string): Promise<Uint8Array> {
 function extFromUri(uri: string, fallback: string): string {
   const match = /\.([a-zA-Z0-9]+)(\?|$)/.exec(uri);
   return match?.[1]?.toLowerCase() ?? fallback;
+}
+
+/** Calls the payment server with the current Supabase session token. */
+async function apiFetch<T = Record<string, any>>(path: string, init: { method?: 'GET' | 'POST'; body?: unknown } = {}): Promise<T> {
+  if (!API_URL) throw new Error('Payment server is not configured. Set EXPO_PUBLIC_API_URL.');
+  const { data } = await requireSupabase().auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error('Please sign in first.');
+  const res = await fetch(`${API_URL}${path}`, {
+    method: init.method ?? 'GET',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+  });
+  const json = (await res.json().catch(() => ({}))) as T & { error?: string };
+  if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
+  return json;
 }
 
 /* ---------- backend ---------- */
@@ -240,12 +256,9 @@ export const supabaseBackend: Backend = {
     if (error) throw new Error(error.message);
   },
   async createCheckout(vaultId) {
-    const { data, error } = await requireSupabase().functions.invoke('create-checkout', {
-      body: { vaultId, redirectOrigin: REDIRECT_ORIGIN },
-    });
-    if (error) throw new Error(error.message);
-    if (!data?.url) throw new Error('Checkout could not be started.');
-    return { url: data.url as string };
+    const data = await apiFetch<{ url?: string }>('/checkout', { method: 'POST', body: { vaultId, redirectOrigin: REDIRECT_ORIGIN } });
+    if (!data.url) throw new Error('Checkout could not be started.');
+    return { url: data.url };
   },
   async getDownloadUrl(vaultId) {
     const sb = requireSupabase();
@@ -335,11 +348,12 @@ export const supabaseBackend: Backend = {
     if (error) throw new Error(error.message);
     return { path, sizeBytes: bytes.byteLength };
   },
-  async becomeSeller() {
-    const { data, error } = await requireSupabase().functions.invoke('connect-onboarding', {
-      body: { redirectOrigin: REDIRECT_ORIGIN },
-    });
-    if (error) throw new Error(error.message);
-    return { onboardingUrl: (data?.url as string | undefined) ?? null };
+  async setupPayouts(details) {
+    const data = await apiFetch<{ status?: PayoutStatus }>('/payouts', { method: 'POST', body: { details } });
+    return { status: data.status ?? 'pending' };
+  },
+  async refreshPayoutStatus() {
+    const data = await apiFetch<{ status?: PayoutStatus }>('/payouts/status');
+    return { status: data.status ?? 'none' };
   },
 };

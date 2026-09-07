@@ -47,7 +47,7 @@ export default function VaultDetailScreen() {
         await api.claimFreeVault(v.id);
       } else {
         const { url } = await api.createCheckout(v.id);
-        if (!isDemo) {
+        if (/^https?:/.test(url)) {
           const result = await WebBrowser.openAuthSessionAsync(url, `${APP_SCHEME}://checkout-result`);
           if (result.type !== 'success') {
             // User closed the sheet; the webhook may still land, so refresh anyway.
@@ -230,7 +230,7 @@ export default function VaultDetailScreen() {
           />
         )}
         {!owned && !isMine && v.priceCents > 0 ? (
-          <Text style={styles.barNote}>Secure checkout by Stripe. Instant download after payment.</Text>
+          <Text style={styles.barNote}>Secure checkout by Razorpay (UPI, cards, netbanking). Instant download after payment.</Text>
         ) : null}
       </SafeAreaView>
     </View>

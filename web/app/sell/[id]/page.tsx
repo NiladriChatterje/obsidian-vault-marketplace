@@ -26,7 +26,7 @@ export default function ListingEditorPage() {
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<CategorySlug>('pkm');
   const [isPaid, setIsPaid] = useState(true);
-  const [priceText, setPriceText] = useState('19');
+  const [priceText, setPriceText] = useState('499');
   const [tagsText, setTagsText] = useState('');
   const [pluginsText, setPluginsText] = useState('');
   const [noteCount, setNoteCount] = useState('');
@@ -56,7 +56,7 @@ export default function ListingEditorPage() {
         setDescription(v.description);
         setCategory(v.category);
         setIsPaid(v.priceCents > 0);
-        setPriceText(v.priceCents > 0 ? (v.priceCents / 100).toFixed(2) : '19');
+        setPriceText(v.priceCents > 0 ? (v.priceCents / 100).toFixed(2) : '499');
         setTagsText(v.tags.join(', '));
         setPluginsText(v.plugins.join(', '));
         setNoteCount(v.noteCount ? String(v.noteCount) : '');
@@ -225,7 +225,7 @@ export default function ListingEditorPage() {
           <input type="checkbox" checked={isPaid} onChange={(e) => setIsPaid(e.target.checked)} /> Paid vault
         </label>
         {isPaid ? (
-          <Field label="Price (USD)" hint={priceError ?? (priceCents ? `You keep ${formatPrice(youKeep)} per sale after the ${PLATFORM_FEE_PERCENT}% fee.` : undefined)}>
+          <Field label="Price (INR)" hint={priceError ?? (priceCents ? `You keep ${formatPrice(youKeep)} per sale after the ${PLATFORM_FEE_PERCENT}% fee.` : undefined)}>
             <input className="input" inputMode="decimal" value={priceText} onChange={(e) => setPriceText(e.target.value)} />
           </Field>
         ) : (

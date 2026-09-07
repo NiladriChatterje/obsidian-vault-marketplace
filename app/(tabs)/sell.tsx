@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,32 +20,34 @@ export default function SellScreen() {
 
   const vaults = useAsync(() => (user && isSeller ? api.getMyVaults() : Promise.resolve([])), [user?.id, isSeller]);
   const stats = useAsync(() => (user && isSeller ? api.getSellerStats() : Promise.resolve(null)), [user?.id, isSeller]);
-  const [joining, setJoining] = useState(false);
+  const [checking, setChecking] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       if (user && isSeller) {
         vaults.refresh();
         stats.refresh();
+        // Razorpay reviews linked accounts asynchronously; sync the flag whenever the tab is opened.
+        if (!profile?.payoutsEnabled && !isDemo) api.refreshPayoutStatus().then(refreshProfile).catch(() => {});
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user?.id, isSeller])
+    }, [user?.id, isSeller, profile?.payoutsEnabled])
   );
 
-  const onBecomeSeller = async () => {
-    if (!user) {
-      router.push('/auth');
-      return;
-    }
-    setJoining(true);
+  const onBecomeSeller = () => {
+    router.push(user ? '/sell/payouts' : '/auth');
+  };
+
+  const onCheckStatus = async () => {
+    setChecking(true);
     try {
-      const { onboardingUrl } = await api.becomeSeller();
-      if (onboardingUrl) await WebBrowser.openBrowserAsync(onboardingUrl);
+      const { status } = await api.refreshPayoutStatus();
       await refreshProfile();
+      if (status !== 'activated') Alert.alert('Still under review', 'Razorpay is verifying your details. Free vaults can be published meanwhile.');
     } catch (e) {
-      Alert.alert('Could not start', e instanceof Error ? e.message : 'Please try again.');
+      Alert.alert('Could not check', e instanceof Error ? e.message : 'Please try again.');
     } finally {
-      setJoining(false);
+      setChecking(false);
     }
   };
 
@@ -88,21 +89,27 @@ export default function SellScreen() {
             <Text style={styles.subtitle}>Turn the vault you already maintain into income.</Text>
             <Card style={{ gap: spacing.lg, marginTop: spacing.lg }}>
               <Perk icon="cash-outline" title={`Keep ${100 - PLATFORM_FEE_PERCENT}% of every sale`} body={`We take a flat ${PLATFORM_FEE_PERCENT}% only when you sell. Free vaults cost nothing to list.`} />
-              <Perk icon="card-outline" title="Payouts by Stripe" body="Stripe Express handles taxes, identity and bank transfers in 40+ countries." />
+              <Perk icon="card-outline" title="Payouts by Razorpay" body="Buyers pay with UPI, cards or netbanking. Your share settles to your bank account through Razorpay Route." />
               <Perk icon="cloud-upload-outline" title="Upload a zip, that is it" body="Export your vault folder as a .zip, add a description and screenshots, publish." />
               <Perk icon="people-outline" title="Built-in audience" body="Buyers browse by category, plugin and tag. Free vaults are a great funnel to paid ones." />
-              <Button title={user ? 'Become a seller' : 'Sign in to start selling'} icon="storefront-outline" onPress={onBecomeSeller} loading={joining} />
+              <Button title={user ? 'Become a seller' : 'Sign in to start selling'} icon="storefront-outline" onPress={onBecomeSeller} />
               {!isDemo ? (
-                <Text style={styles.fine}>You will be redirected to Stripe to set up payouts. It takes about 5 minutes.</Text>
+                <Text style={styles.fine}>You will enter your PAN, address and bank account once. Razorpay verifies them in a day or two.</Text>
               ) : null}
             </Card>
           </>
         ) : (
           <>
-            {!profile?.stripeOnboarded && !isDemo ? (
-              <Pressable onPress={onBecomeSeller} style={styles.warn}>
-                <Ionicons name="warning-outline" size={18} color={colors.warning} />
-                <Text style={styles.warnText}>Finish Stripe setup to receive payouts. Tap to continue.</Text>
+            {!profile?.payoutsEnabled && !isDemo ? (
+              <Pressable onPress={profile?.razorpayAccountId ? onCheckStatus : onBecomeSeller} style={styles.warn}>
+                <Ionicons name="time-outline" size={18} color={colors.warning} />
+                <Text style={styles.warnText}>
+                  {profile?.razorpayAccountId
+                    ? checking
+                      ? 'Checking with Razorpay...'
+                      : 'Payouts pending Razorpay review. Paid vaults unlock once activated. Tap to re-check.'
+                    : 'Add your payout details to sell paid vaults. Tap to continue.'}
+                </Text>
               </Pressable>
             ) : null}
 

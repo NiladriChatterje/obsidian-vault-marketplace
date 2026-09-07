@@ -1,0 +1,23 @@
+{
+  "name": "vaultmarket-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=../.env src/index.ts",
+    "start": "node src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.3.0",
+    "@fastify/formbody": "^9.0.0",
+    "@supabase/supabase-js": "^2.115.0",
+    "dotenv": "^17.2.0",
+    "fastify": "^5.12.3",
+    "razorpay": "^2.9.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~6.0.3"
+  }
+}

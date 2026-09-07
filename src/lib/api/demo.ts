@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
-import { PLATFORM_FEE_PERCENT } from '../config';
+import { API_URL, PLATFORM_FEE_PERCENT, REDIRECT_ORIGIN } from '../config';
 import { DEMO_REVIEWS, DEMO_SELLERS, DEMO_VAULTS } from '../demo-data';
 import type { AuthUser, Backend } from './types';
 
@@ -81,7 +81,7 @@ export const demoBackend: Backend = {
         username: email.split('@')[0]?.toLowerCase() ?? 'you',
         displayName: email.split('@')[0] ?? 'You',
         isSeller: false,
-        stripeOnboarded: false,
+        payoutsEnabled: false,
         createdAt: new Date().toISOString(),
       });
     }
@@ -103,7 +103,7 @@ export const demoBackend: Backend = {
         username,
         displayName: username,
         isSeller: false,
-        stripeOnboarded: false,
+        payoutsEnabled: false,
         createdAt: new Date().toISOString(),
       });
     }
@@ -227,12 +227,33 @@ export const demoBackend: Backend = {
     await persist();
   },
   async createCheckout(vaultId) {
-    // Demo: complete the purchase instantly instead of opening Stripe.
+    // Demo: the purchase is granted locally right away. When the payment server is
+    // running, a real Razorpay *test* order is still created so the checkout flow
+    // can be tried end to end; the outcome of that test payment is not enforced.
     const s = await load();
     const u = requireUser(s);
     const vault = s.vaults.find((v) => v.id === vaultId);
     if (!vault) throw new Error('Vault not found');
-    await wait(700);
+    let url = 'demo://purchase-complete';
+    if (API_URL) {
+      try {
+        const res = await fetch(`${API_URL}/checkout`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            vaultId,
+            redirectOrigin: REDIRECT_ORIGIN,
+            demo: { amountCents: vault.priceCents, currency: vault.currency, title: vault.title },
+          }),
+        });
+        const data = (await res.json()) as { url?: string; error?: string };
+        if (res.ok && data.url) url = data.url;
+      } catch {
+        // Server not running: fall back to the instant demo purchase.
+      }
+    } else {
+      await wait(700);
+    }
     if (!s.purchases.some((p) => p.vaultId === vaultId && p.buyerId === u.id)) {
       const fee = Math.round((vault.priceCents * PLATFORM_FEE_PERCENT) / 100);
       s.purchases.push({
@@ -246,7 +267,7 @@ export const demoBackend: Backend = {
       vault.downloads += 1;
     }
     await persist();
-    return { url: 'demo://purchase-complete' };
+    return { url };
   },
   async getDownloadUrl(vaultId) {
     const s = await load();
@@ -297,7 +318,7 @@ export const demoBackend: Backend = {
       id: uid(),
       sellerId: u.id,
       seller: profile ? summary(profile) : undefined,
-      currency: 'USD',
+      currency: 'INR',
       screenshots: [],
       sizeBytes: 0,
       status: 'draft',
@@ -336,15 +357,21 @@ export const demoBackend: Backend = {
     await wait(600);
     return { path: localUri, sizeBytes: 0 };
   },
-  async becomeSeller() {
+  async setupPayouts(_details) {
     const s = await load();
     const u = requireUser(s);
     const p = s.profiles.find((x) => x.id === u.id);
     if (p) {
       p.isSeller = true;
-      p.stripeOnboarded = true;
+      p.payoutsEnabled = true;
+      p.razorpayAccountId = 'acc_demo';
     }
     await persist();
-    return { onboardingUrl: null };
+    return { status: 'activated' as const };
+  },
+  async refreshPayoutStatus() {
+    const s = await load();
+    const p = s.user ? s.profiles.find((x) => x.id === s.user!.id) : undefined;
+    return { status: p?.payoutsEnabled ? ('activated' as const) : p?.isSeller ? ('pending' as const) : ('none' as const) };
   },
 };

@@ -28,33 +28,30 @@ function Sell() {
 
   const vaults = useAsync(() => (user && isSeller ? api.getMyVaults() : Promise.resolve([])), [user?.id, isSeller]);
   const stats = useAsync(() => (user && isSeller ? api.getSellerStats() : Promise.resolve(null)), [user?.id, isSeller]);
-  const [joining, setJoining] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Back from Stripe Express onboarding (return_url = /sell?onboarding=done).
+  // Razorpay reviews linked accounts asynchronously; sync the flag when the page opens or after saving details.
   useEffect(() => {
-    if (params.get('onboarding')) refreshProfile();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.get('onboarding')]);
-
-  const onBecomeSeller = async () => {
-    if (!user) {
-      router.push('/auth?next=/sell');
-      return;
+    if (user && isSeller && !profile?.payoutsEnabled && !isDemo) {
+      api.refreshPayoutStatus().then(refreshProfile).catch(() => {});
     }
-    setJoining(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, isSeller, profile?.payoutsEnabled, params.get('payouts')]);
+
+  const onBecomeSeller = () => router.push(user ? '/sell/payouts' : '/auth?next=/sell/payouts');
+
+  const onCheckStatus = async () => {
+    setChecking(true);
     setError(null);
     try {
-      const { onboardingUrl } = await api.becomeSeller();
-      if (onboardingUrl) {
-        window.location.assign(onboardingUrl);
-        return;
-      }
+      const { status } = await api.refreshPayoutStatus();
       await refreshProfile();
+      if (status !== 'activated') setError('Razorpay is still verifying your details. Free vaults can be published meanwhile.');
     } catch (e) {
       setError(errorMessage(e));
     } finally {
-      setJoining(false);
+      setChecking(false);
     }
   };
 
@@ -93,16 +90,16 @@ function Sell() {
         </div>
         <div className="perks">
           <Perk title={`Keep ${100 - PLATFORM_FEE_PERCENT}% of every sale`} body={`A flat ${PLATFORM_FEE_PERCENT}% only when you sell. Free vaults cost nothing to list.`} />
-          <Perk title="Payouts by Stripe" body="Stripe Express handles taxes, identity and bank transfers in 40+ countries." />
+          <Perk title="Payouts by Razorpay" body="Buyers pay with UPI, cards or netbanking. Your share settles to your bank account through Razorpay Route." />
           <Perk title="Upload a zip, that is it" body="Export your vault folder as a .zip, add a description and a cover, publish." />
           <Perk title="Download or MCP" body="Buyers unzip into Obsidian or connect the vault to their AI assistant. You do nothing extra." />
         </div>
         {error ? <div className="error">{error}</div> : null}
         <div>
-          <button className="btn" onClick={onBecomeSeller} disabled={joining}>
-            {joining ? 'Starting…' : user ? 'Become a seller' : 'Sign in to start selling'}
+          <button className="btn" onClick={onBecomeSeller}>
+            {user ? 'Become a seller' : 'Sign in to start selling'}
           </button>
-          {!isDemo ? <p className="help" style={{ marginTop: 8 }}>You will be redirected to Stripe to set up payouts. It takes about 5 minutes.</p> : null}
+          {!isDemo ? <p className="help" style={{ marginTop: 8 }}>You enter your PAN, address and bank account once. Razorpay verifies them in a day or two.</p> : null}
         </div>
       </div>
     );
@@ -117,10 +114,28 @@ function Sell() {
         </Link>
       </div>
 
-      {!profile?.stripeOnboarded && !isDemo ? (
-        <button className="notice" style={{ textAlign: 'left', cursor: 'pointer' }} onClick={onBecomeSeller}>
-          Finish Stripe setup to receive payouts. Click to continue.
-        </button>
+      {!profile?.payoutsEnabled && !isDemo ? (
+        <div className="notice row between">
+          <span>
+            {profile?.razorpayAccountId
+              ? 'Payouts pending Razorpay review. Paid vaults unlock once your linked account is activated.'
+              : 'Add your payout details to sell paid vaults.'}
+          </span>
+          {profile?.razorpayAccountId ? (
+            <span className="row">
+              <button className="btn small secondary" onClick={onCheckStatus} disabled={checking}>
+                {checking ? 'Checking…' : 'Re-check'}
+              </button>
+              <Link href="/sell/payouts" className="btn small secondary">
+                Edit bank details
+              </Link>
+            </span>
+          ) : (
+            <button className="btn small" onClick={onBecomeSeller}>
+              Add details
+            </button>
+          )}
+        </div>
       ) : null}
       {error ? <div className="error">{error}</div> : null}
 

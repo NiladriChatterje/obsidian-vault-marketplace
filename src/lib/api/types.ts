@@ -1,5 +1,7 @@
 import type {
   ListVaultsParams,
+  PayoutDetails,
+  PayoutStatus,
   Profile,
   Purchase,
   Review,
@@ -46,7 +48,7 @@ export interface Backend {
   getLibrary(): Promise<Purchase[]>;
   hasAccess(vaultId: string): Promise<boolean>;
   claimFreeVault(vaultId: string): Promise<void>;
-  /** Returns a hosted Stripe Checkout URL to open in the browser. */
+  /** Returns the payment server's hosted Razorpay checkout URL to open in the browser. */
   createCheckout(vaultId: string): Promise<{ url: string }>;
   /** Short-lived download URL for the vault zip. Caller must have access. */
   getDownloadUrl(vaultId: string): Promise<string>;
@@ -59,6 +61,8 @@ export interface Backend {
   deleteVault(id: string): Promise<void>;
   uploadCover(localUri: string): Promise<string>;
   uploadVaultFile(localUri: string, fileName: string): Promise<UploadedFile>;
-  /** Marks the user as a seller and returns a Stripe onboarding URL when payouts still need setup. */
-  becomeSeller(): Promise<{ onboardingUrl: string | null }>;
+  /** Marks the user as a seller and creates their Razorpay Route linked account from the given details. */
+  setupPayouts(details: PayoutDetails): Promise<{ status: PayoutStatus }>;
+  /** Re-checks Razorpay activation and syncs the profile. */
+  refreshPayoutStatus(): Promise<{ status: PayoutStatus }>;
 }
