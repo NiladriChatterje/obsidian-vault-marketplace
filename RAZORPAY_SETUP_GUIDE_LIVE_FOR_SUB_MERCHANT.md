@@ -7,13 +7,20 @@ Sellers set their own price; Razorpay Route splits each payment and sends them t
 1. **Account & Settings → Business details** — finish KYC (PAN, address proof, bank account, video KYC). Live keys need a verified website too.
 2. Add the site URL under the same section. Razorpay checks that it has working terms, refund/cancellation, privacy and contact pages — the site serves these at `/terms`, `/refunds`, `/privacy` and `/contact`, linked from the footer of every page. **Fill in `web/src/lib/legal.ts` first**: it starts with `TODO` placeholders for the legal name, address and support email, and a reviewer will reject the pages while those are showing.
 
-## 2. Turn on Route
+## 2. Route: check eligibility first
 
-1. Left menu → **Route** (under **PAYMENT PRODUCTS**) → request activation.
-2. If it is not visible, ask support for Route and describe the model: *marketplace selling digital Obsidian vaults; sellers price their own listings; platform keeps 10% per sale*.
-3. Route is India/Malaysia only and generally needs a registered business.
+Route is **not available on request any more.** Razorpay discontinued it on **1 January 2026** for accounts that did not meet new RBI-driven criteria. To hold or regain access a business must show:
 
-**Check it worked:** with live keys set, `GET /health` on the server reports `"route": true`, and `POST /v1/orders` with a `transfers` array stops returning `This transfer is not supported`.
+- **Turnover** — domestic above ₹40 lakh, *or* export above ₹5 lakh, in FY25 or FY26.
+- **Payer-payee transparency** — evidence that each linked account really supplies the goods the buyer pays for.
+
+A new marketplace will not clear the turnover bar on day one. You can reapply in a later financial year once you do. Route is also **INR only**: Razorpay states *"Currently, we support only INR for Razorpay Route"*, so international currency orders can never carry transfers.
+
+Left menu → **Route** (under **PAYMENT PRODUCTS**) shows your status and the reapply route.
+
+**Check whether you have it:** with live keys set, `GET /health` reports `"route": true`, and `POST /v1/orders` with a `transfers` array stops returning `This transfer is not supported`. That error is what an ineligible account gets today.
+
+**Until then, run with `RAZORPAY_ROUTE=off`** (see the last section). Do not block launch on Route.
 
 ## 3. API keys
 
@@ -59,12 +66,14 @@ RAZORPAY_ROUTE=on
 
 Rebuild the web image after changing any `EXPO_PUBLIC_*` value; the server reads its own at runtime. Buy a cheap live vault once end to end and confirm the payment, the purchase row and the transfer under **Route → Transfers**.
 
-## Before Route is approved
+## Running without Route (the default for a new account)
 
-Set `RAZORPAY_ROUTE=off`. Payments land wholly in the platform account, sellers can still list and the dashboard still shows their 90% net, but you pay them out yourself. Switch it back on later without code changes.
+Set `RAZORPAY_ROUTE=off`. Payments land wholly in the platform account, sellers can still list, and the dashboard still shows each seller's 90% net from the `purchases` table. You pay them yourself — bank transfer, or RazorpayX Payouts once volume justifies it. Switch the flag back on later without code changes.
+
+**Settle the legal structure before you take money for other people.** RBI's payment aggregator rules are the reason Route is gated: collecting funds and redistributing them to third-party sellers is payment aggregation, which needs a licence or a licensed aggregator's marketplace product. The usual way a small platform stays outside that is to become the **merchant of record** — you license each vault from its creator and sell it as your own product, paying them a royalty as a supplier. That makes payouts vendor payments rather than third-party settlement, and it changes the seller agreement, the invoice, and how TDS under section 194-O and GST on the commission apply. Take this to a CA or lawyer before launch; it is not a code decision.
 
 ## International payments
 
 **Account & Settings → International payments** (under *Payment methods*) enables foreign cards, PayPal and bank transfers. Razorpay asks for PAN, GSTIN or Udyam, address proof and video KYC.
 
-**Route does not support international payments.** With both enabled, foreign card payments cannot be auto-split, so those sellers must be paid manually (or keep international sales on free/platform-owned listings until Razorpay's support changes).
+**Route does not support international payments,** and is INR-only by design. Foreign-card sales can never be auto-split, so those sellers are paid manually whatever your Route status. If international sales become the larger half of the business, the usual answer is a second rail alongside Razorpay — an international gateway that settles to INR, or a merchant-of-record provider that becomes the seller abroad — rather than trying to make Route stretch.
