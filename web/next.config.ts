@@ -26,6 +26,8 @@ const nextConfig: NextConfig = {
     EXPO_PUBLIC_REDIRECT_ORIGIN: process.env.EXPO_PUBLIC_REDIRECT_ORIGIN ?? '',
     EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL ?? '',
   },
+  // Standalone output for the Docker image (web/Dockerfile); traces files from the repo root because ../src is imported.
+  output: 'standalone',
   outputFileTracingRoot: repoRoot,
   turbopack: {
     root: repoRoot,

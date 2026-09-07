@@ -54,6 +54,17 @@ curl localhost:4000/health
 
 Runs on plain Node 22.18+ (TypeScript type stripping, no build step). Without Supabase keys it runs in demo mode: orders are kept in memory and purchases are granted by the client.
 
+## Docker
+
+Both services ship with Dockerfiles and a root `docker-compose.yml` that reads `.env`:
+
+```bash
+docker compose up --build      # web on :3000, api on :4000
+docker compose logs -f api
+```
+
+`server/Dockerfile` runs the TypeScript sources directly on Node 24 (no build step). `web/Dockerfile` uses the repo root as build context because the site imports `../src`, builds Next.js in standalone mode, and inlines the `EXPO_PUBLIC_*` values as build args (compose passes them from `.env`). Rebuild the web image after changing those; server values are read at runtime. The Expo app is not containerised: run it with `npx expo start` against the running api.
+
 ```bash
 npm run typecheck   # tsc --noEmit
 npx expo-doctor

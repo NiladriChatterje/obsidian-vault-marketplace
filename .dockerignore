@@ -1,0 +1,16 @@
+# Build context for web/Dockerfile is the repo root; keep it small.
+node_modules
+**/node_modules
+web/.next
+.git
+.expo
+.env
+.env.*
+!.env.example
+android
+ios
+assets
+server
+supabase
+app
+*.md
