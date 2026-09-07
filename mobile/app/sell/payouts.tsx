@@ -1,13 +1,13 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
-import { Button, Card, Input } from '../../src/components/ui';
-import { api } from '../../src/lib/api';
-import { PLATFORM_FEE_PERCENT } from '../../src/lib/config';
-import { EMPTY_PAYOUT_DETAILS, PAYOUT_FIELDS, normalizePayoutDetails, validatePayoutDetails } from '../../src/lib/payouts';
-import { useAuth } from '../../src/store/auth';
-import { colors, spacing } from '../../src/theme';
-import type { PayoutDetails } from '../../src/types';
+import { Button, Card, Input } from '../../../src/components/ui';
+import { api } from '../../../src/lib/api';
+import { PLATFORM_FEE_PERCENT } from '../../../src/lib/config';
+import { EMPTY_PAYOUT_DETAILS, PAYOUT_FIELDS, normalizePayoutDetails, validatePayoutDetails } from '../../../src/lib/payouts';
+import { useAuth } from '../../../src/store/auth';
+import { colors, spacing } from '../../../src/theme';
+import type { PayoutDetails } from '../../../src/types';
 
 /** One-time KYC + bank form that creates the seller's Razorpay Route linked account. */
 export default function PayoutsScreen() {

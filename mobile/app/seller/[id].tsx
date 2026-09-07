@@ -1,12 +1,12 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { VaultRow } from '../../src/components/VaultCard';
-import { Avatar, EmptyState, ErrorBox, Loading, SectionTitle } from '../../src/components/ui';
-import { useAsync } from '../../src/hooks/useAsync';
-import { api } from '../../src/lib/api';
-import { formatCount } from '../../src/lib/format';
-import { colors, spacing } from '../../src/theme';
+import { VaultRow } from '../../../src/components/VaultCard';
+import { Avatar, EmptyState, ErrorBox, Loading, SectionTitle } from '../../../src/components/ui';
+import { useAsync } from '../../../src/hooks/useAsync';
+import { api } from '../../../src/lib/api';
+import { formatCount } from '../../../src/lib/format';
+import { colors, spacing } from '../../../src/theme';
 
 export default function SellerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

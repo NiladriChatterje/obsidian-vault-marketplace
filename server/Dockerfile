@@ -10,8 +10,6 @@ FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=deps /app/server/node_modules ./server/node_modules
-# ../src resolves packages by walking up; point the repo root at the server's node_modules.
-RUN ln -s server/node_modules node_modules
 COPY src/types.ts ./src/types.ts
 COPY src/lib/sanity ./src/lib/sanity
 COPY src/lib/demo-data.ts ./src/lib/demo-data.ts

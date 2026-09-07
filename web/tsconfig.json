@@ -40,6 +40,18 @@
       ],
       "expo-file-system": [
         "./shims/expo-file-system.ts"
+      ],
+      "react": [
+        "./node_modules/@types/react"
+      ],
+      "react/*": [
+        "./node_modules/@types/react/*"
+      ],
+      "@supabase/supabase-js": [
+        "./node_modules/@supabase/supabase-js/dist/index.d.cts"
+      ],
+      "@sanity/client": [
+        "./node_modules/@sanity/client/dist/index.d.ts"
       ]
     },
     "allowImportingTsExtensions": true

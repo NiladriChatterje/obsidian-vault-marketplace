@@ -3,9 +3,9 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Input } from '../src/components/ui';
-import { useAuth } from '../src/store/auth';
-import { colors, radius, spacing } from '../src/theme';
+import { Button, Input } from '../../src/components/ui';
+import { useAuth } from '../../src/store/auth';
+import { colors, radius, spacing } from '../../src/theme';
 
 export default function AuthScreen() {
   const router = useRouter();

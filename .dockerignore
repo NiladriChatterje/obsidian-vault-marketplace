@@ -9,8 +9,7 @@ web/.next
 !.env.example
 android
 ios
-assets
+mobile
 supabase
-app
 sanity-studio
 *.md

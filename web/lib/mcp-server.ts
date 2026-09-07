@@ -14,6 +14,7 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { STORAGE_BUCKETS } from '@shared/lib/config';
 import { DEMO_VAULTS } from '@shared/lib/demo-data';
+import { createClient as createSanityClient } from '@sanity/client';
 import * as sanityCatalog from '@shared/lib/sanity/index.ts';
 import type { Vault } from '@shared/types';
 
@@ -21,6 +22,7 @@ const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
 export const IS_DEMO = !SUPABASE_URL || !process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 const USE_SANITY = sanityCatalog.SANITY_ENABLED;
+sanityCatalog.useSanityClientFactory(createSanityClient);
 
 const TEXT_EXT = /\.(md|markdown|canvas|txt|base|csv|json)$/i;
 const MAX_NOTE_BYTES = 2 * 1024 * 1024;

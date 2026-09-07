@@ -1,0 +1,51 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "react-native": [
+        "./node_modules/react-native"
+      ],
+      "expo-file-system": [
+        "./node_modules/expo-file-system"
+      ],
+      "expo-image": [
+        "./node_modules/expo-image"
+      ],
+      "expo-router": [
+        "./node_modules/expo-router"
+      ],
+      "@expo/vector-icons": [
+        "./node_modules/@expo/vector-icons"
+      ],
+      "@react-native-async-storage/async-storage": [
+        "./node_modules/@react-native-async-storage/async-storage"
+      ],
+      "react-native-url-polyfill/auto": [
+        "./node_modules/react-native-url-polyfill/auto"
+      ],
+      "react": [
+        "./node_modules/@types/react"
+      ],
+      "react/*": [
+        "./node_modules/@types/react/*"
+      ],
+      "@supabase/supabase-js": [
+        "./node_modules/@supabase/supabase-js/dist/index.d.cts"
+      ]
+    }
+  },
+  "exclude": [
+    "node_modules",
+    "../src/lib/sanity"
+  ],
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "../src/**/*.ts",
+    "../src/**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
+}

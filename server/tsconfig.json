@@ -14,7 +14,12 @@
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true,
     "skipLibCheck": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "paths": {
+      "@sanity/client": [
+        "./node_modules/@sanity/client/dist/index.d.ts"
+      ]
+    }
   },
   "include": [
     "src/**/*.ts",

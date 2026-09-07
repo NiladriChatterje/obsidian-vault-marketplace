@@ -12,8 +12,10 @@ loadEnv({ path: path.resolve(import.meta.dirname, '../../.env'), quiet: true });
 
 const { DEMO_SELLERS, DEMO_VAULTS } = await import('../../src/lib/demo-data.ts');
 const { parseNote } = await import('../../src/lib/sanity/markdown.ts');
-const { requireWriteToken, sanity, SANITY_DATASET, SANITY_PROJECT_ID } = await import('../../src/lib/sanity/client.ts');
+const { requireWriteToken, sanity, useSanityClientFactory, SANITY_DATASET, SANITY_PROJECT_ID } = await import('../../src/lib/sanity/client.ts');
+const { createClient } = await import('@sanity/client');
 
+useSanityClientFactory(createClient);
 requireWriteToken();
 const client = sanity();
 console.log(`Seeding ${SANITY_PROJECT_ID}/${SANITY_DATASET} with ${DEMO_SELLERS.length} sellers and ${DEMO_VAULTS.length} vaults…`);

@@ -26,9 +26,11 @@ Vaults are used in Obsidian, not inside this app, but Apple can still classify t
 ## Running it
 
 ```bash
-npm install --legacy-peer-deps
-npx expo start
+cd mobile && npm install --legacy-peer-deps
+npm start                        # expo start, reading ../.env
 ```
+
+`mobile/`, `web/`, `server/`, `sanity-studio/` and `supabase/` are independent projects with their own `package.json`; there is no root install. `src/` at the repo root is plain shared TypeScript with no dependencies of its own: each consumer resolves the packages it imports (`mobile/metro.config.js` and `mobile/tsconfig.json`, `web/next.config.ts` aliases, and the Sanity module receives its client via `useSanityClientFactory`).
 
 With the Supabase keys empty in `.env`, the app runs in **demo mode**: 8 sample vaults, fake auth (any email works), and instant purchases stored on the device. Every screen is usable in Expo Go. If the payment server is running (below), tapping Buy in demo mode still opens a real Razorpay **test** checkout so the flow can be tried end to end.
 
@@ -93,10 +95,11 @@ docker compose up --build      # web on :3000, api on :4000
 docker compose logs -f api
 ```
 
-`server/Dockerfile` runs the TypeScript sources directly on Node 24 (no build step). `web/Dockerfile` uses the repo root as build context because the site imports `../src`, builds Next.js in standalone mode, and inlines the `EXPO_PUBLIC_*` values as build args (compose passes them from `.env`). Rebuild the web image after changing those; server values are read at runtime. The Expo app is not containerised: run it with `npx expo start` against the running api.
+`server/Dockerfile` runs the TypeScript sources directly on Node 24 (no build step). `web/Dockerfile` uses the repo root as build context because the site imports `../src`, builds Next.js in standalone mode, and inlines the `EXPO_PUBLIC_*` values as build args (compose passes them from `.env`). Rebuild the web image after changing those; server values are read at runtime. The Expo app is not containerised: run it with `npm start` in `mobile/` against the running api.
 
 ```bash
-npm run typecheck   # tsc --noEmit
+cd mobile
+npm run typecheck   # tsc --noEmit (includes ../src)
 npx expo-doctor
 ```
 
@@ -159,6 +162,7 @@ Sellers fill in one form (`/sell/payouts` on both app and web): legal name, phon
 ## Project layout
 
 ```
+mobile/                  Expo app (app/ routes, assets, app.json, metro.config.js)
 app/
   (tabs)/index.tsx       Explore: search, featured, categories, trending, free, new
   (tabs)/library.tsx     Everything the user owns, with download
@@ -171,7 +175,7 @@ app/
   sell/[id].tsx          Create or edit a listing (id = "new")
   auth.tsx               Sign in / sign up modal
   checkout-result.tsx    Deep-link target after Razorpay checkout
-src/
+src/                     Shared by mobile, web and server (no dependencies of its own)
   lib/api/types.ts       Backend interface the UI depends on
   lib/api/demo.ts        In-memory backend with seed data
   lib/api/supabase.ts    Production backend (auth, reviews, uploads of covers)

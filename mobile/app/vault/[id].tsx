@@ -5,15 +5,15 @@ import * as WebBrowser from 'expo-web-browser';
 import React, { useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { VaultCover } from '../../src/components/VaultCard';
-import { Avatar, Button, Card, Chip, ErrorBox, Input, Loading, PriceTag, SectionTitle, Stars } from '../../src/components/ui';
-import { useAsync } from '../../src/hooks/useAsync';
-import { api } from '../../src/lib/api';
-import { APP_SCHEME } from '../../src/lib/config';
-import { formatBytes, formatCount, timeAgo } from '../../src/lib/format';
-import { useAuth } from '../../src/store/auth';
-import { colors, radius, spacing } from '../../src/theme';
-import { categoryLabel } from '../../src/types';
+import { VaultCover } from '../../../src/components/VaultCard';
+import { Avatar, Button, Card, Chip, ErrorBox, Input, Loading, PriceTag, SectionTitle, Stars } from '../../../src/components/ui';
+import { useAsync } from '../../../src/hooks/useAsync';
+import { api } from '../../../src/lib/api';
+import { APP_SCHEME } from '../../../src/lib/config';
+import { formatBytes, formatCount, timeAgo } from '../../../src/lib/format';
+import { useAuth } from '../../../src/store/auth';
+import { colors, radius, spacing } from '../../../src/theme';
+import { categoryLabel } from '../../../src/types';
 
 export default function VaultDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

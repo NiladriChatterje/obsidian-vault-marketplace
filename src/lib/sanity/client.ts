@@ -4,9 +4,20 @@
  * private and every read goes through here with SANITY_API_TOKEN; the app and
  * site never talk to Sanity directly.
  *
+ * This shared folder has no node_modules of its own, so the consumer hands in
+ * `createClient` from its copy of @sanity/client via `useSanityClientFactory`.
  * Imports inside this folder carry a .ts extension so plain Node can run them.
  */
-import { createClient, type SanityClient } from '@sanity/client';
+import type { ClientConfig, SanityClient } from '@sanity/client';
+
+type ClientFactory = (config: ClientConfig) => SanityClient;
+let factory: ClientFactory | null = null;
+
+/** Call once at startup: `useSanityClientFactory(createClient)` with the app's own @sanity/client. */
+export function useSanityClientFactory(f: ClientFactory): void {
+  factory = f;
+  client = null;
+}
 
 const env = (k: string) => (typeof process !== 'undefined' ? process.env[k] : undefined) ?? '';
 
@@ -22,7 +33,8 @@ let client: SanityClient | null = null;
 
 export function sanity(): SanityClient {
   if (!SANITY_ENABLED) throw new Error('Sanity is not configured (SANITY_PROJECT_ID).');
-  return (client ??= createClient({
+  if (!factory) throw new Error('Sanity client not initialised: call useSanityClientFactory(createClient) first.');
+  return (client ??= factory({
     projectId: SANITY_PROJECT_ID,
     dataset: SANITY_DATASET,
     apiVersion: SANITY_API_VERSION,

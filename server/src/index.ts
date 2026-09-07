@@ -6,15 +6,19 @@
  *
  *   npm run dev      # reads ../.env, restarts on change
  */
+import './env.ts'; // must stay first: shared modules read process.env when imported
 import cors from '@fastify/cors';
 import formbody from '@fastify/formbody';
 import Fastify from 'fastify';
-import { SANITY_API_TOKEN, SANITY_DATASET, SANITY_ENABLED, SANITY_PROJECT_ID } from '../../src/lib/sanity/index.ts';
+import { createClient } from '@sanity/client';
+import { SANITY_API_TOKEN, SANITY_DATASET, SANITY_ENABLED, SANITY_PROJECT_ID, useSanityClientFactory } from '../../src/lib/sanity/index.ts';
 import { IS_DEMO, cfg } from './config.ts';
 import catalogRoutes from './routes/catalog.ts';
 import checkoutRoutes from './routes/checkout.ts';
 import payoutRoutes from './routes/payouts.ts';
 import webhookRoutes from './routes/webhook.ts';
+
+useSanityClientFactory(createClient);
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' } });
 

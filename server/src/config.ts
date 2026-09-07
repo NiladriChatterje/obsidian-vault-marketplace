@@ -2,10 +2,7 @@
  * Runs on plain Node (type stripping, no build step). Reads the repo-root .env
  * so the app, the site and this server share one file.
  */
-import { config as loadEnv } from 'dotenv';
-import path from 'node:path';
-
-loadEnv({ path: path.resolve(import.meta.dirname, '../../.env'), quiet: true });
+import './env.ts';
 
 const env = (key: string, fallback = '') => (process.env[key] ?? fallback).trim();
 

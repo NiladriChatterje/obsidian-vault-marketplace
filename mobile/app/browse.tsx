@@ -2,12 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { VaultRow } from '../src/components/VaultCard';
-import { Chip, EmptyState, ErrorBox, Loading } from '../src/components/ui';
-import { useAsync } from '../src/hooks/useAsync';
-import { api } from '../src/lib/api';
-import { colors, radius, spacing } from '../src/theme';
-import { CATEGORIES, categoryLabel, type CategorySlug, type SortMode } from '../src/types';
+import { VaultRow } from '../../src/components/VaultCard';
+import { Chip, EmptyState, ErrorBox, Loading } from '../../src/components/ui';
+import { useAsync } from '../../src/hooks/useAsync';
+import { api } from '../../src/lib/api';
+import { colors, radius, spacing } from '../../src/theme';
+import { CATEGORIES, categoryLabel, type CategorySlug, type SortMode } from '../../src/types';
 
 const SORTS: Array<{ key: SortMode; label: string }> = [
   { key: 'popular', label: 'Popular' },

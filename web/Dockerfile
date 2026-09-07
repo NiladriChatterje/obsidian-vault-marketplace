@@ -8,8 +8,6 @@ COPY web/package.json web/package-lock.json ./web/
 RUN cd web && npm ci --no-audit --no-fund
 COPY src ./src
 COPY web ./web
-# ../src resolves packages by walking up; point the repo root at the site's node_modules.
-RUN ln -s web/node_modules node_modules
 
 ARG EXPO_PUBLIC_SUPABASE_URL=
 ARG EXPO_PUBLIC_SUPABASE_ANON_KEY=

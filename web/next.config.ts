@@ -11,6 +11,9 @@ loadEnvConfig(repoRoot, process.env.NODE_ENV !== 'production');
  * The few React Native modules that layer touches are swapped for browser shims.
  */
 const shims = {
+  // Packages the shared ../src imports; they live in web/node_modules, which ../src cannot see by walking up.
+  '@supabase/supabase-js': 'node_modules/@supabase/supabase-js',
+  '@sanity/client': 'node_modules/@sanity/client',
   'react-native': 'shims/react-native.ts',
   'react-native-url-polyfill/auto': 'shims/empty.ts',
   '@react-native-async-storage/async-storage': 'shims/async-storage.ts',

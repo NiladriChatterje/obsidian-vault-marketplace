@@ -5,13 +5,13 @@ import * as ImagePicker from 'expo-image-picker';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { Button, Card, Chip, Input, Loading, SectionTitle } from '../../src/components/ui';
-import { api } from '../../src/lib/api';
-import { MAX_VAULT_ZIP_BYTES, MIN_PRICE_CENTS, PLATFORM_FEE_PERCENT } from '../../src/lib/config';
-import { formatBytes, formatPrice, parsePriceToCents, parseTags } from '../../src/lib/format';
-import { useAuth } from '../../src/store/auth';
-import { colors, radius, spacing } from '../../src/theme';
-import { CATEGORIES, type CategorySlug, type Vault, type VaultInput } from '../../src/types';
+import { Button, Card, Chip, Input, Loading, SectionTitle } from '../../../src/components/ui';
+import { api } from '../../../src/lib/api';
+import { MAX_VAULT_ZIP_BYTES, MIN_PRICE_CENTS, PLATFORM_FEE_PERCENT } from '../../../src/lib/config';
+import { formatBytes, formatPrice, parsePriceToCents, parseTags } from '../../../src/lib/format';
+import { useAuth } from '../../../src/store/auth';
+import { colors, radius, spacing } from '../../../src/theme';
+import { CATEGORIES, type CategorySlug, type Vault, type VaultInput } from '../../../src/types';
 
 export default function ListingFormScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
