@@ -43,13 +43,13 @@ The secret is shown once. Test keys stay valid; switch modes to keep both.
 | URL | `https://<api-domain>/webhooks/razorpay` |
 | Secret | any strong string → paste into `RAZORPAY_WEBHOOK_SECRET` |
 | Alert email | your ops address |
-| Active events | `payment.captured`, `order.paid`, `payment.failed` |
+| Active events | `payment.captured`, `order.paid`, `payment.failed`, `product.route.activated`, `product.route.under_review`, `product.route.needs_clarification` |
 
 The server verifies the signature over the raw body and rejects anything else.
 
 ## 5. Sellers (linked accounts)
 
-Sellers never touch the dashboard. They fill the payout form at `/sell/payouts`, and the server creates the linked account, stakeholder, Route product and settlement bank details. Razorpay reviews it, then `payouts_enabled` flips to true and paid listings unlock.
+Sellers never touch the dashboard. They fill the payout form at `/sell/payouts`, and the server creates the linked account, stakeholder, Route product and settlement bank details. Razorpay reviews it asynchronously and then sends `product.route.activated`, which flips `payouts_enabled` to true and unlocks paid listings. **The `product.route.*` events above are required for this**: buyers' checkouts read that flag, so without the webhook a seller's vaults stay unbuyable until the seller themselves reopens `/sell`, which re-reads the status directly from Razorpay as a fallback.
 
 Watch them under **Route → Accounts**. New accounts show `Pending` until Razorpay's penny-testing of the bank account passes. Linked-account settlements run on T+2 regardless of your own schedule.
 
