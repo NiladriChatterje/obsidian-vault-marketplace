@@ -53,7 +53,7 @@ export default async function payoutRoutes(app: FastifyInstance) {
       const user = await userFromRequest(req);
       if (!user) return reply.code(401).send({ error: 'Not signed in' });
       try {
-        return await onboard(user, req.body.details);
+        return { status: await onboard(user, req.body.details) };
       } catch (e) {
         req.log.error(e);
         return reply.code(502).send({ error: razorpayError(e) });
@@ -66,7 +66,7 @@ export default async function payoutRoutes(app: FastifyInstance) {
     const user = await userFromRequest(req);
     if (!user) return reply.code(401).send({ error: 'Not signed in' });
     try {
-      return await onboard(user);
+      return { status: await onboard(user) };
     } catch (e) {
       req.log.error(e);
       return reply.code(502).send({ error: razorpayError(e) });
@@ -74,7 +74,7 @@ export default async function payoutRoutes(app: FastifyInstance) {
   });
 }
 
-async function onboard(user: AuthUser, details?: PayoutDetails): Promise<{ status: Status; requirements: unknown[] }> {
+async function onboard(user: AuthUser, details?: PayoutDetails): Promise<Status> {
   const db = admin();
   const { data: profile, error } = await db.from('profiles').select('*').eq('id', user.id).single();
   if (error || !profile) throw new Error('Profile not found');
@@ -82,10 +82,11 @@ async function onboard(user: AuthUser, details?: PayoutDetails): Promise<{ statu
   let accountId: string | null = profile.razorpay_account_id;
   let productId: string | null = profile.razorpay_product_id;
 
+  const phone = details ? razorpayPhone(details.phone) : '';
+  const pan = details ? details.pan.toUpperCase() : '';
+
   if (!accountId) {
-    if (!details) return { status: 'none', requirements: [] };
-    const phone = razorpayPhone(details.phone);
-    const pan = details.pan.toUpperCase();
+    if (!details) return 'none';
 
     const account = (await razorpay.accounts.create({
       email: user.email ?? undefined,
@@ -105,21 +106,31 @@ async function onboard(user: AuthUser, details?: PayoutDetails): Promise<{ statu
       notes: { user_id: user.id },
     } as any)) as Row;
     accountId = account.id;
+    // Save the id before anything else can fail: the account now exists at
+    // Razorpay and a second create for the same email is rejected, so dropping
+    // it here would strand the seller permanently.
+    await db.from('profiles').update({ is_seller: true, razorpay_account_id: accountId }).eq('id', user.id);
+  }
 
-    await razorpay.stakeholders.create(accountId!, {
-      name: details.legalName,
-      email: user.email ?? undefined,
-      percentage_ownership: 100,
-      relationship: { executive: true },
-      phone: { primary: phone },
-      addresses: { residential: { street: details.street, city: details.city, state: details.state, postal_code: details.postalCode, country: 'IN' } },
-      kyc: { pan },
-    } as any);
+  // Also the resume path for a submission that died after the account was
+  // created - most often because the platform has no Route access yet.
+  if (details && !productId) {
+    const { items = [] } = (await razorpay.stakeholders.all(accountId!)) as Row;
+    if (!items.length) {
+      await razorpay.stakeholders.create(accountId!, {
+        name: details.legalName,
+        email: user.email ?? undefined,
+        percentage_ownership: 100,
+        relationship: { executive: true },
+        phone: { primary: phone },
+        addresses: { residential: { street: details.street, city: details.city, state: details.state, postal_code: details.postalCode, country: 'IN' } },
+        kyc: { pan },
+      } as any);
+    }
 
     const product = (await razorpay.products.requestProductConfiguration(accountId!, { product_name: 'route', tnc_accepted: true })) as Row;
     productId = product.id;
-
-    await db.from('profiles').update({ is_seller: true, razorpay_account_id: accountId, razorpay_product_id: productId }).eq('id', user.id);
+    await db.from('profiles').update({ razorpay_product_id: productId }).eq('id', user.id);
   }
 
   if (details && productId) {
@@ -130,12 +141,10 @@ async function onboard(user: AuthUser, details?: PayoutDetails): Promise<{ statu
   }
 
   let status: Status = 'pending';
-  let requirements: unknown[] = [];
   if (productId) {
     const product = (await razorpay.products.fetch(accountId!, productId)) as Row;
     status = product.activation_status === 'activated' ? 'activated' : 'pending';
-    requirements = product.requirements ?? [];
   }
   await db.from('profiles').update({ is_seller: true, payouts_enabled: status === 'activated' }).eq('id', user.id);
-  return { status, requirements };
+  return status;
 }
