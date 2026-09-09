@@ -8,7 +8,22 @@
 export function fileToUri(file: File): string {
   const ext = file.name.split('.').pop()?.toLowerCase();
   const url = URL.createObjectURL(file);
+  picked.set(url, file);
   return ext ? `${url}#.${ext}` : url;
+}
+
+const picked = new Map<string, File>();
+
+/** The original File, so uploads can skip fetching the object URL back. */
+export function fileFromUri(uri: string): File | undefined {
+  return picked.get(uri.split('#')[0]);
+}
+
+/** Call once the upload is done: the object URL pins the whole file in memory. */
+export function releaseUri(uri: string): void {
+  const url = uri.split('#')[0];
+  picked.delete(url);
+  URL.revokeObjectURL(url);
 }
 
 export function errorMessage(e: unknown, fallback = 'Something went wrong. Please try again.'): string {

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Cover, Field, Loading } from '@/components/ui';
-import { errorMessage, fileToUri } from '@/lib/web';
+import { errorMessage, fileToUri, releaseUri } from '@/lib/web';
 import { api } from '@/lib/api';
 import { MAX_VAULT_ZIP_BYTES, MIN_PRICE_CENTS, PLATFORM_FEE_PERCENT } from '@/lib/config';
 import { formatBytes, formatPrice, parsePriceToCents, parseTags } from '@/lib/format';
@@ -78,11 +78,13 @@ export default function ListingEditorPage() {
     if (!file) return;
     setUploadingCover(true);
     setError(null);
+    const uri = fileToUri(file);
     try {
-      setCoverUrl(await api.uploadCover(fileToUri(file)));
+      setCoverUrl(await api.uploadCover(uri));
     } catch (e) {
       setError(errorMessage(e, 'Cover upload failed.'));
     } finally {
+      releaseUri(uri);
       setUploadingCover(false);
     }
   };
@@ -93,14 +95,16 @@ export default function ListingEditorPage() {
     if (file.size > MAX_VAULT_ZIP_BYTES) return setError(`Vault archives must be under ${formatBytes(MAX_VAULT_ZIP_BYTES)}.`);
     setUploadingFile(true);
     setError(null);
+    const uri = fileToUri(file);
     try {
-      const uploaded = await api.uploadVaultFile(fileToUri(file), file.name);
+      const uploaded = await api.uploadVaultFile(uri, file.name);
       setFilePath(uploaded.path);
       setFileName(file.name);
       setSizeBytes(uploaded.sizeBytes || file.size);
     } catch (e) {
       setError(errorMessage(e, 'Upload failed.'));
     } finally {
+      releaseUri(uri);
       setUploadingFile(false);
     }
   };

@@ -139,6 +139,12 @@ export async function upsertSeller(s: SellerInput): Promise<string> {
   return _id;
 }
 
+/** cdn.sanity.io/images/<project>/<dataset>/<hash>-<w>x<h>.<ext> -> the asset's _id. */
+function imageRef(url: string | null | undefined): Doc | undefined {
+  const m = url ? /\/([^/]+)-(\d+x\d+)\.(\w+)$/.exec(url.split('?')[0]) : null;
+  return m ? { _type: 'image', asset: { _type: 'reference', _ref: `image-${m[1]}-${m[2]}-${m[3]}` } } : undefined;
+}
+
 function slugify(text: string): string {
   return text.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 60) || 'vault';
 }
@@ -159,7 +165,7 @@ export async function saveVault(input: VaultInput, seller: SellerInput, id?: str
     plugins: input.plugins,
     version: input.version,
   };
-  if (input.coverUrl !== undefined) fields.coverUrl = input.coverUrl ?? undefined;
+  if (input.coverUrl !== undefined) fields.cover = imageRef(input.coverUrl);
   if (input.screenshots !== undefined) fields.screenshots = input.screenshots;
   if (input.entryNote !== undefined) fields.entryNote = input.entryNote ?? undefined;
 
@@ -206,12 +212,20 @@ export async function setVaultStatus(id: string, status: VaultStatus, sellerUser
 
 export async function deleteVault(id: string, sellerUserId: string): Promise<void> {
   requireWriteToken();
-  const d = await sanity().fetch<Doc | null>(`*[_type == "vault" && _id == $id][0]{ "sellerUserId": seller->userId }`, { id });
+  const d = await sanity().fetch<Doc | null>(`*[_type == "vault" && _id == $id][0]{ "sellerUserId": seller->userId, "coverAsset": cover.asset._ref }`, { id });
   if (!d) return;
   if (d.sellerUserId !== sellerUserId) throw new Error('Not your listing');
   const client = sanity();
   await client.delete({ query: '*[_type in ["note", "attachment"] && vault._ref == $id]', params: { id } });
   await client.delete(id);
+  if (d.coverAsset) await client.delete(d.coverAsset).catch(() => {});
+}
+
+/** Cover images are Sanity assets; the listing keeps a reference, so `deleteVault` can drop them. */
+export async function uploadCoverImage(data: Uint8Array, filename: string): Promise<string> {
+  requireWriteToken();
+  const asset = await sanity().assets.upload('image', Buffer.from(data), { filename });
+  return asset.url;
 }
 
 export async function incrementDownloads(id: string): Promise<void> {

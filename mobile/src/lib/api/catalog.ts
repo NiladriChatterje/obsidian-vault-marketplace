@@ -125,6 +125,12 @@ export function withServerCatalog(base: Backend): Backend {
     async deleteVault(id) {
       await call(demo, `/vaults/${encodeURIComponent(id)}`, { method: 'DELETE' });
     },
+    async uploadCover(localUri) {
+      const form = new FormData();
+      form.append('file', await (await fetch(localUri.split('#')[0])).blob(), 'cover');
+      const { url } = await call<{ url: string }>(demo, '/uploads/cover', { method: 'POST', form });
+      return url;
+    },
     async uploadVaultFile(localUri, fileName): Promise<UploadedFile> {
       const blob = await (await fetch(localUri.split('#')[0])).blob();
       const form = new FormData();
