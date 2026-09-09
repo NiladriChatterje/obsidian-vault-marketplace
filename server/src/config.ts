@@ -16,7 +16,8 @@ export const cfg = {
   razorpay: {
     keyId: env('RAZORPAY_CLIENT_KEY'),
     keySecret: env('RAZORPAY_SECRET_KEY'),
-    merchantId: env('MERCHANT_ID'),
+    /** Accepts the older MERCHANT_ID spelling so existing .env files keep working. */
+    merchantId: env('RAZORPAY_MERCHANT_ID') || env('MERCHANT_ID'),
     webhookSecret: env('RAZORPAY_WEBHOOK_SECRET'),
     /** 'on' (default) splits every paid order to the seller's Route linked account; 'off' keeps everything on the platform account. */
     route: env('RAZORPAY_ROUTE', 'on') !== 'off',
