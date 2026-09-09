@@ -7,6 +7,7 @@
 import type { Purchase, SellerStats, Vault, VaultInput, VaultNote, VaultNoteContent, VaultStatus } from '../../types';
 import { API_URL } from '../config';
 import { getSupabase } from '../supabase';
+import { fileFromUri } from '../web';
 import { demoStore } from './demo';
 import type { Backend, UploadedFile } from './types';
 
@@ -38,6 +39,10 @@ async function call<T = Json>(demo: boolean, path: string, init: { method?: stri
   const json = (await res.json().catch(() => ({}))) as T & { error?: string };
   if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
   return json;
+}
+
+async function blobFor(uri: string): Promise<Blob> {
+  return fileFromUri(uri) ?? (await fetch(uri.split('#')[0])).blob();
 }
 
 function qs(params: Record<string, string | number | boolean | undefined>): string {
@@ -125,10 +130,15 @@ export function withServerCatalog(base: Backend): Backend {
     async deleteVault(id) {
       await call(demo, `/vaults/${encodeURIComponent(id)}`, { method: 'DELETE' });
     },
-    async uploadVaultFile(localUri, fileName): Promise<UploadedFile> {
-      const blob = await (await fetch(localUri.split('#')[0])).blob();
+    async uploadCover(localUri) {
       const form = new FormData();
-      form.append('file', blob, fileName);
+      form.append('file', await blobFor(localUri), 'cover');
+      const { url } = await call<{ url: string }>(demo, '/uploads/cover', { method: 'POST', form });
+      return url;
+    },
+    async uploadVaultFile(localUri, fileName): Promise<UploadedFile> {
+      const form = new FormData();
+      form.append('file', await blobFor(localUri), fileName);
       const res = await call<{ path: string; sizeBytes: number; noteCount: number }>(demo, '/uploads/vault-zip', { method: 'POST', form });
       return { path: res.path, sizeBytes: res.sizeBytes };
     },

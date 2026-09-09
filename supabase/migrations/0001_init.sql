@@ -193,14 +193,8 @@ create policy "authors edit own reviews" on public.reviews for update using (use
 create policy "authors delete own reviews" on public.reviews for delete using (user_id = auth.uid());
 
 -- ---------- storage ----------
-insert into storage.buckets (id, name, public) values ('vault-covers', 'vault-covers', true)
-  on conflict (id) do nothing;
 insert into storage.buckets (id, name, public, file_size_limit) values ('vault-files', 'vault-files', false, 209715200)
   on conflict (id) do nothing;
-
-create policy "covers are public" on storage.objects for select using (bucket_id = 'vault-covers');
-create policy "sellers upload covers to own folder" on storage.objects for insert
-  with check (bucket_id = 'vault-covers' and (storage.foldername(name))[1] = auth.uid()::text);
 
 create policy "sellers upload vault files to own folder" on storage.objects for insert
   with check (bucket_id = 'vault-files' and (storage.foldername(name))[1] = auth.uid()::text);

@@ -17,6 +17,7 @@
  *   POST /vaults/:id/status { status } | DELETE /vaults/:id
  *   POST /vaults/:id/refresh-rating    recompute rating from Supabase reviews into Sanity
  *   POST /uploads/vault-zip            multipart zip -> note/attachment documents -> { path: bundleId, ... }
+ *   POST /uploads/cover                multipart image -> Sanity image asset -> { url }
  */
 import multipart from '@fastify/multipart';
 import type { FastifyInstance } from 'fastify';
@@ -29,6 +30,7 @@ import { buildVaultZip, signDownload, verifyDownload } from '../download.ts';
 import { admin } from '../supabase.ts';
 
 const MAX_ZIP_BYTES = 200 * 1024 * 1024;
+const MAX_COVER_BYTES = 5 * 1024 * 1024;
 
 export default async function catalogRoutes(app: FastifyInstance) {
   await app.register(multipart, { limits: { fileSize: MAX_ZIP_BYTES, files: 1 } });
@@ -271,6 +273,22 @@ export default async function catalogRoutes(app: FastifyInstance) {
       if (!summary.noteCount) return reply.code(400).send({ error: 'No markdown notes found in the zip. Zip the vault folder itself.' });
       // `path` keeps the client's VaultInput.filePath contract: it now carries the bundle id.
       return { path: summary.bundle, sizeBytes: summary.sizeBytes, noteCount: summary.noteCount, attachmentCount: summary.attachmentCount, skipped: summary.skipped, fee: platformFee(0) };
+    } catch (e) {
+      req.log.error(e);
+      return reply.code(502).send({ error: e instanceof Error ? e.message : 'Upload failed' });
+    }
+  });
+
+  app.post('/uploads/cover', async (req, reply) => {
+    const r = await requireRequester(req, reply);
+    if (!r) return;
+    const part = await req.file();
+    if (!part) return reply.code(400).send({ error: 'Attach the image as multipart field "file"' });
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(part.mimetype)) return reply.code(400).send({ error: 'Cover must be a PNG, JPEG, WebP or GIF' });
+    const buf = await part.toBuffer();
+    if (buf.byteLength > MAX_COVER_BYTES) return reply.code(413).send({ error: 'Cover must be under 5 MB' });
+    try {
+      return { url: await catalog.uploadCoverImage(buf, part.filename || 'cover') };
     } catch (e) {
       req.log.error(e);
       return reply.code(502).send({ error: e instanceof Error ? e.message : 'Upload failed' });

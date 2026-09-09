@@ -50,7 +50,7 @@ export const vault = defineType({
       group: 'listing',
       validation: (r) => r.required(),
     }),
-    defineField({ name: 'coverUrl', title: 'Cover image URL', type: 'url', group: 'listing', description: 'Public image URL (uploaded from the app).' }),
+    defineField({ name: 'cover', title: 'Cover image', type: 'image', group: 'listing', options: { hotspot: true } }),
     defineField({ name: 'screenshots', type: 'array', of: [{ type: 'url' }], group: 'listing' }),
     defineField({ name: 'featured', type: 'boolean', group: 'listing', initialValue: false, description: 'Shows in the home carousel.' }),
 
@@ -114,10 +114,11 @@ export const vault = defineType({
     defineField({ name: 'ratingCount', type: 'number', group: 'stats', initialValue: 0, readOnly: true }),
   ],
   preview: {
-    select: { title: 'title', subtitle: 'tagline', status: 'status', price: 'priceCents' },
-    prepare: ({ title, subtitle, status, price }) => ({
+    select: { title: 'title', subtitle: 'tagline', status: 'status', price: 'priceCents', media: 'cover' },
+    prepare: ({ title, subtitle, status, price, media }) => ({
       title: `${title ?? 'Untitled'}${status !== 'published' ? ` · ${status}` : ''}`,
       subtitle: `${price ? `₹${(price / 100).toFixed(0)}` : 'Free'}${subtitle ? ` — ${subtitle}` : ''}`,
+      media,
     }),
   },
   orderings: [

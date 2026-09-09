@@ -3,7 +3,7 @@
 export const VAULT_PROJECTION = `{
   _id, _createdAt, _updatedAt,
   title, "slug": slug.current, tagline, description, category, tags,
-  priceCents, currency, coverUrl, screenshots, plugins,
+  priceCents, currency, "coverUrl": coalesce(cover.asset->url + "?w=1200&fit=max&auto=format", coverUrl), screenshots, plugins,
   noteCount, sizeBytes, version, entryNote, bundle, status,
   downloads, ratingAvg, ratingCount, featured,
   "seller": seller->{ "id": userId, username, displayName, avatarUrl }
