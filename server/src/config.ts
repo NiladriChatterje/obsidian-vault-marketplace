@@ -33,6 +33,14 @@ export const cfg = {
     serviceKey: env('SUPABASE_SERVICE_ROLE_KEY'),
   },
 
+  /** Brevo transactional email (see email.ts). No API key = the server sends no mail. */
+  brevo: {
+    apiKey: env('BREVO_API_KEY'),
+    /** Must be a sender Brevo has verified, or every send is refused. */
+    senderEmail: env('EMAIL_FROM', 'obsidian.vault.marketplace@gmail.com'),
+    senderName: env('EMAIL_FROM_NAME', 'Vault Market'),
+  },
+
   feePercent: Number(env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT', env('PLATFORM_FEE_PERCENT', '10'))),
   /** Signs short-lived download links. Falls back to the Razorpay secret so nothing extra is required. */
   downloadSecret: env('DOWNLOAD_SECRET') || env('RAZORPAY_SECRET_KEY') || 'dev-download-secret',

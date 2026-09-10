@@ -13,6 +13,7 @@ import Fastify from 'fastify';
 import { createClient } from '@sanity/client';
 import { SANITY_API_TOKEN, SANITY_DATASET, SANITY_ENABLED, SANITY_PROJECT_ID, useSanityClientFactory } from './sanity/index.ts';
 import { IS_DEMO, cfg } from './config.ts';
+import { EMAIL_ENABLED } from './email.ts';
 import { startKeepAwake } from './keepalive.ts';
 import catalogRoutes from './routes/catalog.ts';
 import checkoutRoutes from './routes/checkout.ts';
@@ -34,6 +35,7 @@ app.get('/health', async () => ({
   merchantId: cfg.razorpay.merchantId || null,
   route: cfg.razorpay.route,
   webhookConfigured: !!cfg.razorpay.webhookSecret,
+  email: EMAIL_ENABLED ? { provider: 'brevo', from: cfg.brevo.senderEmail } : null,
   catalog: SANITY_ENABLED ? { source: 'sanity', projectId: SANITY_PROJECT_ID, dataset: SANITY_DATASET, canWrite: !!SANITY_API_TOKEN } : { source: 'none' },
 }));
 
