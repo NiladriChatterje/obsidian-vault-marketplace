@@ -59,6 +59,7 @@ To onboard someone manually instead: **Route → Accounts → + Add Account**, t
 
 ```
 SERVER_API_URL=https://<api-domain>
+EXPO_PUBLIC_API_URL=https://<api-domain>
 ALLOWED_REDIRECT_ORIGINS=https://<site-domain>
 EXPO_PUBLIC_PLATFORM_FEE_PERCENT=10
 RAZORPAY_ROUTE=on

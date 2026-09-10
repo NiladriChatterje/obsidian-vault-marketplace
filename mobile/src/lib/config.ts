@@ -26,8 +26,12 @@ export const APP_SCHEME = 'vaultmarket';
  * Base URL of the Fastify payment server (server/). It creates Razorpay orders,
  * hosts the checkout page, verifies signatures and onboards sellers.
  * Empty means "no server": paid checkout is unavailable outside demo mode.
+ *
+ * Prefixed unlike the server and the site, which read SERVER_API_URL: Metro inlines
+ * only EXPO_PUBLIC_* variables into the bundle, so a bare name arrives undefined and
+ * quietly drops CATALOG_SOURCE to 'local' below. Set both to the same URL.
  */
-export const API_URL = (process.env.SERVER_API_URL ?? '').replace(/\/$/, '');
+export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
 
 /**
  * Where listings and notes come from. 'sanity' routes the catalog through the
