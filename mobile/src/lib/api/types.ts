@@ -36,6 +36,14 @@ export interface Backend {
   signIn(email: string, password: string): Promise<void>;
   signUp(email: string, password: string, username: string): Promise<{ needsEmailConfirm: boolean }>;
   signOut(): Promise<void>;
+  /** False when the username is already taken, so sign-up can fail before the account exists. */
+  isUsernameAvailable(username: string): Promise<boolean>;
+  /** Emails a password-reset link. Resolves for unknown addresses too, so it cannot be used to probe for accounts. */
+  sendPasswordReset(email: string): Promise<void>;
+  /** Sets a new password for the user the current session belongs to (a reset link, or a signed-in user). */
+  updatePassword(password: string): Promise<void>;
+  /** Sends the sign-up confirmation email again. */
+  resendConfirmation(email: string): Promise<void>;
   getProfile(userId: string): Promise<Profile | null>;
   updateProfile(patch: Partial<Pick<Profile, 'displayName' | 'bio' | 'username'>>): Promise<Profile>;
 

@@ -20,6 +20,13 @@ export const DEFAULT_CURRENCY = 'INR';
 /** Minimum price a seller may set for a paid vault, in minor units (Rs 49). Mirrored in the vaults check constraint. */
 export const MIN_PRICE_CENTS = 4900;
 
+/**
+ * Minimum password length, enforced in the sign-up form. Supabase enforces its own
+ * minimum server-side (Authentication -> Providers -> Email); keep the two in step,
+ * since the dashboard default is 6.
+ */
+export const MIN_PASSWORD_LENGTH = 8;
+
 export const APP_SCHEME = 'vaultmarket';
 
 /**
