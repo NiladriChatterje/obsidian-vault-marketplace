@@ -119,7 +119,7 @@ The site reads the repo-root `.env` (and its own `web/.env*` files). Keys that m
 
 | Key | Purpose |
 | --- | --- |
-| `EXPO_PUBLIC_API_URL` | Base URL of the payment server (`server/`); every data call from the browser goes there. |
+| `SERVER_API_URL` | Base URL of the payment server (`server/`); every data call from the browser goes there. |
 | `EXPO_PUBLIC_REDIRECT_ORIGIN` | Optional. Where the payment server sends buyers back (defaults to the browser origin). Also list it in `ALLOWED_REDIRECT_ORIGINS`. |
 
 ### MCP access
@@ -142,7 +142,7 @@ Tools: `list_vaults`, `list_notes`, `read_note`, `search_notes`, all reading the
    After migration 0005 Supabase holds `profiles`, `purchases`, `orders`, `reviews`, `mcp_tokens`, row-level security, and the public `vault-covers` bucket. Vault ids in those tables are Sanity document ids.
 1. **Sanity.** Log in once (`npx sanity login` in `sanity-studio/`), create an Editor token at sanity.io/manage → API → Tokens, put it in `.env` as `SANITY_API_TOKEN`, make the dataset private, and optionally seed it (`node server/scripts/seed-sanity.ts`). Deploy the Studio with `npm run deploy` in `sanity-studio/`.
 2. **App env.** Copy `.env.example` to `.env` and set the Supabase URL and anon key. Restart Expo.
-3. **Razorpay.** Create a Razorpay account (KYC as an individual or business), ask support to enable **Route** on it, and put the key id / secret from Settings → API Keys into `.env` (`RAZORPAY_CLIENT_KEY`, `RAZORPAY_SECRET_KEY`, `RAZORPAY_MERCHANT_ID`). Deploy `server/` somewhere public (any Node host), set `EXPO_PUBLIC_API_URL` to its URL, and in the Razorpay dashboard add a webhook pointing at `<api>/webhooks/razorpay` with events `payment.captured`, `order.paid`, `payment.failed`, `product.route.activated`, `product.route.under_review`, `product.route.needs_clarification`; put the secret you choose there into `RAZORPAY_WEBHOOK_SECRET`. Set `RAZORPAY_ROUTE=off` to sell before Route is enabled (the platform then settles sellers manually).
+3. **Razorpay.** Create a Razorpay account (KYC as an individual or business), ask support to enable **Route** on it, and put the key id / secret from Settings → API Keys into `.env` (`RAZORPAY_CLIENT_KEY`, `RAZORPAY_SECRET_KEY`, `RAZORPAY_MERCHANT_ID`). Deploy `server/` somewhere public (any Node host), set `SERVER_API_URL` to its URL, and in the Razorpay dashboard add a webhook pointing at `<api>/webhooks/razorpay` with events `payment.captured`, `order.paid`, `payment.failed`, `product.route.activated`, `product.route.under_review`, `product.route.needs_clarification`; put the secret you choose there into `RAZORPAY_WEBHOOK_SECRET`. Set `RAZORPAY_ROUTE=off` to sell before Route is enabled (the platform then settles sellers manually).
 4. **Redirects.** After checkout the server redirects to `<redirectOrigin>/checkout-result?status=success|failed|cancelled&vault=…&payment=pay_…`. The site passes its own origin; the app passes `vaultmarket:/`, so the in-app browser sheet closes on `vaultmarket://checkout-result`. Restrict accepted origins with `ALLOWED_REDIRECT_ORIGINS`.
 5. **Assets.** Replace the placeholder icon and splash in `assets/`.
 

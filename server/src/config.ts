@@ -14,7 +14,7 @@ const port = Number(env('API_PORT') || env('PORT', '4000'));
 export const cfg = {
   port,
   /** Public URL of this server; Razorpay posts the checkout result back here. */
-  apiUrl: env('EXPO_PUBLIC_API_URL', `http://localhost:${port}`).replace(/\/$/, ''),
+  apiUrl: env('SERVER_API_URL', `http://localhost:${port}`).replace(/\/$/, ''),
 
   razorpay: {
     keyId: env('RAZORPAY_CLIENT_KEY'),

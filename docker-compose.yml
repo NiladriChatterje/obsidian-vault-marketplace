@@ -22,7 +22,7 @@ services:
         EXPO_PUBLIC_SUPABASE_ANON_KEY: ${EXPO_PUBLIC_SUPABASE_ANON_KEY:-}
         EXPO_PUBLIC_PLATFORM_FEE_PERCENT: ${EXPO_PUBLIC_PLATFORM_FEE_PERCENT:-15}
         # Browser-facing URL of the api service (the buyer's browser calls it directly).
-        EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:-http://localhost:4000}
+        SERVER_API_URL: ${SERVER_API_URL:-http://localhost:4000}
         EXPO_PUBLIC_REDIRECT_ORIGIN: ${EXPO_PUBLIC_REDIRECT_ORIGIN:-http://localhost:3000}
         EXPO_PUBLIC_CATALOG_SOURCE: ${EXPO_PUBLIC_CATALOG_SOURCE:-sanity}
     env_file: .env
