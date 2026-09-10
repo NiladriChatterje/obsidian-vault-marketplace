@@ -27,7 +27,7 @@ async function authHeaders(demo: boolean): Promise<Record<string, string>> {
 }
 
 async function call<T = Json>(demo: boolean, path: string, init: { method?: string; body?: unknown; form?: FormData } = {}): Promise<T> {
-  if (!API_URL) throw new Error('Payment server is not configured. Set SERVER_API_URL.');
+  if (!API_URL) throw new Error('Payment server is not configured. Set EXPO_PUBLIC_API_URL.');
   const headers: Record<string, string> = await authHeaders(demo);
   if (!init.form) headers['Content-Type'] = 'application/json';
   const res = await fetch(`${API_URL}${path}`, {
