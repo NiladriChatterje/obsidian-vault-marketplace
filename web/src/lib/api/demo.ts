@@ -158,6 +158,20 @@ export const demoBackend: Backend = {
     listeners.forEach((l) => l(s.user));
     return { needsEmailConfirm: false };
   },
+  async isUsernameAvailable(username) {
+    const s = await load();
+    return !s.profiles.some((p) => p.username.toLowerCase() === username.toLowerCase() && p.id !== s.user?.id);
+  },
+  async sendPasswordReset() {
+    // No mail server and no passwords in demo mode; resolve so the UI shows the same copy.
+    await wait(300);
+  },
+  async updatePassword() {
+    await wait(300);
+  },
+  async resendConfirmation() {
+    await wait(300);
+  },
   async signOut() {
     const s = await load();
     s.user = null;

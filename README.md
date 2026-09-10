@@ -140,7 +140,18 @@ Tools: `list_vaults`, `list_notes`, `read_note`, `search_notes`, all reading the
    supabase link --project-ref <ref>
    supabase db push
    ```
-   After migration 0005 Supabase holds `profiles`, `purchases`, `orders`, `reviews`, `mcp_tokens`, row-level security, and the public `vault-covers` bucket. Vault ids in those tables are Sanity document ids.
+   Supabase holds `profiles`, `purchases`, `orders`, `reviews`, `mcp_tokens` and their row-level security. Vault ids in those tables are Sanity document ids (0005), and vault files and cover images live in Sanity, not in Supabase storage.
+
+   Then set up **Authentication** in the dashboard — the app cannot do this for you, and email links silently fall back to the Site URL until it is done:
+
+   | Setting | Value |
+   | --- | --- |
+   | URL Configuration → Site URL | the site's own origin, e.g. `https://vault.market` |
+   | URL Configuration → Redirect URLs | `https://<site>/auth/callback`, `https://<site>/auth/reset` (add the `http://localhost:3000` pair for local work) |
+   | Providers → Email → Confirm email | on, so an address is proven before it can buy |
+   | Providers → Email → Minimum password length | 8, matching `MIN_PASSWORD_LENGTH` in `web/src/lib/config.ts` and `mobile/src/lib/config.ts` |
+   | Providers → Email → Leaked password protection | on |
+   | Project Settings → Auth → SMTP | your own SMTP provider. The built-in sender is capped at a few messages an hour and is not for production: without it, confirmation and reset mails stop arriving as soon as you have real traffic. |
 1. **Sanity.** Log in once (`npx sanity login` in `sanity-studio/`), create an Editor token at sanity.io/manage → API → Tokens, put it in `.env` as `SANITY_API_TOKEN`, make the dataset private, and optionally seed it (`node server/scripts/seed-sanity.ts`). Deploy the Studio with `npm run deploy` in `sanity-studio/`.
 2. **App env.** Copy `.env.example` to `.env` and set the Supabase URL and anon key. Restart Expo.
 3. **Razorpay.** Create a Razorpay account (KYC as an individual or business), ask support to enable **Route** on it, and put the key id / secret from Settings → API Keys into `.env` (`RAZORPAY_CLIENT_KEY`, `RAZORPAY_SECRET_KEY`, `RAZORPAY_MERCHANT_ID`). Deploy `server/` somewhere public (any Node host), set `SERVER_API_URL` (and `EXPO_PUBLIC_API_URL`, which the Expo app reads) to its URL, and in the Razorpay dashboard add a webhook pointing at `<api>/webhooks/razorpay` with events `payment.captured`, `order.paid`, `payment.failed`, `product.route.activated`, `product.route.under_review`, `product.route.needs_clarification`; put the secret you choose there into `RAZORPAY_WEBHOOK_SECRET`. Set `RAZORPAY_ROUTE=off` to sell before Route is enabled (the platform then settles sellers manually).

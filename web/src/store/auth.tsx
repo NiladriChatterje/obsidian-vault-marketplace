@@ -10,6 +10,10 @@ interface AuthValue {
   signIn(email: string, password: string): Promise<void>;
   signUp(email: string, password: string, username: string): Promise<{ needsEmailConfirm: boolean }>;
   signOut(): Promise<void>;
+  isUsernameAvailable(username: string): Promise<boolean>;
+  sendPasswordReset(email: string): Promise<void>;
+  updatePassword(password: string): Promise<void>;
+  resendConfirmation(email: string): Promise<void>;
   refreshProfile(): Promise<void>;
 }
 
@@ -61,6 +65,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn: (email, password) => api.signIn(email, password),
       signUp: (email, password, username) => api.signUp(email, password, username),
       signOut: () => api.signOut(),
+      isUsernameAvailable: (username) => api.isUsernameAvailable(username),
+      sendPasswordReset: (email) => api.sendPasswordReset(email),
+      updatePassword: (password) => api.updatePassword(password),
+      resendConfirmation: (email) => api.resendConfirmation(email),
       refreshProfile: () => loadProfile(user),
     }),
     [user, profile, loading, loadProfile]

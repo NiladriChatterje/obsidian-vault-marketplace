@@ -1,5 +1,5 @@
 import type { PayoutStatus, Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
-import { API_URL, REDIRECT_ORIGIN, STORAGE_BUCKETS } from '../config';
+import { API_URL, MIN_PASSWORD_LENGTH, REDIRECT_ORIGIN, STORAGE_BUCKETS } from '../config';
 import { requireSupabase } from '../supabase';
 import type { AuthUser, Backend } from './types';
 
@@ -121,6 +121,57 @@ async function apiFetch<T = Record<string, any>>(path: string, init: { method?: 
   return json;
 }
 
+/**
+ * Supabase states auth failures in its own vocabulary ("Invalid login credentials",
+ * "User already registered"). Buyers see these verbatim, so translate the ones people
+ * actually hit into something that says what to do next; anything unrecognised falls
+ * through unchanged rather than being flattened into a generic message.
+ */
+function authMessage(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes('invalid login credentials')) return 'That email and password do not match an account.';
+  if (m.includes('email not confirmed')) return 'Confirm your email first — open the link we sent, then sign in.';
+  if (m.includes('already registered') || m.includes('already been registered')) {
+    return 'An account with that email already exists. Sign in instead, or reset your password.';
+  }
+  if (m.includes('rate limit') || m.includes('too many requests') || /after \d+ second/.test(m)) {
+    return 'Too many attempts. Wait a minute and try again.';
+  }
+  if (m.includes('password should be at least')) return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+  if (m.includes('leaked') || m.includes('weak password')) return 'That password has appeared in a data breach. Pick a different one.';
+  if (m.includes('profiles_username_key') || (m.includes('duplicate key') && m.includes('username'))) {
+    return 'That username is taken. Pick another.';
+  }
+  if (m.includes('auth session missing') || m.includes('session_not_found')) {
+    return 'That link has expired. Request a new one.';
+  }
+  return message;
+}
+
+function authError(error: { message: string }): Error {
+  return new Error(authMessage(error.message));
+}
+
+/**
+ * Where Supabase sends people after they click a link in an email. Must be listed under
+ * Authentication -> URL Configuration in the Supabase dashboard or the link bounces to the
+ * Site URL. Returns undefined when no https origin is known, which falls back to that Site URL.
+ */
+function emailRedirect(path: string): string | undefined {
+  const origin = /^https?:/.test(REDIRECT_ORIGIN) ? REDIRECT_ORIGIN : '';
+  return origin ? `${origin}${path}` : undefined;
+}
+
+/** Free usernames are the ones no profile row holds; profiles are world-readable by policy. */
+async function usernameAvailable(username: string): Promise<boolean> {
+  const { count, error } = await requireSupabase()
+    .from('profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('username', username.toLowerCase());
+  if (error) throw new Error(error.message);
+  return (count ?? 0) === 0;
+}
+
 /* ---------- backend ---------- */
 
 export const supabaseBackend: Backend = {
@@ -140,19 +191,40 @@ export const supabaseBackend: Backend = {
   },
   async signIn(email, password) {
     const { error } = await requireSupabase().auth.signInWithPassword({ email, password });
-    if (error) throw new Error(error.message);
+    if (error) throw authError(error);
   },
   async signUp(email, password, username) {
+    // Checked here as well as in the form: the profiles trigger silently renames a clashing
+    // username (nova -> nova1), so a taken name would otherwise create an account under a
+    // name the seller never chose. Racy by nature; the unique constraint is the real guard.
+    if (!(await usernameAvailable(username))) throw new Error('That username is taken. Pick another.');
     const { data, error } = await requireSupabase().auth.signUp({
       email,
       password,
-      options: { data: { username, display_name: username } },
+      options: { data: { username, display_name: username }, emailRedirectTo: emailRedirect('/auth/callback') },
     });
-    if (error) throw new Error(error.message);
+    if (error) throw authError(error);
     return { needsEmailConfirm: !data.session };
   },
   async signOut() {
     await requireSupabase().auth.signOut();
+  },
+  isUsernameAvailable: usernameAvailable,
+  async sendPasswordReset(email) {
+    const { error } = await requireSupabase().auth.resetPasswordForEmail(email, { redirectTo: emailRedirect('/auth/reset') });
+    if (error) throw authError(error);
+  },
+  async updatePassword(password) {
+    const { error } = await requireSupabase().auth.updateUser({ password });
+    if (error) throw authError(error);
+  },
+  async resendConfirmation(email) {
+    const { error } = await requireSupabase().auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: emailRedirect('/auth/callback') },
+    });
+    if (error) throw authError(error);
   },
   async getProfile(userId) {
     const { data, error } = await requireSupabase().from('profiles').select('*').eq('id', userId).maybeSingle();
@@ -166,7 +238,7 @@ export const supabaseBackend: Backend = {
     if (patch.bio !== undefined) row.bio = patch.bio;
     if (patch.username !== undefined) row.username = patch.username;
     const { data, error } = await requireSupabase().from('profiles').update(row).eq('id', id).select('*').single();
-    if (error) throw new Error(error.message);
+    if (error) throw authError(error);
     return toProfile(data);
   },
 
