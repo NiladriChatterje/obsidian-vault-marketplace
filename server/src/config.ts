@@ -6,7 +6,10 @@ import './env.ts';
 
 const env = (key: string, fallback = '') => (process.env[key] ?? fallback).trim();
 
-const port = Number(env('API_PORT', '4000'));
+// API_PORT first so the shared root .env keeps naming this server's port explicitly (a bare
+// PORT there would collide with Next's). Hosts that inject PORT — Render, Fly, Railway — are
+// picked up when API_PORT is unset, so no host-specific config is needed.
+const port = Number(env('API_PORT') || env('PORT', '4000'));
 
 export const cfg = {
   port,
