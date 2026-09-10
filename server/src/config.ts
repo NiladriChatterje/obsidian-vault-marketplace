@@ -45,6 +45,24 @@ export const cfg = {
 /** No Supabase: orders live in memory and the client grants demo purchases itself. Real Razorpay test payments still work. */
 export const IS_DEMO = !cfg.supabase.url || !cfg.supabase.serviceKey;
 
+/** A real deployment rather than a laptop: set by Render, Fly, Railway and by our own Dockerfile. */
+const IS_HOSTED =
+  env('NODE_ENV') === 'production' || !!env('RENDER') || !!env('FLY_APP_NAME') || !!env('RAILWAY_ENVIRONMENT');
+
+/**
+ * Demo mode trusts an x-demo-user header and hands whoever sends it ownership of every
+ * vault (see access.ts), which would give paid note bodies away for free. It exists for
+ * laptops, so a hosted process that lands in it has lost its Supabase config: fail loudly
+ * at boot rather than quietly serving the catalog for nothing. Deliberate public demos can
+ * set ALLOW_PUBLIC_DEMO=yes.
+ */
+if (IS_DEMO && IS_HOSTED && env('ALLOW_PUBLIC_DEMO') !== 'yes') {
+  throw new Error(
+    'Refusing to start in demo mode on a hosted instance: demo mode grants every caller ownership of every vault. ' +
+      'Set EXPO_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, or ALLOW_PUBLIC_DEMO=yes to override.',
+  );
+}
+
 export function platformFee(amount: number): number {
   return Math.round((amount * cfg.feePercent) / 100);
 }
