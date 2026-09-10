@@ -107,7 +107,7 @@ function extFromUri(uri: string, fallback: string): string {
 
 /** Calls the payment server with the current Supabase session token. */
 async function apiFetch<T = Record<string, any>>(path: string, init: { method?: 'GET' | 'POST'; body?: unknown } = {}): Promise<T> {
-  if (!API_URL) throw new Error('Payment server is not configured. Set EXPO_PUBLIC_API_URL.');
+  if (!API_URL) throw new Error('Payment server is not configured. Set SERVER_API_URL.');
   const { data } = await requireSupabase().auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new Error('Please sign in first.');

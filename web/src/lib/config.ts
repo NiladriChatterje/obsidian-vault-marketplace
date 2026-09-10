@@ -27,7 +27,7 @@ export const APP_SCHEME = 'vaultmarket';
  * hosts the checkout page, verifies signatures and onboards sellers.
  * Empty means "no server": paid checkout is unavailable outside demo mode.
  */
-export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
+export const API_URL = (process.env.SERVER_API_URL ?? '').replace(/\/$/, '');
 
 /**
  * Where listings and notes come from. 'sanity' routes the catalog through the

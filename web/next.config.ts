@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
     EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
     EXPO_PUBLIC_PLATFORM_FEE_PERCENT: process.env.EXPO_PUBLIC_PLATFORM_FEE_PERCENT ?? '10',
     EXPO_PUBLIC_REDIRECT_ORIGIN: process.env.EXPO_PUBLIC_REDIRECT_ORIGIN ?? '',
-    EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL ?? '',
+    SERVER_API_URL: process.env.SERVER_API_URL ?? '',
     EXPO_PUBLIC_CATALOG_SOURCE: process.env.EXPO_PUBLIC_CATALOG_SOURCE ?? '',
   },
   // Standalone output is only for web/Dockerfile. Vercel packages the build itself, and
