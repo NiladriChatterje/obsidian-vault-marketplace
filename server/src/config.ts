@@ -37,8 +37,8 @@ export const cfg = {
   brevo: {
     apiKey: env('BREVO_API_KEY'),
     /** Must be a sender Brevo has verified, or every send is refused. */
-    senderEmail: env('EMAIL_FROM', 'obsidian.vault.marketplace@gmail.com'),
-    senderName: env('EMAIL_FROM_NAME', 'Vault Market'),
+    senderEmail: env('BREVO_EMAIL_FROM', 'obsidian.vault.marketplace@gmail.com'),
+    senderName: env('BREVO_EMAIL_FROM_NAME', 'Vault Market'),
   },
 
   feePercent: Number(env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT', env('PLATFORM_FEE_PERCENT', '10'))),
@@ -67,7 +67,7 @@ const IS_HOSTED =
 if (IS_DEMO && IS_HOSTED && env('ALLOW_PUBLIC_DEMO') !== 'yes') {
   throw new Error(
     'Refusing to start in demo mode on a hosted instance: demo mode grants every caller ownership of every vault. ' +
-      'Set EXPO_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, or ALLOW_PUBLIC_DEMO=yes to override.',
+    'Set EXPO_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, or ALLOW_PUBLIC_DEMO=yes to override.',
   );
 }
 
