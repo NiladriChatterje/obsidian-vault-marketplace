@@ -13,6 +13,7 @@ import Fastify from 'fastify';
 import { createClient } from '@sanity/client';
 import { SANITY_API_TOKEN, SANITY_DATASET, SANITY_ENABLED, SANITY_PROJECT_ID, useSanityClientFactory } from './sanity/index.ts';
 import { IS_DEMO, cfg } from './config.ts';
+import { startKeepAwake } from './keepalive.ts';
 import catalogRoutes from './routes/catalog.ts';
 import checkoutRoutes from './routes/checkout.ts';
 import mcpRoutes from './routes/mcp.ts';
@@ -50,3 +51,4 @@ app.setErrorHandler((err: Error & { statusCode?: number }, req, reply) => {
 
 await app.listen({ port: cfg.port, host: '0.0.0.0' });
 app.log.info(`Vault Market API on ${cfg.apiUrl} (${IS_DEMO ? 'demo' : 'supabase'} mode)`);
+startKeepAwake(app.log); // free tiers idle the instance out; see keepalive.ts
