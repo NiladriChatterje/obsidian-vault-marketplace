@@ -42,7 +42,10 @@ export const cfg = {
     senderName: env('BREVO_EMAIL_FROM_NAME', 'Vault Market'),
   },
 
-  feePercent: Number(env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT', env('PLATFORM_FEE_PERCENT', '10'))),
+  feePercent: Number(env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT', env('PLATFORM_FEE_PERCENT', '15'))),
+  /** What the payment provider takes per sale: Dodo is 4% + $0.40, here in the listing currency. */
+  providerPercentFee: Number(env('EXPO_PUBLIC_PROVIDER_PERCENT_FEE', '4')),
+  providerFixedFeeCents: Number(env('EXPO_PUBLIC_PROVIDER_FIXED_FEE_CENTS', '4000')),
   /** Signs short-lived download links. Falls back to the Dodo key so nothing extra is required. */
   downloadSecret: env('DOWNLOAD_SECRET') || env('DODO_API_KEY') || 'dev-download-secret',
   /**
@@ -79,4 +82,25 @@ if (IS_DEMO && IS_HOSTED && env('ALLOW_PUBLIC_DEMO') !== 'yes') {
 
 export function platformFee(amount: number): number {
   return Math.round((amount * cfg.feePercent) / 100);
+}
+
+/**
+ * The cheapest paid vault that does not lose the platform money.
+ *
+ * The seller takes their share of the **list** price, so the provider's fee comes wholly
+ * out of the commission, and the provider's fixed part does not shrink with the price:
+ *
+ *   kept = price x (commission - provider%) / 100 - providerFixed
+ *
+ * Below the break-even every sale is a loss. This used to be hardcoded at Rs 49 while
+ * break-even at a 10% commission was about Rs 587, so a seller could list a price that cost
+ * the platform Rs 32 each time it sold. Deriving it means the floor follows the commission.
+ *
+ * Mirrored in web/src/lib/config.ts, which shows it to the seller; keep the two in step.
+ */
+export function minPriceCents(): number {
+  const margin = cfg.feePercent - cfg.providerPercentFee;
+  if (margin <= 0) return 100_000;
+  const breakEven = (cfg.providerFixedFeeCents * 100) / margin;
+  return Math.ceil((breakEven * 1.2) / 5000) * 5000;
 }
