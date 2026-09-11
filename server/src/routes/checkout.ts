@@ -10,6 +10,7 @@ import type { FastifyInstance } from 'fastify';
 import { IS_DEMO, cfg, platformFee } from '../config.ts';
 import { getOrder, markOrderFailed, saveOrder, settleOrder, type Order } from '../orders.ts';
 import { razorpay, razorpayError, verifyPaymentSignature } from '../razorpay.ts';
+import { recordRouteAvailable, recordRouteFailure } from '../route-status.ts';
 import { resolveReturnOrigin, returnUrl } from '../redirect.ts';
 import { admin, userFromRequest } from '../supabase.ts';
 import { SANITY_ENABLED, getVault } from '../sanity/index.ts';
@@ -118,8 +119,12 @@ export default async function checkoutRoutes(app: FastifyInstance) {
         } as any);
       } catch (e) {
         req.log.error(e);
-        return reply.code(502).send({ error: razorpayError(e) });
+        const message = razorpayError(e);
+        // An order carrying transfers is the one call that proves Route either way.
+        if (transfers.length) recordRouteFailure(message);
+        return reply.code(502).send({ error: message });
       }
+      if (transfers.length) recordRouteAvailable();
 
       await saveOrder({ ...order, razorpayOrderId: rzpOrder.id, status: 'created', paymentId: null, signature: null, transferId: null });
 

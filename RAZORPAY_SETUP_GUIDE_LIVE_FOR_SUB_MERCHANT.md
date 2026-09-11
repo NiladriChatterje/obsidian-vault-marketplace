@@ -18,7 +18,15 @@ A new marketplace will not clear the turnover bar on day one. You can reapply in
 
 Left menu → **Route** (under **PAYMENT PRODUCTS**) shows your status and the reapply route.
 
-**Check whether you have it:** with live keys set, `GET /health` reports `"route": true`, and `POST /v1/orders` with a `transfers` array stops returning `This transfer is not supported`. That error is what an ineligible account gets today.
+**Check whether you have it:**
+
+```bash
+cd server && npm run check-route
+```
+
+It asks Razorpay directly and reports both halves — whether an order may carry a split, and whether linked accounts may be created — then tells you which `RAZORPAY_ROUTE` value to run. It creates one unpaid throwaway order and nothing else. `This transfer is not supported` and `Access Denied` are what an ineligible account gets today.
+
+Do **not** read `RAZORPAY_ROUTE` or the old `"route": true` as confirmation: that flag is only our intent and reads `true` on an account that rejects every transfer. `GET /health` now reports `route.configured` (the flag) separately from `route.verified`, which is `unknown` until a real Route call has been made and then `available` / `unavailable` with Razorpay's own wording.
 
 **Until then, run with `RAZORPAY_ROUTE=off`** (see the last section). Do not block launch on Route.
 
@@ -43,15 +51,19 @@ The secret is shown once. Test keys stay valid; switch modes to keep both.
 | URL | `https://<api-domain>/webhooks/razorpay` |
 | Secret | any strong string → paste into `RAZORPAY_WEBHOOK_SECRET` |
 | Alert email | your ops address |
-| Active events | `payment.captured`, `order.paid`, `payment.failed`, `product.route.activated`, `product.route.under_review`, `product.route.needs_clarification` |
+| Active events | `payment.captured`, `order.paid`, `payment.failed`, `refund.created`, `refund.processed`, `product.route.activated`, `product.route.under_review`, `product.route.needs_clarification` |
 
 The server verifies the signature over the raw body and rejects anything else.
+
+**The refund events are not optional once Route is on.** A refund returns the full amount from the platform balance, but the seller's share left that balance when the payment was captured. The server answers `refund.created` / `refund.processed` by reversing the Route transfer for the same proportion as the refund and revoking the buyer's `purchases` row. Without them a refund quietly costs the platform the seller's cut, every time.
 
 ## 5. Sellers (linked accounts)
 
 Sellers never touch the dashboard. They fill the payout form at `/sell/payouts`, and the server creates the linked account, stakeholder, Route product and settlement bank details. Razorpay reviews it asynchronously and then sends `product.route.activated`, which flips `payouts_enabled` to true and unlocks paid listings. **The `product.route.*` events above are required for this**: buyers' checkouts read that flag, so without the webhook a seller's vaults stay unbuyable until the seller themselves reopens `/sell`, which re-reads the status directly from Razorpay as a fallback.
 
 Watch them under **Route → Accounts**. New accounts show `Pending` until Razorpay's penny-testing of the bank account passes. Linked-account settlements run on T+2 regardless of your own schedule.
+
+`needs_clarification` means Razorpay is waiting on the **seller**, not on itself, so it is the one review state they can act on. The product's `requirements` are stored in `profiles.razorpay_requirements` and listed on `/sell`, naming the field and the reason; the seller fixes it and presses Re-check. Both `/payouts` and `/payouts/status` return `{ status, requirements }`.
 
 To onboard someone manually instead: **Route → Accounts → + Add Account**, then complete the KYC form.
 
@@ -64,6 +76,8 @@ ALLOWED_REDIRECT_ORIGINS=https://<site-domain>
 EXPO_PUBLIC_PLATFORM_FEE_PERCENT=10
 RAZORPAY_ROUTE=on
 ```
+
+Apply migrations through `0007_payout_review.sql` first: it adds the review verdict and requirements to `profiles`, and the refunded state to `orders`. The Route and refund webhooks return 500 until it is in place, which makes Razorpay retry them rather than lose them.
 
 Rebuild the web image after changing any `EXPO_PUBLIC_*` value; the server reads its own at runtime. Buy a cheap live vault once end to end and confirm the payment, the purchase row and the transfer under **Route → Transfers**.
 

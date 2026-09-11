@@ -433,11 +433,14 @@ export const demoBackend: Backend = {
       p.razorpayAccountId = 'acc_demo';
     }
     await persist();
-    return { status: 'activated' as const };
+    return { status: 'activated' as const, requirements: [] };
   },
   async refreshPayoutStatus() {
     const s = await load();
     const p = s.user ? s.profiles.find((x) => x.id === s.user!.id) : undefined;
-    return { status: p?.payoutsEnabled ? ('activated' as const) : p?.isSeller ? ('pending' as const) : ('none' as const) };
+    return {
+      status: p?.payoutsEnabled ? ('activated' as const) : p?.isSeller ? ('pending' as const) : ('none' as const),
+      requirements: [],
+    };
   },
 };

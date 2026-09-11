@@ -15,6 +15,7 @@ import { SANITY_API_TOKEN, SANITY_DATASET, SANITY_ENABLED, SANITY_PROJECT_ID, us
 import { IS_DEMO, cfg } from './config.ts';
 import { EMAIL_ENABLED } from './email.ts';
 import { startKeepAwake } from './keepalive.ts';
+import { routeStatus } from './route-status.ts';
 import catalogRoutes from './routes/catalog.ts';
 import checkoutRoutes from './routes/checkout.ts';
 import mcpRoutes from './routes/mcp.ts';
@@ -33,7 +34,9 @@ app.get('/health', async () => ({
   mode: IS_DEMO ? 'demo (no Supabase: orders in memory)' : 'supabase',
   razorpayKey: cfg.razorpay.keyId.replace(/^(rzp_\w+_).+$/, '$1…'),
   merchantId: cfg.razorpay.merchantId || null,
-  route: cfg.razorpay.route,
+  // The env flag plus what Razorpay actually answered; the flag alone reads as
+  // confirmation on an account that rejects every transfer. See route-status.ts.
+  route: routeStatus(cfg.razorpay.route),
   webhookConfigured: !!cfg.razorpay.webhookSecret,
   email: EMAIL_ENABLED ? { provider: 'brevo', from: cfg.brevo.senderEmail } : null,
   catalog: SANITY_ENABLED ? { source: 'sanity', projectId: SANITY_PROJECT_ID, dataset: SANITY_DATASET, canWrite: !!SANITY_API_TOKEN } : { source: 'none' },

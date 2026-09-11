@@ -1,4 +1,4 @@
-import type { PayoutStatus, Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
+import type { PayoutState, Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
 import { API_URL, MIN_PASSWORD_LENGTH, REDIRECT_ORIGIN, STORAGE_BUCKETS } from '../config';
 import { requireSupabase } from '../supabase';
 import type { AuthUser, Backend } from './types';
@@ -427,11 +427,11 @@ export const supabaseBackend: Backend = {
     return { path, sizeBytes: bytes.byteLength };
   },
   async setupPayouts(details) {
-    const data = await apiFetch<{ status?: PayoutStatus }>('/payouts', { method: 'POST', body: { details } });
-    return { status: data.status ?? 'pending' };
+    const data = await apiFetch<Partial<PayoutState>>('/payouts', { method: 'POST', body: { details } });
+    return { status: data.status ?? 'pending', requirements: data.requirements ?? [] };
   },
   async refreshPayoutStatus() {
-    const data = await apiFetch<{ status?: PayoutStatus }>('/payouts/status');
-    return { status: data.status ?? 'none' };
+    const data = await apiFetch<Partial<PayoutState>>('/payouts/status');
+    return { status: data.status ?? 'none', requirements: data.requirements ?? [] };
   },
 };

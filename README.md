@@ -210,7 +210,9 @@ server/                    Fastify (own package.json)
   src/routes/catalog.ts    Sanity catalog, notes, uploads, downloads, seller CRUD
   src/routes/mcp.ts        MCP endpoint over purchased vaults
   src/sanity/              GROQ queries, mappers, markdown parsing, writes
-  src/orders.ts            Order + purchase bookkeeping (Supabase or in-memory demo)
+  src/orders.ts            Order + purchase bookkeeping, refunds + Route reversals
+  src/route-status.ts      What Razorpay actually answered about Route (see /health)
+  scripts/check-route.ts   `npm run check-route` - does this account have Route?
   scripts/seed-sanity.ts   Seeds sample vaults + notes into Sanity
 sanity-studio/             Studio: schemaTypes/ (vault, note, attachment, seller), structure.ts
 supabase/                  migrations/0001_init.sql … 0005_sanity_catalog.sql

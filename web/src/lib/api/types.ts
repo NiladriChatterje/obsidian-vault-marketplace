@@ -1,6 +1,7 @@
 import type {
   ListVaultsParams,
   PayoutDetails,
+  PayoutState,
   PayoutStatus,
   Profile,
   Purchase,
@@ -76,7 +77,7 @@ export interface Backend {
   uploadCover(localUri: string): Promise<string>;
   uploadVaultFile(localUri: string, fileName: string): Promise<UploadedFile>;
   /** Marks the user as a seller and creates their Razorpay Route linked account from the given details. */
-  setupPayouts(details: PayoutDetails): Promise<{ status: PayoutStatus }>;
+  setupPayouts(details: PayoutDetails): Promise<PayoutState>;
   /** Re-checks Razorpay activation and syncs the profile. */
-  refreshPayoutStatus(): Promise<{ status: PayoutStatus }>;
+  refreshPayoutStatus(): Promise<PayoutState>;
 }

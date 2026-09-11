@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node --watch --env-file-if-exists=../.env src/index.ts",
     "start": "node src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check-route": "node --env-file-if-exists=../.env scripts/check-route.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",
