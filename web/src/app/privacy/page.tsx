@@ -22,14 +22,14 @@ export default function PrivacyPage() {
       <h3>When you buy a vault</h3>
       <p>
         The vault purchased, the amount, our commission, the payment and transfer identifiers returned by Razorpay, and the time of purchase. Card numbers,
-        UPI IDs and bank credentials are entered on Razorpay&rsquo;s own checkout and never reach our servers.
+        UPI IDs and bank credentials are entered on the payment provider&rsquo;s own checkout page and never reach our servers.
       </p>
 
       <h3>When you sell a vault</h3>
       <p>
-        Your listing text, cover image and the notes inside the vault you upload. To pay you, we ask for your legal name, mobile number with country code, PAN,
-        address and bank account details. <strong>These are passed straight to Razorpay to create your payout account and are not stored by us.</strong> We keep
-        only the Razorpay account identifier and whether payouts are active.
+        Your listing text, cover image and the notes inside the vault you upload. <strong>We no longer collect your PAN, address or bank account details.</strong>{' '}
+        Vault Market is the seller of record to the buyer, so your share is settled with you separately as a supplier rather than paid out of the buyer&rsquo;s
+        payment, and whatever details that settlement needs are exchanged outside this site.
       </p>
 
       <h3>When you connect over MCP</h3>
@@ -53,7 +53,11 @@ export default function PrivacyPage() {
       <h2>Who else sees it</h2>
       <ul>
         <li>
-          <strong>Razorpay</strong> — payments, seller payout accounts and KYC. Governed by Razorpay&rsquo;s own privacy policy.
+          <strong>Dodo Payments</strong> — merchant of record for payments outside India: it takes the payment, issues the invoice and handles sales tax and VAT.
+          Governed by Dodo Payments&rsquo; own privacy policy.
+        </li>
+        <li>
+          <strong>Razorpay</strong> — payments taken in India. Governed by Razorpay&rsquo;s own privacy policy.
         </li>
         <li>
           <strong>Supabase</strong> — accounts, purchases and orders.

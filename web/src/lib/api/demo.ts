@@ -127,7 +127,6 @@ export const demoBackend: Backend = {
         username: email.split('@')[0]?.toLowerCase() ?? 'you',
         displayName: email.split('@')[0] ?? 'You',
         isSeller: false,
-        payoutsEnabled: false,
         createdAt: new Date().toISOString(),
       });
     }
@@ -149,7 +148,6 @@ export const demoBackend: Backend = {
         username,
         displayName: username,
         isSeller: false,
-        payoutsEnabled: false,
         createdAt: new Date().toISOString(),
       });
     }
@@ -422,25 +420,5 @@ export const demoBackend: Backend = {
   async uploadVaultFile(localUri, _fileName) {
     await wait(600);
     return { path: localUri, sizeBytes: 0 };
-  },
-  async setupPayouts(_details) {
-    const s = await load();
-    const u = requireUser(s);
-    const p = s.profiles.find((x) => x.id === u.id);
-    if (p) {
-      p.isSeller = true;
-      p.payoutsEnabled = true;
-      p.razorpayAccountId = 'acc_demo';
-    }
-    await persist();
-    return { status: 'activated' as const, requirements: [] };
-  },
-  async refreshPayoutStatus() {
-    const s = await load();
-    const p = s.user ? s.profiles.find((x) => x.id === s.user!.id) : undefined;
-    return {
-      status: p?.payoutsEnabled ? ('activated' as const) : p?.isSeller ? ('pending' as const) : ('none' as const),
-      requirements: [],
-    };
   },
 };

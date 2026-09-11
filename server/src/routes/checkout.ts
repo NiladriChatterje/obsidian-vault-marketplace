@@ -1,19 +1,24 @@
 /**
- * Razorpay Standard Checkout, server side.
- *   POST /checkout                        create an Order for a vault -> { url, orderId, keyId, amount, currency }
+ * Checkout, server side. PAYMENT_PROVIDER decides the rail: Dodo Payments as merchant of
+ * record (global cards and local methods, tax handled for us), or Razorpay Standard
+ * Checkout for a domestic-only setup. Nothing is split to anyone: the platform is the
+ * seller, and creators are paid outside the checkout.
+ *
+ *   POST /checkout                        create an Order for a vault -> { url, orderId, ... }
  *   GET  /checkout/:orderId               hosted page that opens Checkout.js (works in a browser sheet on mobile too)
  *   POST /checkout/:orderId/callback      Checkout.js posts payment_id + signature here; verified, settled, redirected
  *   GET  /checkout/:orderId/cancel        buyer closed the modal
  *   GET  /checkout/:orderId/status        { status, paymentId } for polling
  */
 import type { FastifyInstance } from 'fastify';
-import { IS_DEMO, cfg, platformFee } from '../config.ts';
+import { IS_DEMO, PAYMENT_PROVIDER, cfg, platformFee } from '../config.ts';
+import { DODO_ENABLED, dodo, dodoError, productForVault } from '../dodo.ts';
 import { getOrder, markOrderFailed, saveOrder, settleOrder, type Order } from '../orders.ts';
 import { razorpay, razorpayError, verifyPaymentSignature } from '../razorpay.ts';
-import { recordRouteAvailable, recordRouteFailure } from '../route-status.ts';
 import { resolveReturnOrigin, returnUrl } from '../redirect.ts';
 import { admin, userFromRequest } from '../supabase.ts';
 import { SANITY_ENABLED, getVault } from '../sanity/index.ts';
+import type { Vault } from '../types.ts';
 
 interface CheckoutBody {
   vaultId: string;
@@ -49,8 +54,8 @@ export default async function checkoutRoutes(app: FastifyInstance) {
       const { vaultId, demo } = req.body;
       const returnOrigin = resolveReturnOrigin(req.body.redirectOrigin);
 
-      let order: Omit<Order, 'razorpayOrderId' | 'status' | 'paymentId' | 'signature' | 'transferId'>;
-      let transfers: Row[] = [];
+      let order: Omit<Order, 'provider' | 'providerOrderId' | 'status' | 'paymentId' | 'signature'>;
+      let vault: Vault | null = null;
 
       if (IS_DEMO) {
         if (!demo) return reply.code(400).send({ error: 'Demo checkout needs amountCents and title' });
@@ -78,34 +83,36 @@ export default async function checkoutRoutes(app: FastifyInstance) {
         const { data: owned } = await admin().from('purchases').select('id').eq('vault_id', vaultId).eq('buyer_id', user.id).maybeSingle();
         if (owned) return reply.code(400).send({ error: 'You already own this vault' });
 
-        const vault = { id: v.id, title: v.title, price_cents: v.priceCents, currency: v.currency };
-        const fee = platformFee(vault.price_cents);
-        const { data: seller } = await admin().from('profiles').select('razorpay_account_id, payouts_enabled').eq('id', v.sellerId).maybeSingle();
-        if (cfg.razorpay.route) {
-          if (!seller?.razorpay_account_id || !seller.payouts_enabled) {
-            return reply.code(400).send({ error: 'This seller has not finished payout setup yet' });
-          }
-          transfers = [
-            {
-              account: seller.razorpay_account_id,
-              amount: vault.price_cents - fee,
-              currency: vault.currency.toUpperCase(),
-              notes: { vault_id: vault.id },
-              on_hold: false,
-            },
-          ];
-        }
-
+        vault = v;
         order = {
-          vaultId: vault.id,
+          vaultId: v.id,
           buyerId: user.id,
           buyerEmail: user.email,
-          title: vault.title,
-          amount: vault.price_cents,
-          currency: vault.currency.toUpperCase(),
-          fee,
+          title: v.title,
+          amount: v.priceCents,
+          currency: v.currency.toUpperCase(),
+          fee: platformFee(v.priceCents),
           returnOrigin,
         };
+      }
+
+      // Dodo hosts its own checkout page, so the buyer leaves for it and comes back to
+      // /checkout-result; the purchase is granted by the webhook, never by that redirect.
+      if (PAYMENT_PROVIDER === 'dodo' && DODO_ENABLED && !IS_DEMO && vault) {
+        try {
+          const session = await dodo().checkoutSessions.create({
+            product_cart: [{ product_id: await productForVault(vault), quantity: 1 }],
+            customer: order.buyerEmail ? { email: order.buyerEmail, name: order.buyerEmail.split('@')[0] } : undefined,
+            return_url: returnUrl(returnOrigin, '/checkout-result', { status: 'success', vault: order.vaultId }),
+            metadata: { vault_id: order.vaultId, buyer_id: order.buyerId ?? '' },
+          });
+          if (!session.checkout_url) throw new Error('Dodo returned no checkout url');
+          await saveOrder({ ...order, provider: 'dodo', providerOrderId: session.session_id, status: 'created', paymentId: null, signature: null });
+          return { url: session.checkout_url, orderId: session.session_id, amount: order.amount, currency: order.currency };
+        } catch (e) {
+          req.log.error(e);
+          return reply.code(502).send({ error: dodoError(e) });
+        }
       }
 
       let rzpOrder: Row;
@@ -115,18 +122,13 @@ export default async function checkoutRoutes(app: FastifyInstance) {
           currency: order.currency,
           receipt: `vault-${order.vaultId.slice(0, 8)}-${Date.now().toString(36)}`,
           notes: { vault_id: order.vaultId, buyer_id: order.buyerId ?? 'demo', fee_cents: String(order.fee) },
-          ...(transfers.length ? { transfers } : {}),
         } as any);
       } catch (e) {
         req.log.error(e);
-        const message = razorpayError(e);
-        // An order carrying transfers is the one call that proves Route either way.
-        if (transfers.length) recordRouteFailure(message);
-        return reply.code(502).send({ error: message });
+        return reply.code(502).send({ error: razorpayError(e) });
       }
-      if (transfers.length) recordRouteAvailable();
 
-      await saveOrder({ ...order, razorpayOrderId: rzpOrder.id, status: 'created', paymentId: null, signature: null, transferId: null });
+      await saveOrder({ ...order, provider: 'razorpay', providerOrderId: rzpOrder.id, status: 'created', paymentId: null, signature: null });
 
       return {
         url: `${cfg.apiUrl}/checkout/${rzpOrder.id}`,
@@ -149,14 +151,14 @@ export default async function checkoutRoutes(app: FastifyInstance) {
       currency: order.currency,
       name: 'Vault Market',
       description: order.title,
-      order_id: order.razorpayOrderId,
+      order_id: order.providerOrderId,
       prefill: { email: order.buyerEmail ?? undefined },
       notes: { vault_id: order.vaultId },
       theme: { color: '#0B0B0C' },
-      callback_url: `${cfg.apiUrl}/checkout/${order.razorpayOrderId}/callback`,
+      callback_url: `${cfg.apiUrl}/checkout/${order.providerOrderId}/callback`,
       redirect: true,
     };
-    const cancelUrl = `${cfg.apiUrl}/checkout/${order.razorpayOrderId}/cancel`;
+    const cancelUrl = `${cfg.apiUrl}/checkout/${order.providerOrderId}/cancel`;
 
     reply.type('text/html').send(
       page(
@@ -184,8 +186,8 @@ export default async function checkoutRoutes(app: FastifyInstance) {
     const signature = body.razorpay_signature;
     const orderId = body.razorpay_order_id;
 
-    if (orderId !== order.razorpayOrderId || !verifyPaymentSignature(orderId, paymentId, signature)) {
-      req.log.warn({ orderId: order.razorpayOrderId }, 'invalid payment signature');
+    if (orderId !== order.providerOrderId || !verifyPaymentSignature(orderId, paymentId, signature)) {
+      req.log.warn({ orderId: order.providerOrderId }, 'invalid payment signature');
       return reply.redirect(returnUrl(order.returnOrigin, '/checkout-result', { status: 'failed', vault: order.vaultId, reason: 'signature' }));
     }
 
@@ -201,14 +203,14 @@ export default async function checkoutRoutes(app: FastifyInstance) {
   app.get<{ Params: { orderId: string } }>('/checkout/:orderId/cancel', async (req, reply) => {
     const order = await getOrder(req.params.orderId);
     if (!order) return reply.code(404).send({ error: 'Order not found' });
-    if (order.status !== 'paid') await markOrderFailed(order.razorpayOrderId);
+    if (order.status !== 'paid') await markOrderFailed(order.providerOrderId);
     return reply.redirect(returnUrl(order.returnOrigin, '/checkout-result', { status: order.status === 'paid' ? 'success' : 'cancelled', vault: order.vaultId }));
   });
 
   app.get<{ Params: { orderId: string } }>('/checkout/:orderId/status', async (req, reply) => {
     const order = await getOrder(req.params.orderId);
     if (!order) return reply.code(404).send({ error: 'Order not found' });
-    return { status: order.status, paymentId: order.paymentId, transferId: order.transferId, vaultId: order.vaultId };
+    return { status: order.status, provider: order.provider, paymentId: order.paymentId, vaultId: order.vaultId };
   });
 }
 

@@ -22,10 +22,18 @@ export const cfg = {
     /** Accepts the older MERCHANT_ID spelling so existing .env files keep working. */
     merchantId: env('RAZORPAY_MERCHANT_ID') || env('MERCHANT_ID'),
     webhookSecret: env('RAZORPAY_WEBHOOK_SECRET'),
-    /** 'on' (default) splits every paid order to the seller's Route linked account; 'off' keeps everything on the platform account. */
-    route: env('RAZORPAY_ROUTE', 'on') !== 'off',
-    linkedCategory: env('RAZORPAY_LINKED_CATEGORY', 'education'),
-    linkedSubcategory: env('RAZORPAY_LINKED_SUBCATEGORY', 'elearning'),
+  },
+
+  /**
+   * Dodo Payments, the merchant of record. It is the seller of record to the buyer, so it
+   * handles global cards and local methods, registers and remits VAT / sales tax, and
+   * settles the net to our bank. Without DODO_API_KEY the server falls back to Razorpay.
+   */
+  dodo: {
+    apiKey: env('DODO_API_KEY'),
+    webhookSecret: env('DODO_WEBHOOK_SECRET'),
+    /** Anything but 'live' stays on Dodo's test host, so a stray key cannot take real money. */
+    live: env('DODO_ENVIRONMENT', 'test') === 'live',
   },
 
   supabase: {
@@ -70,6 +78,14 @@ if (IS_DEMO && IS_HOSTED && env('ALLOW_PUBLIC_DEMO') !== 'yes') {
     'Set EXPO_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, or ALLOW_PUBLIC_DEMO=yes to override.',
   );
 }
+
+/**
+ * Which rail takes the money. Dodo whenever it is configured, because it is the only one
+ * that can sell globally and settle the tax; Razorpay is the domestic fallback and is what
+ * every existing order was taken on.
+ */
+export const PAYMENT_PROVIDER: 'dodo' | 'razorpay' =
+  env('PAYMENT_PROVIDER') === 'razorpay' ? 'razorpay' : env('DODO_API_KEY') ? 'dodo' : 'razorpay';
 
 export function platformFee(amount: number): number {
   return Math.round((amount * cfg.feePercent) / 100);

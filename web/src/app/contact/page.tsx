@@ -32,7 +32,7 @@ export default function ContactPage() {
           <strong>A purchase or refund:</strong> the email on your account, the vault name and the payment identifier from your receipt.
         </li>
         <li>
-          <strong>A payout:</strong> your seller username and the date of the sale in question.
+          <strong>Your seller earnings:</strong> your seller username and the date of the sale in question.
         </li>
         <li>
           <strong>A copyright or content complaint:</strong> the listing URL, what is wrong with it, and your basis for the claim.

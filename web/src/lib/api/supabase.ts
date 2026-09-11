@@ -1,4 +1,4 @@
-import type { PayoutState, Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
+import type { Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
 import { API_URL, MIN_PASSWORD_LENGTH, REDIRECT_ORIGIN, STORAGE_BUCKETS } from '../config';
 import { requireSupabase } from '../supabase';
 import type { AuthUser, Backend } from './types';
@@ -15,8 +15,6 @@ function toProfile(r: Row): Profile {
     avatarUrl: r.avatar_url,
     bio: r.bio,
     isSeller: !!r.is_seller,
-    razorpayAccountId: r.razorpay_account_id,
-    payoutsEnabled: !!r.payouts_enabled,
     createdAt: r.created_at,
   };
 }
@@ -237,6 +235,9 @@ export const supabaseBackend: Backend = {
     if (patch.displayName !== undefined) row.display_name = patch.displayName;
     if (patch.bio !== undefined) row.bio = patch.bio;
     if (patch.username !== undefined) row.username = patch.username;
+    // Selling used to be switched on as a side effect of payout onboarding, which no
+    // longer exists: the platform is the seller of record and creators just list.
+    if (patch.isSeller !== undefined) row.is_seller = patch.isSeller;
     const { data, error } = await requireSupabase().from('profiles').update(row).eq('id', id).select('*').single();
     if (error) throw authError(error);
     return toProfile(data);
@@ -425,13 +426,5 @@ export const supabaseBackend: Backend = {
     });
     if (error) throw new Error(error.message);
     return { path, sizeBytes: bytes.byteLength };
-  },
-  async setupPayouts(details) {
-    const data = await apiFetch<Partial<PayoutState>>('/payouts', { method: 'POST', body: { details } });
-    return { status: data.status ?? 'pending', requirements: data.requirements ?? [] };
-  },
-  async refreshPayoutStatus() {
-    const data = await apiFetch<Partial<PayoutState>>('/payouts/status');
-    return { status: data.status ?? 'none', requirements: data.requirements ?? [] };
   },
 };

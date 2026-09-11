@@ -1,36 +1,62 @@
-# Razorpay: going live with sub-merchants (Route)
+# Payments: Dodo Payments (merchant of record), with Razorpay for India
 
-Sellers set their own price; Razorpay Route splits each payment and sends them their share while the platform keeps `EXPO_PUBLIC_PLATFORM_FEE_PERCENT` (10%). Dashboard paths below match the current UI.
+**Route is gone.** Splitting a buyer's payment out to a seller's linked account made this
+platform a payment aggregator, which RBI gates behind an authorisation no individual can
+hold — and Route linked accounts only exist for India and Malaysia anyway, so it could
+never have paid a seller abroad.
 
-## 1. Activate the account
+The model instead: **Vault Market is the seller of record.** Dodo Payments is the merchant
+of record on top of that — it is the legal seller to the buyer, takes payment in 150+
+countries, registers and remits VAT and sales tax everywhere, carries chargebacks, and
+settles the net to our bank as an inward remittance for export of services. Creators are
+suppliers paid a royalty outside the checkout, which is an ordinary vendor payment rather
+than third-party settlement.
+
+## Dodo setup
+
+1. **Dashboard → Developer → API Keys** → create a read-write key → `DODO_API_KEY`.
+2. **Dashboard → Developer → Webhooks** → add `https://<api-domain>/webhooks/dodo`,
+   subscribe to `payment.succeeded`, `payment.failed` and `refund.succeeded`, and put the
+   signing secret in `DODO_WEBHOOK_SECRET`.
+3. `DODO_ENVIRONMENT=live` when you are ready; anything else stays on the test host.
+
+Products are created for you: the first checkout for a vault creates a Dodo product and
+caches it in `public.dodo_products`, and a price change re-pushes to the same product so a
+listing and its Dodo product cannot drift.
+
+**Fulfilment is webhook-only.** The buyer's redirect back to `/checkout-result` is a
+navigation they can close or replay, so it grants nothing; `payment.succeeded` does.
+
+### Before you build on it
+
+Ask Dodo two things in writing, because both can block this path:
+
+- **Do they onboard an individual or sole proprietor**, or do they require a registered
+  business? This is the same wall Stripe India puts up.
+- **Which payout method reaches India.** INR-denominated payouts are discontinued, so you
+  settle through a USD/GBP/EUR wallet and your own bank converts — that FX spread, not
+  Dodo's 4%, is the largest cost. Payouts run twice a month once the balance clears $50.
+
+### Tax, briefly
+
+Dodo handles every foreign tax. In India, GST registration is not required below ₹20 lakh
+aggregate turnover in a financial year (Notification 10/2017–IGST covers exports too);
+above it, register and file an annual LUT so exports stay zero-rated. Income tax on the
+profit is the only thing due below that threshold. Not legal advice — talk to a CA before
+launch, especially about how you pay creators abroad.
+
+## Razorpay, for India
+
+Razorpay stays wired up as the domestic rail and is what every existing order was taken
+on. Set `PAYMENT_PROVIDER=razorpay` to force it, or leave `DODO_API_KEY` unset. Route
+config (`RAZORPAY_ROUTE`, linked categories) is gone; nothing splits a payment.
+
+## Razorpay account activation
 
 1. **Account & Settings → Business details** — finish KYC (PAN, address proof, bank account, video KYC). Live keys need a verified website too.
 2. Add the site URL under the same section. Razorpay checks that it has working terms, refund/cancellation, privacy and contact pages — the site serves these at `/terms`, `/refunds`, `/privacy` and `/contact`, linked from the footer of every page. **Fill in `web/src/lib/legal.ts` first**: it starts with `TODO` placeholders for the legal name, address and support email, and a reviewer will reject the pages while those are showing.
 
-## 2. Route: check eligibility first
-
-Route is **not available on request any more.** Razorpay discontinued it on **1 January 2026** for accounts that did not meet new RBI-driven criteria. To hold or regain access a business must show:
-
-- **Turnover** — domestic above ₹40 lakh, *or* export above ₹5 lakh, in FY25 or FY26.
-- **Payer-payee transparency** — evidence that each linked account really supplies the goods the buyer pays for.
-
-A new marketplace will not clear the turnover bar on day one. You can reapply in a later financial year once you do. Route is also **INR only**: Razorpay states *"Currently, we support only INR for Razorpay Route"*, so international currency orders can never carry transfers.
-
-Left menu → **Route** (under **PAYMENT PRODUCTS**) shows your status and the reapply route.
-
-**Check whether you have it:**
-
-```bash
-cd server && npm run check-route
-```
-
-It asks Razorpay directly and reports both halves — whether an order may carry a split, and whether linked accounts may be created — then tells you which `RAZORPAY_ROUTE` value to run. It creates one unpaid throwaway order and nothing else. `This transfer is not supported` and `Access Denied` are what an ineligible account gets today.
-
-Do **not** read `RAZORPAY_ROUTE` or the old `"route": true` as confirmation: that flag is only our intent and reads `true` on an account that rejects every transfer. `GET /health` now reports `route.configured` (the flag) separately from `route.verified`, which is `unknown` until a real Route call has been made and then `available` / `unavailable` with Razorpay's own wording.
-
-**Until then, run with `RAZORPAY_ROUTE=off`** (see the last section). Do not block launch on Route.
-
-## 3. API keys
+## Razorpay API keys
 
 **Account & Settings → API Keys** (under *Website and app settings*) → **Generate Key**, with the mode switch on **Live**. Copy into `.env`:
 
@@ -42,7 +68,7 @@ RAZORPAY_MERCHANT_ID=...
 
 The secret is shown once. Test keys stay valid; switch modes to keep both.
 
-## 4. Webhook
+## Razorpay webhook
 
 **Account & Settings → Webhooks** (under *Website and app settings*) → **Add New Webhook**.
 
@@ -51,44 +77,28 @@ The secret is shown once. Test keys stay valid; switch modes to keep both.
 | URL | `https://<api-domain>/webhooks/razorpay` |
 | Secret | any strong string → paste into `RAZORPAY_WEBHOOK_SECRET` |
 | Alert email | your ops address |
-| Active events | `payment.captured`, `order.paid`, `payment.failed`, `refund.created`, `refund.processed`, `product.route.activated`, `product.route.under_review`, `product.route.needs_clarification` |
+| Active events | `payment.captured`, `order.paid`, `payment.failed`, `refund.created`, `refund.processed` |
 
 The server verifies the signature over the raw body and rejects anything else.
 
-**The refund events are not optional once Route is on.** A refund returns the full amount from the platform balance, but the seller's share left that balance when the payment was captured. The server answers `refund.created` / `refund.processed` by reversing the Route transfer for the same proportion as the refund and revoking the buyer's `purchases` row. Without them a refund quietly costs the platform the seller's cut, every time.
+The server answers `refund.created` / `refund.processed` by marking the order refunded and revoking the buyer's `purchases` row. Nothing is reversed to anyone else: the platform is the seller, so a creator's royalty is settled with them like any other supplier credit.
 
-## 5. Sellers (linked accounts)
-
-Sellers never touch the dashboard. They fill the payout form at `/sell/payouts`, and the server creates the linked account, stakeholder, Route product and settlement bank details. Razorpay reviews it asynchronously and then sends `product.route.activated`, which flips `payouts_enabled` to true and unlocks paid listings. **The `product.route.*` events above are required for this**: buyers' checkouts read that flag, so without the webhook a seller's vaults stay unbuyable until the seller themselves reopens `/sell`, which re-reads the status directly from Razorpay as a fallback.
-
-Watch them under **Route → Accounts**. New accounts show `Pending` until Razorpay's penny-testing of the bank account passes. Linked-account settlements run on T+2 regardless of your own schedule.
-
-`needs_clarification` means Razorpay is waiting on the **seller**, not on itself, so it is the one review state they can act on. The product's `requirements` are stored in `profiles.razorpay_requirements` and listed on `/sell`, naming the field and the reason; the seller fixes it and presses Re-check. Both `/payouts` and `/payouts/status` return `{ status, requirements }`.
-
-To onboard someone manually instead: **Route → Accounts → + Add Account**, then complete the KYC form.
-
-## 6. Deploy checklist
+## Deploy checklist
 
 ```
 SERVER_API_URL=https://<api-domain>
 EXPO_PUBLIC_API_URL=https://<api-domain>
 ALLOWED_REDIRECT_ORIGINS=https://<site-domain>
 EXPO_PUBLIC_PLATFORM_FEE_PERCENT=10
-RAZORPAY_ROUTE=on
+PAYMENT_PROVIDER=dodo
 ```
 
-Apply migrations through `0007_payout_review.sql` first: it adds the review verdict and requirements to `profiles`, and the refunded state to `orders`. The Route and refund webhooks return 500 until it is in place, which makes Razorpay retry them rather than lose them.
+Apply migrations through `0008_dodo_merchant_of_record.sql` first: it drops the linked-account columns, makes `orders` provider-neutral and adds `dodo_products`. Every webhook returns 500 until it is in place, which makes the provider retry rather than lose the event.
 
-Rebuild the web image after changing any `EXPO_PUBLIC_*` value; the server reads its own at runtime. Buy a cheap live vault once end to end and confirm the payment, the purchase row and the transfer under **Route → Transfers**.
-
-## Running without Route (the default for a new account)
-
-Set `RAZORPAY_ROUTE=off`. Payments land wholly in the platform account, sellers can still list, and the dashboard still shows each seller's 90% net from the `purchases` table. You pay them yourself — bank transfer, or RazorpayX Payouts once volume justifies it. Switch the flag back on later without code changes.
-
-**Settle the legal structure before you take money for other people.** RBI's payment aggregator rules are the reason Route is gated: collecting funds and redistributing them to third-party sellers is payment aggregation, which needs a licence or a licensed aggregator's marketplace product. The usual way a small platform stays outside that is to become the **merchant of record** — you license each vault from its creator and sell it as your own product, paying them a royalty as a supplier. That makes payouts vendor payments rather than third-party settlement, and it changes the seller agreement, the invoice, and how TDS under section 194-O and GST on the commission apply. Take this to a CA or lawyer before launch; it is not a code decision.
+Rebuild the web image after changing any `EXPO_PUBLIC_*` value; the server reads its own at runtime. Buy a cheap live vault once end to end and confirm the payment in the Dodo dashboard and the `purchases` row in Supabase.
 
 ## International payments
 
 **Account & Settings → International payments** (under *Payment methods*) enables foreign cards, PayPal and bank transfers. Razorpay asks for PAN, GSTIN or Udyam, address proof and video KYC.
 
-**Route does not support international payments,** and is INR-only by design. Foreign-card sales can never be auto-split, so those sellers are paid manually whatever your Route status. If international sales become the larger half of the business, the usual answer is a second rail alongside Razorpay — an international gateway that settles to INR, or a merchant-of-record provider that becomes the seller abroad — rather than trying to make Route stretch.
+You do not need this for foreign buyers: Dodo is the merchant of record and already accepts them worldwide. Enabling it on Razorpay only matters if you want foreign cards on the *domestic* rail too, which is rarely worth the extra KYC.
