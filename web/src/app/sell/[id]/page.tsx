@@ -16,7 +16,7 @@ import { CATEGORIES, type CategorySlug, type Vault, type VaultInput } from '@/ty
 export default function ListingEditorPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading, isDemo } = useAuth();
   const isNew = id === 'new';
 
   const [loading, setLoading] = useState(!isNew);
@@ -44,6 +44,9 @@ export default function ListingEditorPage() {
   // A zip refused before it is uploaded. The picker sits at the top of a long form, so the
   // page's error banner further down would not be seen.
   const [rejected, setRejected] = useState<string | null>(null);
+  // Whether the seller can be paid at all. The server refuses to publish a paid vault
+  // without it; checking here means the refusal arrives before the save round trip.
+  const [canBePaid, setCanBePaid] = useState<boolean | null>(null);
 
   const zipInput = useRef<HTMLInputElement>(null);
   const coverInput = useRef<HTMLInputElement>(null);
@@ -93,6 +96,15 @@ export default function ListingEditorPage() {
     }
   };
 
+  useEffect(() => {
+    if (!user || isDemo) return setCanBePaid(true);
+    api
+      .getPayoutDetails()
+      .then(({ details }) => setCanBePaid(!!details))
+      // Unknown rather than false, so a failed check never blocks a publish the server allows.
+      .catch(() => setCanBePaid(null));
+  }, [user?.id, isDemo]);
+
   const pickZip = async (file: File | undefined) => {
     if (!file) return;
     if (!file.name.toLowerCase().endsWith('.zip')) return setRejected('Zip files only. Export your vault folder as a .zip archive first.');
@@ -135,6 +147,9 @@ export default function ListingEditorPage() {
     if (description.trim().length < 40) return setError('Tell buyers what is inside. At least a couple of sentences.');
     if (priceError || priceCents === null) return setError(priceError ?? 'Enter a valid price.');
     if (publish && !filePath) return setError('Attach the .zip before publishing. You can still save a draft.');
+    if (publish && priceCents > 0 && canBePaid === false) {
+      return setRejected('Add your payout details before publishing a paid vault. Nobody can pay you until we know where to send your share. You can save it as a draft, or set the price to free.');
+    }
 
     setSaving(publish ? 'publish' : 'draft');
     setError(null);

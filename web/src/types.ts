@@ -31,6 +31,26 @@ export interface Profile {
   createdAt: string;
 }
 
+/**
+ * Where a seller's share is sent. Dodo settles to the platform and never pays a seller, so
+ * these are the platform's own records, and a paid vault cannot go live without them.
+ */
+export type PayoutMethod = 'bank' | 'wise' | 'payoneer' | 'paypal';
+
+export interface PayoutDetails {
+  /** ISO 3166-1 alpha-2. */
+  country: string;
+  /** ISO 4217. */
+  currency: string;
+  method: PayoutMethod;
+  accountName: string;
+  /** Account number or IBAN for a bank; the account email otherwise. */
+  accountRef: string;
+  /** IFSC, sort code, routing number or SWIFT/BIC, whichever the country uses. */
+  bankCode?: string | null;
+  notes?: string | null;
+}
+
 export type SellerSummary = Pick<Profile, 'id' | 'username' | 'displayName' | 'avatarUrl'>;
 
 export interface Vault {

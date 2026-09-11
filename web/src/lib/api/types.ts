@@ -1,5 +1,6 @@
 import type {
   ListVaultsParams,
+  PayoutDetails,
   Profile,
   Purchase,
   Review,
@@ -44,6 +45,9 @@ export interface Backend {
   resendConfirmation(email: string): Promise<void>;
   getProfile(userId: string): Promise<Profile | null>;
   updateProfile(patch: Partial<Pick<Profile, 'displayName' | 'bio' | 'username' | 'isSeller'>>): Promise<Profile>;
+  /** Null until the seller says where their share should go. Paid listings are gated on it. */
+  getPayoutDetails(): Promise<{ details: PayoutDetails | null; currencies: string[] }>;
+  savePayoutDetails(details: PayoutDetails): Promise<PayoutDetails>;
 
   // Catalog
   listVaults(params?: ListVaultsParams): Promise<Vault[]>;

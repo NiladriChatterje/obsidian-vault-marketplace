@@ -1,4 +1,4 @@
-import type { Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
+import type { PayoutDetails, Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
 import { API_URL, MIN_PASSWORD_LENGTH, REDIRECT_ORIGIN, STORAGE_BUCKETS } from '../config';
 import { requireSupabase } from '../supabase';
 import type { AuthUser, Backend } from './types';
@@ -104,7 +104,7 @@ function extFromUri(uri: string, fallback: string): string {
 }
 
 /** Calls the payment server with the current Supabase session token. */
-async function apiFetch<T = Record<string, any>>(path: string, init: { method?: 'GET' | 'POST'; body?: unknown } = {}): Promise<T> {
+async function apiFetch<T = Record<string, any>>(path: string, init: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown } = {}): Promise<T> {
   if (!API_URL) throw new Error('Payment server is not configured. Set SERVER_API_URL.');
   const { data } = await requireSupabase().auth.getSession();
   const token = data.session?.access_token;
@@ -241,6 +241,15 @@ export const supabaseBackend: Backend = {
     const { data, error } = await requireSupabase().from('profiles').update(row).eq('id', id).select('*').single();
     if (error) throw authError(error);
     return toProfile(data);
+  },
+
+  async getPayoutDetails() {
+    const data = await apiFetch<{ details: PayoutDetails | null; currencies: string[] }>('/me/payout-details');
+    return { details: data.details ?? null, currencies: data.currencies ?? [] };
+  },
+  async savePayoutDetails(details: PayoutDetails) {
+    const data = await apiFetch<{ details: PayoutDetails }>('/me/payout-details', { method: 'PUT', body: { details } });
+    return data.details;
   },
 
   async listVaults(params = {}) {

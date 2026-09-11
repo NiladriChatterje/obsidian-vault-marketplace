@@ -15,7 +15,7 @@ const AsyncStorage = {
     }
   },
 };
-import type { Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
+import type { PayoutDetails, Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
 import { API_URL, PLATFORM_FEE_PERCENT, REDIRECT_ORIGIN } from '../config';
 import { DEMO_REVIEWS, DEMO_SELLERS, DEMO_VAULTS } from '../demo-data';
 import type { AuthUser, Backend } from './types';
@@ -188,6 +188,14 @@ export const demoBackend: Backend = {
     Object.assign(p, patch);
     await persist();
     return p;
+  },
+
+  async getPayoutDetails() {
+    // Demo grants purchases in the browser, so there is nobody to pay and nothing to gate.
+    return { details: null, currencies: [] };
+  },
+  async savePayoutDetails(details: PayoutDetails) {
+    return details;
   },
 
   async listVaults(params = {}) {

@@ -26,6 +26,7 @@ import type { CategorySlug, SortMode, VaultInput, VaultStatus } from '../types.t
 import * as catalog from '../sanity/index.ts';
 import { ownsVault, requester, requireRequester, sellerProfile } from '../access.ts';
 import { IS_DEMO, cfg, platformFee } from '../config.ts';
+import { hasPayoutDetails } from '../seller-payouts.ts';
 import { buildVaultZip, signDownload, verifyDownload } from '../download.ts';
 import { admin } from '../supabase.ts';
 
@@ -209,6 +210,11 @@ export default async function catalogRoutes(app: FastifyInstance) {
       const input = req.body.input;
       if (!input.title || input.title.trim().length < 3) return reply.code(400).send({ error: 'Title is too short' });
       if (input.priceCents !== 0 && input.priceCents < 4900) return reply.code(400).send({ error: 'Paid vaults start at ₹49' });
+      // A paid listing that goes live must belong to a seller we can actually pay. Dodo
+      // settles to the platform, so nothing reaches the seller unless we know where to send it.
+      if (input.status === 'published' && input.priceCents > 0 && !(await hasPayoutDetails(r.id))) {
+        return reply.code(400).send({ error: 'Add your payout details before publishing a paid vault. You can save it as a draft, or publish it free.' });
+      }
       const seller = await sellerProfile(r);
       try {
         return await catalog.saveVault({ ...input, priceCents: Math.round(input.priceCents) }, seller, req.body.id);
@@ -222,6 +228,12 @@ export default async function catalogRoutes(app: FastifyInstance) {
     const r = await requireRequester(req, reply);
     if (!r) return;
     if (!['draft', 'published', 'unlisted'].includes(req.body?.status)) return reply.code(400).send({ error: 'Invalid status' });
+    if (req.body.status === 'published') {
+      const v = await catalog.getVault(req.params.id);
+      if (v && v.priceCents > 0 && !(await hasPayoutDetails(r.id))) {
+        return reply.code(400).send({ error: 'Add your payout details before publishing a paid vault. You can publish it free instead.' });
+      }
+    }
     try {
       await catalog.setVaultStatus(req.params.id, req.body.status, r.id);
       return { ok: true };
