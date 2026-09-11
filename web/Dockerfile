@@ -23,6 +23,19 @@ ENV EXPO_PUBLIC_SUPABASE_URL=$EXPO_PUBLIC_SUPABASE_URL \
     NEXT_TELEMETRY_DISABLED=1
 RUN npx next build
 
+# Dev stage: the source is bind-mounted from the host (see docker-compose.dev.yml), so only
+# the dependencies are baked in. EXPO_PUBLIC_* are read from the environment at request time
+# here rather than inlined, so editing .env needs a restart but not a rebuild.
+FROM node:24-alpine AS dev
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+EXPOSE 3000
+# --webpack with WATCHPACK_POLLING: Turbopack exposes no polling option, and Docker Desktop
+# does not deliver inotify events across a Windows/macOS bind mount, so edits go unnoticed.
+CMD ["npx", "next", "dev", "--webpack", "--hostname", "0.0.0.0", "--port", "3000"]
+
 FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0 NEXT_TELEMETRY_DISABLED=1
