@@ -185,10 +185,11 @@ Free vaults skip the provider entirely: `claim_free_vault` inserts the purchase 
 
 ### Seller onboarding
 
-There isn't any, by design. A creator switches on selling from `/sell` and lists; there is no
-linked account, no KYC form and no bank details, because Vault Market is the seller of record
-and their share is settled with them outside the checkout. The Route onboarding that used to
-live here was removed in `0008_dodo_merchant_of_record.sql` — see `PAYMENTS_SETUP_GUIDE.md`.
+A creator switches on selling from `/sell`, then records where their share should go at
+`/sell/payouts`: country, currency, method and account. There is no linked account and no KYC,
+because Vault Market is the seller of record; these are simply the platform's own records of
+who to pay. Dodo settles one amount to the platform and never pays a seller, so a paid vault
+cannot be published or bought until the seller can be paid. Free vaults are unaffected.
 
 ## Project layout
 
@@ -206,6 +207,8 @@ web/                       Next.js site (own package.json), no server-side secre
   src/lib/                 Browser copy of the data layer + mcp-token.ts, web.ts
 server/                    Fastify (own package.json)
   src/routes/checkout.ts   Opens a Dodo checkout session for a vault
+  src/routes/payouts.ts    Seller payout details; gates publishing a paid vault
+  src/seller-payouts.ts    Reads/validates them; hasPayoutDetails is the gate
   src/routes/catalog.ts    Sanity catalog, notes, uploads, downloads, seller CRUD
   src/routes/mcp.ts        MCP endpoint over purchased vaults
   src/sanity/              GROQ queries, mappers, markdown parsing, writes

@@ -47,6 +47,27 @@ above it, register and file an annual LUT so exports stay zero-rated. Income tax
 profit is the only thing due below that threshold. Not legal advice — talk to a CA before
 launch, especially about how you pay creators abroad.
 
+## Paying sellers
+
+Dodo has no sub-merchant concept. `client.payouts` exposes only `list()`, and every payout
+carries your own `business_id`, so Dodo settles one amount to the platform and never pays a
+seller. Paying creators is the platform's own job.
+
+So each seller records where their share goes at `/sell/payouts`: country, currency, method
+(bank, Wise, Payoneer or PayPal), account holder name and the account itself. It is held in
+`public.seller_payouts`, which is owner-only under RLS and deliberately not on
+`public.profiles`, because that table is world readable.
+
+**A paid vault cannot be published, or bought, without it.** The server refuses on three
+paths: saving a listing as published, flipping an existing listing to published, and
+checkout itself. The last is the one that matters, since a seller could go live and have
+their details removed afterwards, and taking money that cannot be passed on is worse than
+refusing the sale. Free vaults are unaffected.
+
+The currency is checked against Dodo's ISO 4217 payout list in
+`server/src/payout-currencies.ts`. A seller whose currency is not on it is told so at the
+form rather than after someone has bought from them.
+
 ## Deploy checklist
 
 ```

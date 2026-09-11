@@ -27,6 +27,13 @@ function Sell() {
   const isSeller = !!profile?.isSeller;
 
   const vaults = useAsync(() => (user && isSeller ? api.getMyVaults() : Promise.resolve([])), [user?.id, isSeller]);
+  // Dodo settles to the platform and never pays a seller, so a paid listing can only go
+  // live once we know where to send their share.
+  const payout = useAsync(
+    () => (user && isSeller && !isDemo ? api.getPayoutDetails() : Promise.resolve({ details: null, currencies: [] })),
+    [user?.id, isSeller]
+  );
+  const payoutMissing = !isDemo && isSeller && !payout.loading && !payout.data?.details;
   const stats = useAsync(() => (user && isSeller ? api.getSellerStats() : Promise.resolve(null)), [user?.id, isSeller]);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +119,15 @@ function Sell() {
           <button className="btn small" onClick={onBecomeSeller} disabled={joining}>
             {joining ? 'Enabling…' : 'Start selling'}
           </button>
+        </div>
+      ) : null}
+
+      {payoutMissing ? (
+        <div className="notice row between">
+          <span>Add your payout details to publish paid vaults. Free vaults can go live without them.</span>
+          <Link href="/sell/payouts" className="btn small">
+            Add details
+          </Link>
         </div>
       ) : null}
       {error ? <div className="error">{error}</div> : null}

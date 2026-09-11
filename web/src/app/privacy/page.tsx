@@ -27,9 +27,11 @@ export default function PrivacyPage() {
 
       <h3>When you sell a vault</h3>
       <p>
-        Your listing text, cover image and the notes inside the vault you upload. <strong>We no longer collect your PAN, address or bank account details.</strong>{' '}
-        Vault Market is the seller of record to the buyer, so your share is settled with you separately as a supplier rather than paid out of the buyer&rsquo;s
-        payment, and whatever details that settlement needs are exchanged outside this site.
+        Your listing text, cover image and the notes inside the vault you upload. Vault Market is the seller of record to the buyer, so your share is settled
+        with you separately rather than paid out of the buyer&rsquo;s payment. To do that we hold the payout details you enter: country, currency, how you want
+        to be paid, the name on the account and the account itself, which is an account number or IBAN for a bank transfer and an email address otherwise.
+        <strong>We do not ask for your PAN or any government identity document.</strong> Payout details are readable only by you and by the server that pays
+        you; they are never shown publicly, attached to your listings or shared with buyers.
       </p>
 
       <h3>When you connect over MCP</h3>
