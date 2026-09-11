@@ -73,20 +73,36 @@ form rather than after someone has bought from them.
 Nothing splits a payment. Dodo settles every sale to the platform in full, so a seller's
 share is a debt the platform carries until it transfers the money itself.
 
-**The seller's share is 90% of the list price**, so the payment provider's fee comes
-entirely out of the platform's 10%. That is a choice with a sharp edge: Dodo's fixed $0.40
-per sale does not shrink with the price, so a cheap vault costs the platform money.
+**The seller's share is 90% of the list price** at a 10% commission, so the payment
+provider's fee comes entirely out of the platform's share. That has a sharp edge: Dodo's
+fixed $0.40 per sale does not shrink with the price, so below a certain price every sale
+costs the platform money.
 
-| List | Platform receives | Seller's 90% | Platform keeps |
+That threshold is now derived rather than guessed:
+
+```
+kept = price x (commission - provider%) / 100 - providerFixed
+```
+
+which is zero at `providerFixed x 100 / (commission - provider%)`. `minPriceCents()` in
+`server/src/config.ts` adds 20% of headroom, rounds up to a round Rs 50 and refuses any
+paid listing below it. `web/src/lib/config.ts` mirrors it so the seller sees the same
+number. Change `EXPO_PUBLIC_PLATFORM_FEE_PERCENT` and the floor follows:
+
+| Commission | Break-even | Minimum price | Platform keeps on a Rs 2,499 sale |
 | ---: | ---: | ---: | ---: |
-| Rs 49 | 12 | 44 | **-32** |
-| Rs 499 | 444 | 449 | **-5** |
-| Rs 999 | 924 | 899 | +25 |
-| Rs 2,499 | 2,364 | 2,249 | +115 |
+| 8% | Rs 1,000 | Rs 1,200 | Rs 60 |
+| 10% | Rs 667 | Rs 800 | Rs 110 |
+| **15% (current)** | **Rs 364** | **Rs 450** | **Rs 235** |
+| 20% | Rs 250 | Rs 300 | Rs 360 |
 
-Break-even is about **Rs 587 at a 10% commission**, Rs 320 at 15% and Rs 220 at 20%.
-`MIN_PRICE_CENTS` in `web/src/lib/config.ts` is Rs 49, which is well below all three, so
-either raise the floor above break-even or raise `EXPO_PUBLIC_PLATFORM_FEE_PERCENT`.
+The commission was 10% with a Rs 49 floor, which lost Rs 32 on every sale at that floor.
+It is 15% with a Rs 450 floor. Free vaults are unaffected: they never reach checkout, so
+they cost nothing to give away, which is what makes them the top of the funnel.
+
+`EXPO_PUBLIC_PROVIDER_PERCENT_FEE` and `EXPO_PUBLIC_PROVIDER_FIXED_FEE_CENTS` describe the
+provider and default to Dodo's 4% and Rs 40, the latter being $0.40 with headroom over the
+exchange rate. Revisit the fixed one if the rupee moves a long way.
 
 The ledger is at `/admin/payouts`, gated on `ADMIN_USER_IDS` (a comma-separated list of
 Supabase user ids; unset closes the routes rather than opening them):

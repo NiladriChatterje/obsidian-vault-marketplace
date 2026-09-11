@@ -25,7 +25,7 @@ import { unzipSync } from 'fflate';
 import type { CategorySlug, SellerStats, SortMode, VaultInput, VaultStatus } from '../types.ts';
 import * as catalog from '../sanity/index.ts';
 import { ownsVault, requester, requireRequester, sellerProfile } from '../access.ts';
-import { IS_DEMO, cfg, platformFee } from '../config.ts';
+import { IS_DEMO, cfg, minPriceCents, platformFee } from '../config.ts';
 import { sellerBalance } from '../payout-ledger.ts';
 import { hasPayoutDetails } from '../seller-payouts.ts';
 import { buildVaultZip, signDownload, verifyDownload } from '../download.ts';
@@ -215,7 +215,12 @@ export default async function catalogRoutes(app: FastifyInstance) {
       if (!r) return;
       const input = req.body.input;
       if (!input.title || input.title.trim().length < 3) return reply.code(400).send({ error: 'Title is too short' });
-      if (input.priceCents !== 0 && input.priceCents < 4900) return reply.code(400).send({ error: 'Paid vaults start at ₹49' });
+      // Derived from the commission and the provider's fee, so a price that would cost the
+      // platform money on every sale cannot be listed at all.
+      const floor = minPriceCents();
+      if (input.priceCents !== 0 && input.priceCents < floor) {
+        return reply.code(400).send({ error: `Paid vaults start at ₹${Math.round(floor / 100)}. Below that the payment fees cost more than the sale earns. You can list it free instead.` });
+      }
       // A paid listing that goes live must belong to a seller we can actually pay. Dodo
       // settles to the platform, so nothing reaches the seller unless we know where to send it.
       if (input.status === 'published' && input.priceCents > 0 && !(await hasPayoutDetails(r.id))) {

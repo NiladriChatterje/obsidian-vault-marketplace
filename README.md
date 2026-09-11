@@ -13,7 +13,7 @@ A two-sided marketplace for Obsidian vaults, built with Expo (React Native) and 
 
 | Stream | How |
 | --- | --- |
-| Commission | 10% of every paid sale (`PLATFORM_FEE_PERCENT`). Sellers keep 90% **of the list price**, settled to them outside the checkout. Dodo's fee therefore comes wholly out of the platform's 10%, and its fixed $0.40 per sale means anything under about ₹587 loses money at that rate. See `PAYMENTS_SETUP_GUIDE.md`. |
+| Commission | 15% of every paid sale (`PLATFORM_FEE_PERCENT`). Sellers keep 85% **of the list price**, settled to them outside the checkout, so Dodo's fee comes wholly out of the platform's share. Its fixed $0.40 per sale is why the minimum price is derived from the commission rather than fixed: at 15% that is ₹450, below which a sale costs more in fees than it earns. See `PAYMENTS_SETUP_GUIDE.md`. |
 | Featured placement | The `featured` flag drives the home carousel. Sell slots to sellers weekly. |
 | Seller Pro (future) | Analytics, coupons, early-access releases for a monthly fee. |
 
