@@ -4,6 +4,11 @@
 # still runs the production build described in docker-compose.yml.
 services:
   web:
+    # Its own tag: the two stages would otherwise share vault-marketplace-web:latest, and
+    # `target` only chooses what a build produces, not which image an existing container
+    # reuses. Whichever stage was built last would win, so starting without --build could
+    # silently run the production server.js against the bind-mounted source and crash-loop.
+    image: vaultmarket-web-dev
     build:
       target: dev
     environment:
