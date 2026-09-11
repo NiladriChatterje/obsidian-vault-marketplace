@@ -7,7 +7,7 @@
  *
  * Signed with Standard Webhooks — HMAC over `id.timestamp.body` — so the raw body has to
  * reach the verifier byte for byte. Its own plugin scope keeps that parser off every other
- * route, the same way the Razorpay webhook does.
+ * route.
  *
  * Configure at Dodo → Developer → Webhooks with events payment.succeeded, payment.failed,
  * refund.succeeded, and put the signing secret in DODO_WEBHOOK_SECRET.

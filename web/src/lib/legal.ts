@@ -1,18 +1,18 @@
 /**
- * Business details shown on the legal pages. Razorpay's activation review checks
+ * Business details shown on the legal pages. Payment providers' activation reviews check
  * that these pages exist, name a real operator and give a working contact route.
  *
  * FILL THESE IN before requesting live keys. The placeholders are deliberately
  * obvious so a half-finished page is easy to spot.
  */
 export const BUSINESS = {
-  /** Registered or proprietor name that appears on the Razorpay account. */
+  /** Registered or proprietor name that appears on the payment provider account. */
   legalName: 'TODO Legal Name',
   /** Public trading name. */
   tradingName: 'Vault Market',
-  /** Support inbox. Must be monitored: Razorpay and card networks use it for disputes. */
+  /** Support inbox. Must be monitored: the provider and card networks use it for disputes. */
   supportEmail: 'obsidian.vault.marketplace@gmail.com',
-  /** Operating address as registered with Razorpay. */
+  /** Operating address as registered with the payment provider. */
   address: 'TODO Street, City, State, PIN, India',
   /** Courts named in the terms. */
   jurisdiction: 'the courts of TODO City, India',

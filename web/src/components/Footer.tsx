@@ -8,7 +8,7 @@ const LINKS = [
   { href: '/contact', label: 'Contact' },
 ];
 
-/** Razorpay's activation review looks for these links from every page. */
+/** Payment providers' activation reviews look for these links from every page. */
 export function Footer() {
   return (
     <footer className="site-footer">

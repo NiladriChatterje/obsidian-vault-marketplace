@@ -31,7 +31,7 @@ function Sell() {
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Selling used to require Razorpay Route payout onboarding — a linked account, KYC and
+  // Selling used to require payout onboarding — a linked account, KYC and
   // bank details — before a paid vault could be listed. The platform is now the seller of
   // record, so a creator just opts in and lists; their royalty is settled outside checkout.
   const onBecomeSeller = async () => {
@@ -83,7 +83,7 @@ function Sell() {
         </div>
         <div className="perks">
           <Perk title={`Keep ${100 - PLATFORM_FEE_PERCENT}% of every sale`} body={`A flat ${PLATFORM_FEE_PERCENT}% only when you sell. Free vaults cost nothing to list.`} />
-          <Perk title="Payouts by Razorpay" body="Buyers pay with UPI, cards or netbanking. Your share settles to your bank account through Razorpay Route." />
+          <Perk title="Paid worldwide" body="Buyers pay in their own currency and we handle the tax. Your share is settled to you separately." />
           <Perk title="Upload a zip, that is it" body="Export your vault folder as a .zip, add a description and a cover, publish." />
           <Perk title="Download or MCP" body="Buyers unzip into Obsidian or connect the vault to their AI assistant. You do nothing extra." />
         </div>
@@ -92,7 +92,6 @@ function Sell() {
           <button className="btn" onClick={onBecomeSeller}>
             {user ? 'Become a seller' : 'Sign in to start selling'}
           </button>
-          {!isDemo ? <p className="help" style={{ marginTop: 8 }}>You enter your PAN, address and bank account once. Razorpay verifies them in a day or two.</p> : null}
         </div>
       </div>
     );

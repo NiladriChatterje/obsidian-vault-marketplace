@@ -21,7 +21,7 @@ export default function PrivacyPage() {
 
       <h3>When you buy a vault</h3>
       <p>
-        The vault purchased, the amount, our commission, the payment and transfer identifiers returned by Razorpay, and the time of purchase. Card numbers,
+        The vault purchased, the amount, our commission, the payment identifier returned by the payment provider, and the time of purchase. Card numbers,
         UPI IDs and bank credentials are entered on the payment provider&rsquo;s own checkout page and never reach our servers.
       </p>
 
@@ -55,9 +55,6 @@ export default function PrivacyPage() {
         <li>
           <strong>Dodo Payments</strong> — merchant of record for payments outside India: it takes the payment, issues the invoice and handles sales tax and VAT.
           Governed by Dodo Payments&rsquo; own privacy policy.
-        </li>
-        <li>
-          <strong>Razorpay</strong> — payments taken in India. Governed by Razorpay&rsquo;s own privacy policy.
         </li>
         <li>
           <strong>Supabase</strong> — accounts, purchases and orders.

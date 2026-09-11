@@ -13,21 +13,14 @@ const port = Number(env('API_PORT') || env('PORT', '4000'));
 
 export const cfg = {
   port,
-  /** Public URL of this server; Razorpay posts the checkout result back here. */
+  /** Public URL of this server; the buyer is sent back here after checkout. */
   apiUrl: env('SERVER_API_URL', `http://localhost:${port}`).replace(/\/$/, ''),
-
-  razorpay: {
-    keyId: env('RAZORPAY_CLIENT_KEY'),
-    keySecret: env('RAZORPAY_SECRET_KEY'),
-    /** Accepts the older MERCHANT_ID spelling so existing .env files keep working. */
-    merchantId: env('RAZORPAY_MERCHANT_ID') || env('MERCHANT_ID'),
-    webhookSecret: env('RAZORPAY_WEBHOOK_SECRET'),
-  },
 
   /**
    * Dodo Payments, the merchant of record. It is the seller of record to the buyer, so it
    * handles global cards and local methods, registers and remits VAT / sales tax, and
-   * settles the net to our bank. Without DODO_API_KEY the server falls back to Razorpay.
+   * settles the net to our bank. It is the only payment rail; without DODO_API_KEY no paid
+   * checkout can be created.
    */
   dodo: {
     apiKey: env('DODO_API_KEY'),
@@ -50,15 +43,15 @@ export const cfg = {
   },
 
   feePercent: Number(env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT', env('PLATFORM_FEE_PERCENT', '10'))),
-  /** Signs short-lived download links. Falls back to the Razorpay secret so nothing extra is required. */
-  downloadSecret: env('DOWNLOAD_SECRET') || env('RAZORPAY_SECRET_KEY') || 'dev-download-secret',
+  /** Signs short-lived download links. Falls back to the Dodo key so nothing extra is required. */
+  downloadSecret: env('DOWNLOAD_SECRET') || env('DODO_API_KEY') || 'dev-download-secret',
   /** Comma-separated http(s) origins buyers may be redirected to after checkout. Empty = any. */
   allowedRedirectOrigins: env('ALLOWED_REDIRECT_ORIGINS').split(',').map((s) => s.trim()).filter(Boolean),
   /** Site origin; native buyers land there before deep-linking back into the app. */
   webOrigin: env('EXPO_PUBLIC_REDIRECT_ORIGIN').replace(/\/$/, ''),
 };
 
-/** No Supabase: orders live in memory and the client grants demo purchases itself. Real Razorpay test payments still work. */
+/** No Supabase: orders live in memory and the client grants demo purchases itself. */
 export const IS_DEMO = !cfg.supabase.url || !cfg.supabase.serviceKey;
 
 /** A real deployment rather than a laptop: set by Render, Fly, Railway and by our own Dockerfile. */
@@ -78,14 +71,6 @@ if (IS_DEMO && IS_HOSTED && env('ALLOW_PUBLIC_DEMO') !== 'yes') {
     'Set EXPO_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, or ALLOW_PUBLIC_DEMO=yes to override.',
   );
 }
-
-/**
- * Which rail takes the money. Dodo whenever it is configured, because it is the only one
- * that can sell globally and settle the tax; Razorpay is the domestic fallback and is what
- * every existing order was taken on.
- */
-export const PAYMENT_PROVIDER: 'dodo' | 'razorpay' =
-  env('PAYMENT_PROVIDER') === 'razorpay' ? 'razorpay' : env('DODO_API_KEY') ? 'dodo' : 'razorpay';
 
 export function platformFee(amount: number): number {
   return Math.round((amount * cfg.feePercent) / 100);

@@ -31,7 +31,7 @@ export default function TermsPage() {
 
       <h2>3. Buying</h2>
       <p>
-        Prices are shown before payment and charged through Razorpay. A purchase gives you a personal, non-exclusive, non-transferable licence to use the vault
+        Prices are shown before payment and charged by our payment provider, who is the merchant of record for the sale. A purchase gives you a personal, non-exclusive, non-transferable licence to use the vault
         yourself: read it, edit it, build on it. You may not resell it, republish it, or share it publicly in whole or in substantial part. Access to download and
         to read the vault over MCP lasts as long as your account and the listing exist. Refunds are covered by the{' '}
         <Link href="/refunds">Refund &amp; Cancellation Policy</Link>.
@@ -44,7 +44,7 @@ export default function TermsPage() {
         that the listing describes it honestly.
       </p>
       <p>
-        We keep a commission on each paid sale, shown on the Sell page and applied at checkout; the rest is transferred to your Razorpay payout account. You are
+        We keep a commission on each paid sale, shown on the Sell page and applied at checkout; the rest is settled to you separately as your share. You are
         responsible for your own taxes. We may unlist a vault that breaks these terms or draws repeated complaints. Buyers who already paid keep access to what
         they bought.
       </p>

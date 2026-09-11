@@ -14,7 +14,7 @@ export const IS_DEMO = !SUPABASE_URL || !SUPABASE_ANON_KEY;
 /** Platform commission on every paid sale, in percent. Enforced by the payment server (server/). */
 export const PLATFORM_FEE_PERCENT = Number(process.env.EXPO_PUBLIC_PLATFORM_FEE_PERCENT ?? 10);
 
-/** Default currency for listings. Razorpay settles in INR. */
+/** Default currency listings are priced in. */
 export const DEFAULT_CURRENCY = 'INR';
 
 /** Minimum price a seller may set for a paid vault, in minor units (Rs 49). Mirrored in the vaults check constraint. */
@@ -30,7 +30,7 @@ export const MIN_PASSWORD_LENGTH = 8;
 export const APP_SCHEME = 'vaultmarket';
 
 /**
- * Base URL of the Fastify payment server (server/). It creates Razorpay orders,
+ * Base URL of the Fastify payment server (server/). It opens checkout sessions,
  * hosts the checkout page, verifies signatures and onboards sellers.
  * Empty means "no server": paid checkout is unavailable outside demo mode.
  */

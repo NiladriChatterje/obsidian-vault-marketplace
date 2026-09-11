@@ -9,8 +9,6 @@ export const DEMO_SELLERS: Profile[] = [
     displayName: 'Nova Notes',
     bio: 'Building thinking systems in Obsidian since 2020. 40k+ students.',
     isSeller: true,
-    payoutsEnabled: true,
-    razorpayAccountId: 'acc_demo',
     createdAt: daysAgo(400),
   },
   {
@@ -19,8 +17,6 @@ export const DEMO_SELLERS: Profile[] = [
     displayName: 'Kai Builds',
     bio: 'Engineer. I sell the vaults I actually use.',
     isSeller: true,
-    payoutsEnabled: true,
-    razorpayAccountId: 'acc_demo',
     createdAt: daysAgo(300),
   },
   {
@@ -29,8 +25,6 @@ export const DEMO_SELLERS: Profile[] = [
     displayName: 'Mira, PhD',
     bio: 'Academic workflows, Zotero pipelines and literature reviews.',
     isSeller: true,
-    payoutsEnabled: true,
-    razorpayAccountId: 'acc_demo',
     createdAt: daysAgo(220),
   },
 ];
