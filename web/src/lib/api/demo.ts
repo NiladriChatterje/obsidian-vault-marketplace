@@ -292,7 +292,7 @@ export const demoBackend: Backend = {
   },
   async createCheckout(vaultId) {
     // Demo: the purchase is granted locally right away. When the payment server is
-    // running, a real Razorpay *test* order is still created so the checkout flow
+    // running, a real *test* checkout is still created so the flow
     // can be tried end to end; the outcome of that test payment is not enforced.
     const s = await load();
     const u = requireUser(s);

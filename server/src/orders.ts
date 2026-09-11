@@ -1,23 +1,26 @@
 /**
- * Order bookkeeping, one shape whichever provider took the payment. With Supabase
- * configured, rows live in public.orders and paid orders become public.purchases. In demo
- * mode orders live in memory so checkout still works end to end.
+ * Order bookkeeping. With Supabase configured, rows live in public.orders and paid orders
+ * become public.purchases. In demo mode orders live in memory so checkout still works end
+ * to end.
  *
  * Nothing splits a payment any more: under a merchant of record the platform is the seller
  * and creators are paid outside the checkout, so there is no transfer to track or reverse.
  */
 import { IS_DEMO } from './config.ts';
 import { dodo } from './dodo.ts';
-import { razorpay, razorpayError } from './razorpay.ts';
 import { admin } from './supabase.ts';
 
 export type OrderStatus = 'created' | 'paid' | 'failed' | 'refunded';
 
+/**
+ * Only Dodo takes money now. Rows written before the switch are still labelled 'razorpay'
+ * and are all terminal, so the union exists to read history, not to write it.
+ */
 export type PaymentProvider = 'razorpay' | 'dodo';
 
 export interface Order {
   provider: PaymentProvider;
-  /** Razorpay order id, or the Dodo checkout session id. */
+  /** The Dodo checkout session id (a Razorpay order id on rows predating the switch). */
   providerOrderId: string;
   vaultId: string;
   buyerId: string | null;
@@ -111,8 +114,8 @@ export async function markOrderFailed(providerOrderId: string): Promise<void> {
 export async function settleOrder(order: Order, paymentId: string, signature: string | null): Promise<Order> {
   if (order.status === 'paid' && order.paymentId === paymentId) return order;
 
-  if (order.provider === 'razorpay') await confirmRazorpayPayment(order, paymentId);
-  else await confirmDodoPayment(order, paymentId);
+  if (order.provider !== 'dodo') throw new Error('This order predates Dodo Payments and cannot be settled.');
+  await confirmDodoPayment(order, paymentId);
 
   await updateOrder(order.providerOrderId, { status: 'paid', paymentId, signature });
 
@@ -133,20 +136,6 @@ export async function settleOrder(order: Order, paymentId: string, signature: st
   }
 
   return { ...order, status: 'paid', paymentId, signature };
-}
-
-/** Razorpay authorises first and captures second, so an authorised payment is captured here. */
-async function confirmRazorpayPayment(order: Order, paymentId: string): Promise<void> {
-  let payment: Row;
-  try {
-    payment = await razorpay.payments.fetch(paymentId);
-  } catch (e) {
-    throw new Error(`Could not fetch payment: ${razorpayError(e)}`);
-  }
-  if (payment.order_id !== order.providerOrderId) throw new Error('Payment does not belong to this order');
-  if (payment.status === 'authorized') payment = await razorpay.payments.capture(paymentId, order.amount, order.currency);
-  if (payment.status !== 'captured') throw new Error(`Payment is ${payment.status}, not captured`);
-  if (Number(payment.amount) !== order.amount) throw new Error('Paid amount does not match the order');
 }
 
 /**

@@ -99,7 +99,7 @@ export function withServerCatalog(base: Backend): Backend {
     },
     async createCheckout(vaultId) {
       if (!demo) return base.createCheckout(vaultId);
-      // Demo: grant locally, then hand back the real Razorpay test checkout page if the server made one.
+      // Demo: grant locally, then hand back the real test checkout page if the server made one.
       const v = await getVault(vaultId);
       if (!v) throw new Error('Vault not found');
       await demoStore.grant(vaultId, v.priceCents);

@@ -18,7 +18,7 @@ const REQUEST_TIMEOUT_MS = 10_000;
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
 
-/** Render exports its own public URL; fall back to the URL Razorpay already redirects to. */
+/** Render exports its own public URL; fall back to the URL checkout redirects to. */
 function target(): string {
   return (env('KEEP_AWAKE_URL') || env('RENDER_EXTERNAL_URL') || cfg.apiUrl).replace(/\/$/, '');
 }

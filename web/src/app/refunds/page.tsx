@@ -17,7 +17,7 @@ export default function RefundsPage() {
 
       <h2>Cancelling before payment</h2>
       <p>
-        You can abandon checkout at any point before paying. Closing the Razorpay window cancels the order and no money is taken. Nothing is added to your
+        You can abandon checkout at any point before paying. Closing the checkout window cancels the order and no money is taken. Nothing is added to your
         library.
       </p>
 

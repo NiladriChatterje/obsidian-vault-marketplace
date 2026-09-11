@@ -7,7 +7,8 @@ import { Loading } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAuth } from '@/store/auth';
 
-/** Landing page after the payment server settles (or fails/cancels) a Razorpay order. */
+/** Landing page the buyer returns to after checkout. It only reports the outcome: the
+ * purchase itself is granted by the provider's webhook, so this page never grants access. */
 export default function CheckoutResultPage() {
   return (
     <Suspense fallback={<Loading />}>
@@ -57,7 +58,7 @@ function CheckoutResult() {
       {paymentId ? <p className="mono muted">Payment {paymentId}</p> : null}
       <p className="muted">
         {failed
-          ? 'The payment signature did not check out or the payment was not captured. If money left your account it will be refunded automatically by Razorpay; contact support with the payment id.'
+          ? 'The payment could not be confirmed. If money left your account it will be refunded automatically; contact support with the payment id.'
           : !ok
           ? 'No charge was made. You can come back to the vault any time.'
           : state === 'checking'
