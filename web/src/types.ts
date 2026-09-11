@@ -50,7 +50,24 @@ export interface PayoutDetails {
 }
 
 /** 'none' = not a seller yet, 'pending' = under Razorpay review, 'activated' = payouts flowing. */
-export type PayoutStatus = 'none' | 'pending' | 'activated';
+/**
+ * Razorpay's verdict on a Route linked account. 'needs_clarification' is kept apart
+ * from 'pending' because it is the only one the seller can act on.
+ */
+export type PayoutStatus = 'none' | 'pending' | 'needs_clarification' | 'activated' | 'suspended';
+
+/** Something Razorpay is still waiting for before it will activate the account. */
+export interface PayoutRequirement {
+  field: string;
+  reason: string;
+  status: string;
+  resolutionUrl?: string;
+}
+
+export interface PayoutState {
+  status: PayoutStatus;
+  requirements: PayoutRequirement[];
+}
 
 export type SellerSummary = Pick<Profile, 'id' | 'username' | 'displayName' | 'avatarUrl'>;
 

@@ -7,7 +7,7 @@ import { IS_DEMO } from './config.ts';
 import { razorpay, razorpayError } from './razorpay.ts';
 import { admin } from './supabase.ts';
 
-export type OrderStatus = 'created' | 'paid' | 'failed';
+export type OrderStatus = 'created' | 'paid' | 'failed' | 'refunded';
 
 export interface Order {
   razorpayOrderId: string;
@@ -24,6 +24,8 @@ export interface Order {
   paymentId: string | null;
   signature: string | null;
   transferId: string | null;
+  /** Route reversal that clawed the seller's share back, when a refund needed one. */
+  reversalId?: string | null;
 }
 
 const memory = new Map<string, Order>();
@@ -43,6 +45,7 @@ const fromRow = (r: Row): Order => ({
   paymentId: r.razorpay_payment_id,
   signature: r.razorpay_signature,
   transferId: r.razorpay_transfer_id,
+  reversalId: r.razorpay_reversal_id ?? null,
 });
 
 export async function saveOrder(order: Order): Promise<void> {
@@ -83,7 +86,9 @@ async function updateOrder(razorpayOrderId: string, patch: Partial<Order>): Prom
   if (patch.paymentId !== undefined) row.razorpay_payment_id = patch.paymentId;
   if (patch.signature !== undefined) row.razorpay_signature = patch.signature;
   if (patch.transferId !== undefined) row.razorpay_transfer_id = patch.transferId;
+  if (patch.reversalId !== undefined) row.razorpay_reversal_id = patch.reversalId;
   if (patch.status === 'paid') row.paid_at = new Date().toISOString();
+  if (patch.status === 'refunded') row.refunded_at = new Date().toISOString();
   const { error } = await admin().from('orders').update(row).eq('razorpay_order_id', razorpayOrderId);
   if (error) throw new Error(error.message);
 }
@@ -143,4 +148,51 @@ export async function settleOrder(order: Order, paymentId: string, signature: st
   }
 
   return { ...order, status: 'paid', paymentId, signature, transferId };
+}
+
+/** Refunds arrive by webhook keyed on the payment, not the order. */
+export async function getOrderByPayment(paymentId: string): Promise<Order | null> {
+  if (IS_DEMO) {
+    for (const o of memory.values()) if (o.paymentId === paymentId) return o;
+    return null;
+  }
+  const { data, error } = await admin().from('orders').select('*').eq('razorpay_payment_id', paymentId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? fromRow(data) : null;
+}
+
+/**
+ * Undoes a paid order after Razorpay refunded the buyer.
+ *
+ * A refund returns the full amount from the platform balance, but with Route the
+ * seller's share left that balance the moment the payment was captured. Without a
+ * reversal the platform eats the seller's cut on every refund, silently. So the
+ * transfer is reversed for the same proportion as the refund before the buyer's
+ * access is revoked.
+ *
+ * Idempotent: Razorpay sends refund.created and refund.processed for the same refund,
+ * and retries anything it does not get a 2xx for.
+ */
+export async function refundOrder(order: Order, refundedAmount: number): Promise<void> {
+  if (order.status === 'refunded') return;
+
+  let reversalId: string | null = order.reversalId ?? null;
+  if (order.transferId && !reversalId) {
+    // Partial refunds claw back the same fraction, so the split survives the refund.
+    const share = Math.min(1, refundedAmount / order.amount);
+    const sellerAmount = order.amount - order.fee;
+    const reverse = Math.round(sellerAmount * share);
+    if (reverse > 0) {
+      const reversal = (await razorpay.transfers.reverse(order.transferId, { amount: reverse } as any)) as Row;
+      reversalId = reversal?.id ?? null;
+    }
+  }
+
+  await updateOrder(order.razorpayOrderId, { status: 'refunded', reversalId });
+
+  // The buyer paid and was given the vault; the money is back, so the access goes too.
+  if (!IS_DEMO && order.buyerId) {
+    const { error } = await admin().from('purchases').delete().eq('vault_id', order.vaultId).eq('buyer_id', order.buyerId);
+    if (error) throw new Error(error.message);
+  }
 }

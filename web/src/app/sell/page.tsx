@@ -10,7 +10,7 @@ import { api } from '@/lib/api';
 import { PLATFORM_FEE_PERCENT } from '@/lib/config';
 import { formatCount, formatPrice } from '@/lib/format';
 import { useAuth } from '@/store/auth';
-import type { Vault, VaultStatus } from '@/types';
+import type { PayoutState, Vault, VaultStatus } from '@/types';
 
 export default function SellPage() {
   return (
@@ -30,11 +30,20 @@ function Sell() {
   const stats = useAsync(() => (user && isSeller ? api.getSellerStats() : Promise.resolve(null)), [user?.id, isSeller]);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Razorpay's verdict, which the profile flag cannot carry: "not activated" covers both
+  // waiting on Razorpay and waiting on the seller, and only the second is actionable.
+  const [payout, setPayout] = useState<PayoutState | null>(null);
 
   // Razorpay reviews linked accounts asynchronously; sync the flag when the page opens or after saving details.
   useEffect(() => {
     if (user && isSeller && !profile?.payoutsEnabled && !isDemo) {
-      api.refreshPayoutStatus().then(refreshProfile).catch(() => {});
+      api
+        .refreshPayoutStatus()
+        .then((state) => {
+          setPayout(state);
+          return refreshProfile();
+        })
+        .catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, isSeller, profile?.payoutsEnabled, params.get('payouts')]);
@@ -45,9 +54,12 @@ function Sell() {
     setChecking(true);
     setError(null);
     try {
-      const { status } = await api.refreshPayoutStatus();
+      const state = await api.refreshPayoutStatus();
+      setPayout(state);
       await refreshProfile();
-      if (status !== 'activated') setError('Razorpay is still verifying your details. Free vaults can be published meanwhile.');
+      if (state.status === 'needs_clarification') setError('Razorpay needs something from you before it can activate payouts. See below.');
+      else if (state.status === 'suspended') setError('Razorpay has suspended this linked account. Contact Razorpay support to reinstate it.');
+      else if (state.status !== 'activated') setError('Razorpay is still verifying your details. Free vaults can be published meanwhile.');
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -117,9 +129,13 @@ function Sell() {
       {!profile?.payoutsEnabled && !isDemo ? (
         <div className="notice row between">
           <span>
-            {profile?.razorpayAccountId
-              ? 'Payouts pending Razorpay review. Paid vaults unlock once your linked account is activated.'
-              : 'Add your payout details to sell paid vaults.'}
+            {!profile?.razorpayAccountId
+              ? 'Add your payout details to sell paid vaults.'
+              : payout?.status === 'needs_clarification'
+                ? 'Razorpay needs more information before payouts can be activated.'
+                : payout?.status === 'suspended'
+                  ? 'Razorpay has suspended your linked account, so paid vaults cannot be sold.'
+                  : 'Payouts pending Razorpay review. Paid vaults unlock once your linked account is activated.'}
           </span>
           {profile?.razorpayAccountId ? (
             <span className="row">
@@ -135,6 +151,29 @@ function Sell() {
               Add details
             </button>
           )}
+        </div>
+      ) : null}
+      {/* What Razorpay is waiting for. Without this the seller sees "pending" forever
+          with nothing to act on, which is the state that leaves accounts stuck. */}
+      {payout?.requirements?.length ? (
+        <div className="notice stack" style={{ gap: 8 }}>
+          <strong>Razorpay still needs:</strong>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {payout.requirements.map((r) => (
+              <li key={`${r.field}-${r.reason}`}>
+                <code>{r.field}</code> — {r.reason.replace(/_/g, ' ')}
+                {r.resolutionUrl ? (
+                  <>
+                    {' '}
+                    <a href={r.resolutionUrl} target="_blank" rel="noreferrer">
+                      resolve
+                    </a>
+                  </>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          <span className="muted small">Update the affected details on this page, then re-check.</span>
         </div>
       ) : null}
       {error ? <div className="error">{error}</div> : null}

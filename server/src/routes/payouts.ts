@@ -2,10 +2,14 @@
  * Seller payouts via Razorpay Route linked accounts.
  *   POST /payouts          { details } -> create linked account + stakeholder + Route product + bank details
  *   GET  /payouts/status   re-read activation status and sync profiles.payouts_enabled
+ *
+ * Both answer { status, requirements }. `requirements` is Razorpay's own list of what
+ * it still wants; without it needs_clarification is indistinguishable from waiting.
  */
 import type { FastifyInstance } from 'fastify';
 import { IS_DEMO, cfg } from '../config.ts';
 import { razorpay, razorpayError } from '../razorpay.ts';
+import { recordRouteAvailable, recordRouteFailure } from '../route-status.ts';
 import { admin, userFromRequest, type AuthUser } from '../supabase.ts';
 
 interface PayoutDetails {
@@ -22,7 +26,48 @@ interface PayoutDetails {
 }
 
 type Row = Record<string, any>;
-type Status = 'none' | 'pending' | 'activated';
+/**
+ * 'needs_clarification' is split out of 'pending' deliberately: it is the only one the
+ * seller can do anything about, and it used to be invisible.
+ */
+type Status = 'none' | 'pending' | 'needs_clarification' | 'activated' | 'suspended';
+
+/** One thing Razorpay is still waiting for, flattened out of the product's requirements. */
+interface Requirement {
+  field: string;
+  reason: string;
+  status: string;
+  resolutionUrl?: string;
+}
+
+interface PayoutState {
+  status: Status;
+  requirements: Requirement[];
+}
+
+function toRequirements(product: Row | null | undefined): Requirement[] {
+  const items: Row[] = Array.isArray(product?.requirements) ? product!.requirements : [];
+  return items.map((r) => ({
+    field: String(r.field_reference ?? r.field ?? 'details'),
+    reason: String(r.reason_code ?? r.reason ?? 'needs_clarification'),
+    status: String(r.status ?? 'required'),
+    ...(r.resolution_url ? { resolutionUrl: String(r.resolution_url) } : {}),
+  }));
+}
+
+/** Razorpay's activation_status vocabulary, narrowed to ours. */
+function toStatus(activationStatus: unknown): Status {
+  switch (activationStatus) {
+    case 'activated':
+      return 'activated';
+    case 'needs_clarification':
+      return 'needs_clarification';
+    case 'suspended':
+      return 'suspended';
+    default:
+      return 'pending';
+  }
+}
 
 const str = { type: 'string', minLength: 1 } as const;
 const detailsSchema = {
@@ -53,28 +98,33 @@ export default async function payoutRoutes(app: FastifyInstance) {
       const user = await userFromRequest(req);
       if (!user) return reply.code(401).send({ error: 'Not signed in' });
       try {
-        return { status: await onboard(user, req.body.details) };
+        return await onboard(user, req.body.details);
       } catch (e) {
         req.log.error(e);
-        return reply.code(502).send({ error: razorpayError(e) });
+        const message = razorpayError(e);
+        // Creating a linked account is the other call that proves Route either way.
+        recordRouteFailure(message);
+        return reply.code(502).send({ error: message });
       }
     }
   );
 
   app.get('/payouts/status', async (req, reply) => {
-    if (IS_DEMO) return { status: 'none' as Status };
+    if (IS_DEMO) return { status: 'none' as Status, requirements: [] as Requirement[] };
     const user = await userFromRequest(req);
     if (!user) return reply.code(401).send({ error: 'Not signed in' });
     try {
-      return { status: await onboard(user) };
+      return await onboard(user);
     } catch (e) {
       req.log.error(e);
-      return reply.code(502).send({ error: razorpayError(e) });
+      const message = razorpayError(e);
+      recordRouteFailure(message);
+      return reply.code(502).send({ error: message });
     }
   });
 }
 
-async function onboard(user: AuthUser, details?: PayoutDetails): Promise<Status> {
+async function onboard(user: AuthUser, details?: PayoutDetails): Promise<PayoutState> {
   const db = admin();
   const { data: profile, error } = await db.from('profiles').select('*').eq('id', user.id).single();
   if (error || !profile) throw new Error('Profile not found');
@@ -86,7 +136,7 @@ async function onboard(user: AuthUser, details?: PayoutDetails): Promise<Status>
   const pan = details ? details.pan.toUpperCase() : '';
 
   if (!accountId) {
-    if (!details) return 'none';
+    if (!details) return { status: 'none', requirements: [] };
 
     const account = (await razorpay.accounts.create({
       email: user.email ?? undefined,
@@ -106,6 +156,7 @@ async function onboard(user: AuthUser, details?: PayoutDetails): Promise<Status>
       notes: { user_id: user.id },
     } as any)) as Row;
     accountId = account.id;
+    recordRouteAvailable();
     // Save the id before anything else can fail: the account now exists at
     // Razorpay and a second create for the same email is rejected, so dropping
     // it here would strand the seller permanently.
@@ -141,10 +192,22 @@ async function onboard(user: AuthUser, details?: PayoutDetails): Promise<Status>
   }
 
   let status: Status = 'pending';
+  let requirements: Requirement[] = [];
+  let activationStatus: string | null = null;
   if (productId) {
     const product = (await razorpay.products.fetch(accountId!, productId)) as Row;
-    status = product.activation_status === 'activated' ? 'activated' : 'pending';
+    activationStatus = product.activation_status ?? null;
+    status = toStatus(activationStatus);
+    requirements = status === 'activated' ? [] : toRequirements(product);
   }
-  await db.from('profiles').update({ is_seller: true, payouts_enabled: status === 'activated' }).eq('id', user.id);
-  return status;
+  await db
+    .from('profiles')
+    .update({
+      is_seller: true,
+      payouts_enabled: status === 'activated',
+      razorpay_payout_status: activationStatus,
+      razorpay_requirements: requirements.length ? requirements : null,
+    })
+    .eq('id', user.id);
+  return { status, requirements };
 }
