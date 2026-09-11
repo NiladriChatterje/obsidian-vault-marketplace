@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { formatCount, formatPrice } from '@/lib/format';
 import type { Vault, VaultStatus } from '@/types';
 
@@ -120,5 +120,31 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
       {children}
       {hint ? <span className="help">{hint}</span> : null}
     </label>
+  );
+}
+
+/**
+ * A refusal the seller must see even when the page's error banner is scrolled out of
+ * view, which is what happens when a zip is rejected from a button near the top of a
+ * long form. Dismisses itself; `onClose` clears the state that raised it.
+ */
+export function Toast({ title, message, onClose, duration = 8000 }: { title: string; message?: string; onClose: () => void; duration?: number }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, duration);
+    return () => clearTimeout(t);
+  }, [onClose, duration]);
+
+  return (
+    <div className="toast-wrap" role="status" aria-live="polite">
+      <div className="toast">
+        <div className="toast-body">
+          <div className="toast-title">{title}</div>
+          {message ? <div className="toast-message">{message}</div> : null}
+        </div>
+        <button className="toast-close" onClick={onClose} aria-label="Dismiss">
+          ×
+        </button>
+      </div>
+    </div>
   );
 }
