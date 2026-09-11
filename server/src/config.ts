@@ -45,6 +45,11 @@ export const cfg = {
   feePercent: Number(env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT', env('PLATFORM_FEE_PERCENT', '10'))),
   /** Signs short-lived download links. Falls back to the Dodo key so nothing extra is required. */
   downloadSecret: env('DOWNLOAD_SECRET') || env('DODO_API_KEY') || 'dev-download-secret',
+  /**
+   * Supabase user ids allowed to reach /admin/*. Empty closes those routes entirely, so a
+   * forgotten variable leaves the admin surface unavailable rather than open.
+   */
+  adminUserIds: env('ADMIN_USER_IDS').split(',').map((s) => s.trim()).filter(Boolean),
   /** Comma-separated http(s) origins buyers may be redirected to after checkout. Empty = any. */
   allowedRedirectOrigins: env('ALLOWED_REDIRECT_ORIGINS').split(',').map((s) => s.trim()).filter(Boolean),
   /** Site origin; native buyers land there before deep-linking back into the app. */

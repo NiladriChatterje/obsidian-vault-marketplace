@@ -68,6 +68,43 @@ The currency is checked against Dodo's ISO 4217 payout list in
 `server/src/payout-currencies.ts`. A seller whose currency is not on it is told so at the
 form rather than after someone has bought from them.
 
+## Actually paying them
+
+Nothing splits a payment. Dodo settles every sale to the platform in full, so a seller's
+share is a debt the platform carries until it transfers the money itself.
+
+**The seller's share is 90% of the list price**, so the payment provider's fee comes
+entirely out of the platform's 10%. That is a choice with a sharp edge: Dodo's fixed $0.40
+per sale does not shrink with the price, so a cheap vault costs the platform money.
+
+| List | Platform receives | Seller's 90% | Platform keeps |
+| ---: | ---: | ---: | ---: |
+| Rs 49 | 12 | 44 | **-32** |
+| Rs 499 | 444 | 449 | **-5** |
+| Rs 999 | 924 | 899 | +25 |
+| Rs 2,499 | 2,364 | 2,249 | +115 |
+
+Break-even is about **Rs 587 at a 10% commission**, Rs 320 at 15% and Rs 220 at 20%.
+`MIN_PRICE_CENTS` in `web/src/lib/config.ts` is Rs 49, which is well below all three, so
+either raise the floor above break-even or raise `EXPO_PUBLIC_PLATFORM_FEE_PERCENT`.
+
+The ledger is at `/admin/payouts`, gated on `ADMIN_USER_IDS` (a comma-separated list of
+Supabase user ids; unset closes the routes rather than opening them):
+
+```bash
+curl -H "Authorization: Bearer <your supabase token>" https://<api>/admin/payouts
+curl -H "Authorization: Bearer <token>" https://<api>/admin/payouts.csv -o payouts.csv
+curl -X POST https://<api>/admin/payouts -H "Authorization: Bearer <token>"   -H 'Content-Type: application/json'   -d '{"sellerId":"<uuid>","amountCents":449820,"reference":"wise-123"}'
+```
+
+The CSV carries one row per seller with an outstanding balance and full account details,
+ready for a batch transfer. Record the payment afterwards; `POST /admin/payouts` only
+writes down a transfer that already happened, it never sends one.
+
+A refund deletes the purchase, so the debt goes with it. If that seller was already paid,
+their balance goes negative and carries against their next sale rather than being written
+off.
+
 ## Deploy checklist
 
 ```

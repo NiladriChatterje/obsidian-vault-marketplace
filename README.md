@@ -13,7 +13,7 @@ A two-sided marketplace for Obsidian vaults, built with Expo (React Native) and 
 
 | Stream | How |
 | --- | --- |
-| Commission | 10% of every paid sale (`PLATFORM_FEE_PERCENT`). Sellers keep 90%, settled to them as a royalty outside the checkout. The merchant-of-record fee comes out of the platform's share, so the split is worth deciding deliberately. |
+| Commission | 10% of every paid sale (`PLATFORM_FEE_PERCENT`). Sellers keep 90% **of the list price**, settled to them outside the checkout. Dodo's fee therefore comes wholly out of the platform's 10%, and its fixed $0.40 per sale means anything under about ₹587 loses money at that rate. See `PAYMENTS_SETUP_GUIDE.md`. |
 | Featured placement | The `featured` flag drives the home carousel. Sell slots to sellers weekly. |
 | Seller Pro (future) | Analytics, coupons, early-access releases for a monthly fee. |
 
@@ -209,6 +209,8 @@ server/                    Fastify (own package.json)
   src/routes/checkout.ts   Opens a Dodo checkout session for a vault
   src/routes/payouts.ts    Seller payout details; gates publishing a paid vault
   src/seller-payouts.ts    Reads/validates them; hasPayoutDetails is the gate
+  src/routes/admin-payouts.ts  Who is owed what, CSV for a batch transfer, record a payment
+  src/payout-ledger.ts     Earned minus paid, per seller
   src/routes/catalog.ts    Sanity catalog, notes, uploads, downloads, seller CRUD
   src/routes/mcp.ts        MCP endpoint over purchased vaults
   src/sanity/              GROQ queries, mappers, markdown parsing, writes

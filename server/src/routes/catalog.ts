@@ -22,10 +22,11 @@
 import multipart from '@fastify/multipart';
 import type { FastifyInstance } from 'fastify';
 import { unzipSync } from 'fflate';
-import type { CategorySlug, SortMode, VaultInput, VaultStatus } from '../types.ts';
+import type { CategorySlug, SellerStats, SortMode, VaultInput, VaultStatus } from '../types.ts';
 import * as catalog from '../sanity/index.ts';
 import { ownsVault, requester, requireRequester, sellerProfile } from '../access.ts';
 import { IS_DEMO, cfg, platformFee } from '../config.ts';
+import { sellerBalance } from '../payout-ledger.ts';
 import { hasPayoutDetails } from '../seller-payouts.ts';
 import { buildVaultZip, signDownload, verifyDownload } from '../download.ts';
 import { admin } from '../supabase.ts';
@@ -178,7 +179,7 @@ export default async function catalogRoutes(app: FastifyInstance) {
     const r = await requireRequester(req, reply);
     if (!r) return;
     const mine = await catalog.getSellerVaults(r.id, true);
-    const stats = {
+    const stats: SellerStats = {
       grossCents: 0,
       feeCents: 0,
       netCents: 0,
@@ -197,6 +198,11 @@ export default async function catalogRoutes(app: FastifyInstance) {
         if (p.amount_cents > 0) stats.salesCount++;
       }
       stats.netCents = stats.grossCents - stats.feeCents;
+      // What has actually reached them, which is not the same as what they have earned:
+      // the platform transfers it separately, so a sale and its payout are different events.
+      const balance = await sellerBalance(r.id);
+      stats.paidOutCents = balance.paidCents;
+      stats.outstandingCents = balance.outstandingCents;
     }
     return stats;
   });
