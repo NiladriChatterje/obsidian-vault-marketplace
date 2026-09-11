@@ -16,6 +16,7 @@ import { EMAIL_ENABLED } from './email.ts';
 import { DODO_ENABLED } from './dodo.ts';
 import { startKeepAwake } from './keepalive.ts';
 import catalogRoutes from './routes/catalog.ts';
+import adminPayoutRoutes from './routes/admin-payouts.ts';
 import dodoWebhookRoutes from './routes/dodo.ts';
 import payoutRoutes from './routes/payouts.ts';
 import checkoutRoutes from './routes/checkout.ts';
@@ -40,6 +41,7 @@ app.get('/health', async () => ({
 await app.register(catalogRoutes); // own scope: multipart parser for zip uploads
 await app.register(checkoutRoutes);
 await app.register(payoutRoutes);
+await app.register(adminPayoutRoutes);
 await app.register(dodoWebhookRoutes); // same, for Dodo's Standard Webhooks signature
 await app.register(mcpRoutes); // own plugin scope: raw JSON for the MCP SDK
 

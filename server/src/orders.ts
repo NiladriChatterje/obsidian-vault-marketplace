@@ -23,6 +23,8 @@ export interface Order {
   /** The Dodo checkout session id (a Razorpay order id on rows predating the switch). */
   providerOrderId: string;
   vaultId: string;
+  /** Who earns from this sale. Copied to the purchase so the ledger can total by seller. */
+  sellerId: string | null;
   buyerId: string | null;
   buyerEmail: string | null;
   title: string;
@@ -43,6 +45,7 @@ const fromRow = (r: Row): Order => ({
   provider: (r.provider ?? 'razorpay') as PaymentProvider,
   providerOrderId: r.provider_order_id,
   vaultId: r.vault_id,
+  sellerId: r.seller_id ?? null,
   buyerId: r.buyer_id,
   buyerEmail: r.buyer_email,
   title: r.title,
@@ -64,6 +67,7 @@ export async function saveOrder(order: Order): Promise<void> {
     provider: order.provider,
     provider_order_id: order.providerOrderId,
     vault_id: order.vaultId,
+    seller_id: order.sellerId,
     buyer_id: order.buyerId,
     buyer_email: order.buyerEmail,
     title: order.title,
@@ -125,6 +129,7 @@ export async function settleOrder(order: Order, paymentId: string, signature: st
       .upsert(
         {
           vault_id: order.vaultId,
+          seller_id: order.sellerId,
           buyer_id: order.buyerId,
           amount_cents: order.amount,
           fee_cents: order.fee,

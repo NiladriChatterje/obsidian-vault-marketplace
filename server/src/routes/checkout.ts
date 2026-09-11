@@ -59,6 +59,7 @@ export default async function checkoutRoutes(app: FastifyInstance) {
         if (!demo) return reply.code(400).send({ error: 'Demo checkout needs amountCents and title' });
         order = {
           vaultId,
+          sellerId: null,
           buyerId: null,
           buyerEmail: null,
           title: demo.title,
@@ -91,6 +92,7 @@ export default async function checkoutRoutes(app: FastifyInstance) {
         vault = v;
         order = {
           vaultId: v.id,
+          sellerId: v.sellerId,
           buyerId: user.id,
           buyerEmail: user.email,
           title: v.title,

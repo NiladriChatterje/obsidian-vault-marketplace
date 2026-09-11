@@ -128,6 +128,10 @@ export interface SellerStats {
   salesCount: number;
   downloads: number;
   publishedCount: number;
+  /** Transferred to the seller so far. Earnings and payouts are separate events. */
+  paidOutCents?: number;
+  /** Earned but not yet transferred. Negative after a refund on an already-paid sale. */
+  outstandingCents?: number;
 }
 
 export type SortMode = 'new' | 'popular' | 'top';
