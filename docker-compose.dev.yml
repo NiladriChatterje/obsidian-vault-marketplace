@@ -1,0 +1,19 @@
+# Development overlay for the website: runs it out of your working tree with hot reload.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# Edits under web/ show up in the browser without a rebuild. Plain `docker compose up`
+# still runs the production build described in docker-compose.yml.
+services:
+  web:
+    build:
+      target: dev
+    environment:
+      NODE_ENV: development
+      # Docker Desktop drops inotify events across a Windows/macOS bind mount, so the
+      # watcher has to poll instead (paired with `next dev --webpack` in the dev stage).
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./web:/app
+      # Anonymous volumes so the host's Windows-built node_modules and its .next from a
+      # local `npm run dev` do not shadow the container's Linux ones.
+      - /app/node_modules
+      - /app/.next

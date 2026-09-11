@@ -104,6 +104,20 @@ npm run typecheck   # tsc --noEmit (includes ../src)
 npx expo-doctor
 ```
 
+To work on the website inside the container, add the `docker-compose.dev.yml` overlay. It swaps the
+`web` service to the Dockerfile's `dev` stage, bind-mounts `web/` over `/app`, and runs `next dev`,
+so edits under `web/` recompile in about a second with no rebuild:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+Only the website is mounted; the api already runs its sources directly. `node_modules` and `.next`
+stay on anonymous volumes so the container keeps its own Linux-built copies. The overlay also forces
+`next dev --webpack` with `WATCHPACK_POLLING=true`, because Turbopack has no polling option and
+Docker Desktop does not deliver file events across a Windows or macOS bind mount. Without the
+overlay, `docker compose up` runs the production build as before.
+
 ## Website (Next.js)
 
 `web/` is the same marketplace as a website: sellers list vaults at their price, buyers pay through Razorpay Checkout (via the payment server), then download the zip or connect the vault to an AI assistant over MCP. It is a plain Next.js project under `web/src/` with a browser-native copy of the app's data layer and no server-side secrets.
