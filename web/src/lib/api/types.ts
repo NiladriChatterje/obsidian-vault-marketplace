@@ -1,8 +1,5 @@
 import type {
   ListVaultsParams,
-  PayoutDetails,
-  PayoutState,
-  PayoutStatus,
   Profile,
   Purchase,
   Review,
@@ -46,7 +43,7 @@ export interface Backend {
   /** Sends the sign-up confirmation email again. */
   resendConfirmation(email: string): Promise<void>;
   getProfile(userId: string): Promise<Profile | null>;
-  updateProfile(patch: Partial<Pick<Profile, 'displayName' | 'bio' | 'username'>>): Promise<Profile>;
+  updateProfile(patch: Partial<Pick<Profile, 'displayName' | 'bio' | 'username' | 'isSeller'>>): Promise<Profile>;
 
   // Catalog
   listVaults(params?: ListVaultsParams): Promise<Vault[]>;
@@ -77,7 +74,5 @@ export interface Backend {
   uploadCover(localUri: string): Promise<string>;
   uploadVaultFile(localUri: string, fileName: string): Promise<UploadedFile>;
   /** Marks the user as a seller and creates their Razorpay Route linked account from the given details. */
-  setupPayouts(details: PayoutDetails): Promise<PayoutState>;
   /** Re-checks Razorpay activation and syncs the profile. */
-  refreshPayoutStatus(): Promise<PayoutState>;
 }

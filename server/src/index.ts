@@ -12,14 +12,14 @@ import formbody from '@fastify/formbody';
 import Fastify from 'fastify';
 import { createClient } from '@sanity/client';
 import { SANITY_API_TOKEN, SANITY_DATASET, SANITY_ENABLED, SANITY_PROJECT_ID, useSanityClientFactory } from './sanity/index.ts';
-import { IS_DEMO, cfg } from './config.ts';
+import { IS_DEMO, PAYMENT_PROVIDER, cfg } from './config.ts';
 import { EMAIL_ENABLED } from './email.ts';
+import { DODO_ENABLED } from './dodo.ts';
 import { startKeepAwake } from './keepalive.ts';
-import { routeStatus } from './route-status.ts';
 import catalogRoutes from './routes/catalog.ts';
+import dodoWebhookRoutes from './routes/dodo.ts';
 import checkoutRoutes from './routes/checkout.ts';
 import mcpRoutes from './routes/mcp.ts';
-import payoutRoutes from './routes/payouts.ts';
 import webhookRoutes from './routes/webhook.ts';
 
 useSanityClientFactory(createClient);
@@ -34,9 +34,10 @@ app.get('/health', async () => ({
   mode: IS_DEMO ? 'demo (no Supabase: orders in memory)' : 'supabase',
   razorpayKey: cfg.razorpay.keyId.replace(/^(rzp_\w+_).+$/, '$1…'),
   merchantId: cfg.razorpay.merchantId || null,
-  // The env flag plus what Razorpay actually answered; the flag alone reads as
-  // confirmation on an account that rejects every transfer. See route-status.ts.
-  route: routeStatus(cfg.razorpay.route),
+  // Which rail takes the money, and whether the merchant of record is wired up.
+  // Nothing is split to a seller any more, so there is no Route status to report.
+  provider: PAYMENT_PROVIDER,
+  dodo: DODO_ENABLED ? { configured: true, mode: cfg.dodo.live ? 'live' : 'test', webhook: !!cfg.dodo.webhookSecret } : { configured: false },
   webhookConfigured: !!cfg.razorpay.webhookSecret,
   email: EMAIL_ENABLED ? { provider: 'brevo', from: cfg.brevo.senderEmail } : null,
   catalog: SANITY_ENABLED ? { source: 'sanity', projectId: SANITY_PROJECT_ID, dataset: SANITY_DATASET, canWrite: !!SANITY_API_TOKEN } : { source: 'none' },
@@ -44,8 +45,8 @@ app.get('/health', async () => ({
 
 await app.register(catalogRoutes); // own scope: multipart parser for zip uploads
 await app.register(checkoutRoutes);
-await app.register(payoutRoutes);
 await app.register(webhookRoutes); // own plugin scope: keeps the raw JSON body for signature checks
+await app.register(dodoWebhookRoutes); // same, for Dodo's Standard Webhooks signature
 await app.register(mcpRoutes); // own plugin scope: raw JSON for the MCP SDK
 
 app.setErrorHandler((err: Error & { statusCode?: number }, req, reply) => {

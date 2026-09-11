@@ -1,6 +1,6 @@
 # Vault Market
 
-A two-sided marketplace for Obsidian vaults, built with Expo (React Native) and TypeScript. Sellers upload a zipped vault, set a price in INR, and get paid through Razorpay Route. Listings and every note inside a vault live in Sanity; Supabase handles accounts and purchases. Buyers browse by category, plugin and tag, buy or grab free vaults, and download them into Obsidian.
+A two-sided marketplace for Obsidian vaults, built with Expo (React Native) and TypeScript. Sellers upload a zipped vault and set a price; Vault Market is the seller of record and pays them their share. Listings and every note inside a vault live in Sanity; Supabase handles accounts and purchases. Buyers browse by category, plugin and tag, buy or grab free vaults, and download them into Obsidian.
 
 ## Why this idea
 
@@ -13,7 +13,7 @@ A two-sided marketplace for Obsidian vaults, built with Expo (React Native) and 
 
 | Stream | How |
 | --- | --- |
-| Commission | 10% of every paid sale (`PLATFORM_FEE_PERCENT`), kept back when the seller's share is transferred via Razorpay Route. Sellers keep 90%. |
+| Commission | 10% of every paid sale (`PLATFORM_FEE_PERCENT`). Sellers keep 90%, settled to them as a royalty outside the checkout. The merchant-of-record fee comes out of the platform's share, so the split is worth deciding deliberately. |
 | Featured placement | The `featured` flag drives the home carousel. Sell slots to sellers weekly. |
 | Seller Pro (future) | Analytics, coupons, early-access releases for a monthly fee. |
 
@@ -60,16 +60,16 @@ Studio structure: Vaults → each vault → Listing / Notes / Attachments, plus 
 
 ## Payment server (Fastify)
 
-`server/` is a small Node service that owns everything needing the Razorpay secret. The app and the site call it with the buyer's Supabase token.
+`server/` is a small Node service that owns every secret. The app and the site call it with the buyer's Supabase token. `PAYMENT_PROVIDER` decides the rail: Dodo Payments as merchant of record (global, tax handled), or Razorpay for a domestic-only setup.
 
 | Route | What it does |
 | --- | --- |
-| `POST /checkout` | Validates the vault and buyer, creates a Razorpay **Order** (with a Route transfer to the seller), stores it in `orders`, returns the hosted checkout URL. |
+| `POST /checkout` | Validates the vault and buyer, opens a Dodo checkout session (or a Razorpay Order), stores it in `orders`, returns the hosted checkout URL. Nothing is split to anyone. |
 | `GET /checkout/:orderId` | Hosted page that opens Razorpay Checkout.js for that order. Works in a browser sheet on mobile, so no native SDK is needed. |
-| `POST /checkout/:orderId/callback` | Checkout.js posts `razorpay_payment_id` + `razorpay_signature` here. The server verifies HMAC(order_id\|payment_id), fetches the payment, captures it if needed, checks the amount, records the purchase and transfer id, then redirects to `/checkout-result`. |
+| `POST /checkout/:orderId/callback` | Checkout.js posts `razorpay_payment_id` + `razorpay_signature` here. The server verifies HMAC(order_id\|payment_id), fetches the payment, captures it if needed, checks the amount, records the purchase, then redirects to `/checkout-result`. |
 | `GET /checkout/:orderId/status` | Order status for polling. |
-| `POST /webhooks/razorpay` | Verifies `X-Razorpay-Signature` over the raw body, then settles or fails the order (`payment.captured`, `order.paid`, `payment.failed`) or syncs a seller's Route activation (`product.route.activated`, `product.route.under_review`, `product.route.needs_clarification`). Idempotent with the callback. |
-| `POST /payouts`, `GET /payouts/status` | Seller onboarding to Razorpay Route (linked account, stakeholder, product, bank details) and activation sync. |
+| `POST /webhooks/razorpay` | Verifies `X-Razorpay-Signature` over the raw body, then settles, fails or refunds the order. Idempotent with the callback. |
+| `POST /webhooks/dodo` | Standard Webhooks signature over the raw body, then settles, fails or refunds. The only way a Dodo purchase is granted — the buyer's redirect grants nothing. |
 | `GET /vaults`, `GET /vaults/:id`, `GET /sellers/:id/vaults` | Public catalog from Sanity (filters: `category`, `q`, `sort`, `featured`, `free`, `ids`). |
 | `GET /vaults/:id/notes`, `GET /vaults/:id/notes/*`, `GET /vaults/:id/search` | Note index (public), note body and search (preview or owners only). |
 | `GET /vaults/:id/access`, `POST /vaults/:id/claim`, `GET /me/library` | Ownership check, free-vault claim, the buyer's library. |
@@ -172,22 +172,26 @@ Tools: `list_vaults`, `list_notes`, `read_note`, `search_notes`, all reading the
    | Project Settings → Auth → SMTP | your own SMTP provider. The built-in sender is capped at a few messages an hour and is not for production: without it, confirmation and reset mails stop arriving as soon as you have real traffic. |
 1. **Sanity.** Log in once (`npx sanity login` in `sanity-studio/`), create an Editor token at sanity.io/manage → API → Tokens, put it in `.env` as `SANITY_API_TOKEN`, make the dataset private, and optionally seed it (`node server/scripts/seed-sanity.ts`). Deploy the Studio with `npm run deploy` in `sanity-studio/`.
 2. **App env.** Copy `.env.example` to `.env` and set the Supabase URL and anon key. Restart Expo.
-3. **Razorpay.** Create a Razorpay account (KYC as an individual or business), ask support to enable **Route** on it, and put the key id / secret from Settings → API Keys into `.env` (`RAZORPAY_CLIENT_KEY`, `RAZORPAY_SECRET_KEY`, `RAZORPAY_MERCHANT_ID`). Deploy `server/` somewhere public (any Node host), set `SERVER_API_URL` (and `EXPO_PUBLIC_API_URL`, which the Expo app reads) to its URL, and in the Razorpay dashboard add a webhook pointing at `<api>/webhooks/razorpay` with events `payment.captured`, `order.paid`, `payment.failed`, `product.route.activated`, `product.route.under_review`, `product.route.needs_clarification`; put the secret you choose there into `RAZORPAY_WEBHOOK_SECRET`. Set `RAZORPAY_ROUTE=off` to sell before Route is enabled (the platform then settles sellers manually).
+3. **Razorpay.** Create a Razorpay account (KYC as an individual or business), and put the key id / secret from Settings → API Keys into `.env` (`RAZORPAY_CLIENT_KEY`, `RAZORPAY_SECRET_KEY`, `RAZORPAY_MERCHANT_ID`). Deploy `server/` somewhere public (any Node host), set `SERVER_API_URL` (and `EXPO_PUBLIC_API_URL`, which the Expo app reads) to its URL, and in the Razorpay dashboard add a webhook pointing at `<api>/webhooks/razorpay` with events `payment.captured`, `order.paid`, `payment.failed`, `refund.created`, `refund.processed`; put the secret you choose there into `RAZORPAY_WEBHOOK_SECRET`. Razorpay is the domestic rail only — set `DODO_API_KEY` for global sales.
 4. **Redirects.** After checkout the server redirects to `<redirectOrigin>/checkout-result?status=success|failed|cancelled&vault=…&payment=pay_…`. The site passes its own origin; the app passes `vaultmarket:/`, so the in-app browser sheet closes on `vaultmarket://checkout-result`. Restrict accepted origins with `ALLOWED_REDIRECT_ORIGINS`.
 5. **Assets.** Replace the placeholder icon and splash in `assets/`.
 
 ## How the money flows
 
-1. Buyer taps Buy. The app calls `POST /checkout` on the payment server, which verifies the vault is published, the seller's linked account is activated, and the buyer does not already own it. It creates a Razorpay Order carrying a Route `transfers` entry for `price - fee` to the seller, stores it in `orders`, and returns the hosted checkout URL.
-2. The server's checkout page opens Razorpay Checkout.js (UPI, cards, netbanking, wallets). On success Checkout.js posts the payment id and signature to the server's callback.
-3. The server verifies the signature, confirms the payment is captured for the right amount, writes `purchases` (service role key) with the payment and transfer ids, and redirects the buyer. The webhook does the same independently, so a closed browser never loses a sale.
-4. The app polls `has_vault_access` for a few seconds, then shows Download. Download URLs are signed and expire in 5 minutes. Storage policies only let owners and buyers read the file.
+1. Buyer taps Buy. The site calls `POST /checkout`, which verifies the vault is published, priced and not already owned. On the Dodo rail it ensures the vault's Dodo product exists, opens a checkout session carrying `vault_id` and `buyer_id` as metadata, stores the session in `orders`, and returns Dodo's hosted checkout URL. On the Razorpay rail it creates a Razorpay Order instead. Nothing is split to anyone.
+2. The buyer pays on the provider's page — Dodo presents local methods and charges in their own currency, after tax.
+3. **The webhook grants the purchase, never the redirect.** `payment.succeeded` (or Razorpay's callback plus `payment.captured`) re-reads the payment from the provider, then writes `purchases` with the service role key. The buyer's return to `/checkout-result` only shows them the result, so a closed browser never loses a sale and a replayed redirect never fakes one.
+4. A refund (`refund.succeeded`) marks the order refunded and deletes the `purchases` row, so access goes back with the money.
+5. Creators are paid their 90% separately, as suppliers. That is the whole reason this is a merchant-of-record setup: the platform never holds anyone else's money, which would make it a payment aggregator.
 
-Free vaults skip Razorpay: `claim_free_vault` inserts the purchase row directly and is guarded in SQL.
+Free vaults skip the provider entirely: `claim_free_vault` inserts the purchase row directly and is guarded in SQL.
 
 ### Seller onboarding
 
-Sellers fill in one form (`/sell/payouts` on both app and web): legal name, mobile number with country code (E.164, e.g. +91…), PAN, address, bank account, IFSC. `POST /payouts` on the server creates a Razorpay **linked account** (`POST /v2/accounts`), a stakeholder, requests the `route` product and attaches the settlement bank details. Razorpay reviews the account; `profiles.payouts_enabled` flips to true once `activation_status` is `activated` (the function re-syncs it whenever the Sell screen opens). Until then the seller can list free vaults but paid checkout is refused server-side.
+There isn't any, by design. A creator switches on selling from `/sell` and lists; there is no
+linked account, no KYC form and no bank details, because Vault Market is the seller of record
+and their share is settled with them outside the checkout. The Razorpay Route onboarding that
+used to live here was removed in `0008_dodo_merchant_of_record.sql` — see the payments guide.
 
 ## Project layout
 
@@ -200,19 +204,18 @@ mobile/                    Expo app (own package.json)
   src/lib/payouts.ts       Payout form fields + validation
   src/store, hooks, components, theme
 web/                       Next.js site (own package.json), no server-side secrets
-  src/app/                 Pages: explore, browse, vault, library, sell, sell/payouts, connect (MCP), auth
+  src/app/                 Pages: explore, browse, vault, library, sell, connect (MCP), auth
   src/components/          UI kit, VaultContents
   src/lib/                 Browser copy of the data layer + mcp-token.ts, web.ts
 server/                    Fastify (own package.json)
   src/routes/checkout.ts   Razorpay orders, hosted Checkout.js page, signature callback
   src/routes/webhook.ts    Razorpay webhook (raw-body HMAC)
-  src/routes/payouts.ts    Route linked-account onboarding
   src/routes/catalog.ts    Sanity catalog, notes, uploads, downloads, seller CRUD
   src/routes/mcp.ts        MCP endpoint over purchased vaults
   src/sanity/              GROQ queries, mappers, markdown parsing, writes
-  src/orders.ts            Order + purchase bookkeeping, refunds + Route reversals
-  src/route-status.ts      What Razorpay actually answered about Route (see /health)
-  scripts/check-route.ts   `npm run check-route` - does this account have Route?
+  src/orders.ts            Order + purchase bookkeeping, provider-neutral, refunds
+  src/dodo.ts              Dodo Payments client, product sync, webhook verification
+  src/routes/dodo.ts       POST /webhooks/dodo - the only way a Dodo purchase is granted
   scripts/seed-sanity.ts   Seeds sample vaults + notes into Sanity
 sanity-studio/             Studio: schemaTypes/ (vault, note, attachment, seller), structure.ts
 supabase/                  migrations/0001_init.sql … 0005_sanity_catalog.sql
