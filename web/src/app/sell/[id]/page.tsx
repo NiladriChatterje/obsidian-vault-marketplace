@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { Cover, Field, Loading } from '@/components/ui';
+import { Cover, Field, Loading, Toast } from '@/components/ui';
 import { errorMessage, fileToUri, releaseUri } from '@/lib/web';
+import { inspectVaultZip } from '@/lib/vault-zip';
 import { api } from '@/lib/api';
 import { MAX_VAULT_ZIP_BYTES, MIN_PRICE_CENTS, PLATFORM_FEE_PERCENT } from '@/lib/config';
 import { formatBytes, formatPrice, parsePriceToCents, parseTags } from '@/lib/format';
@@ -40,6 +41,9 @@ export default function ListingEditorPage() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [saving, setSaving] = useState<'draft' | 'publish' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A zip refused before it is uploaded. The picker sits at the top of a long form, so the
+  // page's error banner further down would not be seen.
+  const [rejected, setRejected] = useState<string | null>(null);
 
   const zipInput = useRef<HTMLInputElement>(null);
   const coverInput = useRef<HTMLInputElement>(null);
@@ -91,10 +95,25 @@ export default function ListingEditorPage() {
 
   const pickZip = async (file: File | undefined) => {
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith('.zip')) return setError('Zip files only. Export your vault folder as a .zip archive first.');
-    if (file.size > MAX_VAULT_ZIP_BYTES) return setError(`Vault archives must be under ${formatBytes(MAX_VAULT_ZIP_BYTES)}.`);
+    if (!file.name.toLowerCase().endsWith('.zip')) return setRejected('Zip files only. Export your vault folder as a .zip archive first.');
+    if (file.size > MAX_VAULT_ZIP_BYTES) return setRejected(`Vault archives must be under ${formatBytes(MAX_VAULT_ZIP_BYTES)}.`);
+
     setUploadingFile(true);
     setError(null);
+    setRejected(null);
+    // Read the archive here rather than letting the server refuse it after a long upload.
+    // It applies the same rules and stays the authority; this only saves the wait.
+    try {
+      const check = await inspectVaultZip(file);
+      if (!check.ok) {
+        setRejected(check.reason ?? 'That zip is not an Obsidian vault.');
+        setUploadingFile(false);
+        return;
+      }
+    } catch {
+      // Unreadable here for some other reason; let the server have the final say.
+    }
+
     const uri = fileToUri(file);
     try {
       const uploaded = await api.uploadVaultFile(uri, file.name);
@@ -267,6 +286,10 @@ export default function ListingEditorPage() {
           </button>
         ) : null}
       </div>
+
+      {rejected ? (
+        <Toast title="That zip is not an Obsidian vault" message={rejected} onClose={() => setRejected(null)} />
+      ) : null}
     </div>
   );
 }
