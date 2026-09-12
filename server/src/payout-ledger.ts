@@ -4,15 +4,15 @@
  * Dodo settles every sale to the platform as one amount, so a seller's share is a debt the
  * platform carries until it transfers the money itself. This is the record of that.
  *
- * The seller's share is 90% of the **list price** (`amount_cents - fee_cents`), which means
- * the payment provider's fee comes entirely out of the platform's 10%. That is a deliberate
- * choice and it is why a cheap vault can cost the platform money: Dodo's fixed $0.40 per
- * sale does not shrink with the price. See the note in PAYMENTS_SETUP_GUIDE.md.
+ * The seller's share is the list price less the commission (`amount_cents - fee_cents`),
+ * which is a percentage plus a fixed amount so that no sale can cost the platform money.
+ * A payout has its own fixed cost, which is what payout-thresholds.ts amortises.
  *
  * A refund deletes the purchase row, so the debt disappears with it. If the seller has
  * already been paid for that sale, the balance goes negative and is carried against their
  * next sale rather than being written off.
  */
+import { payoutThresholdCents, transferCostCents, type PayoutMethod } from './payout-thresholds.ts';
 import { admin } from './supabase.ts';
 
 export interface SellerBalance {
@@ -30,6 +30,12 @@ export interface SellerBalance {
   /** Earned minus paid. Negative means they were overpaid, usually after a refund. */
   outstandingCents: number;
   salesCount: number;
+  /** What they must accrue before a transfer is worth making. Derived from their method. */
+  thresholdCents: number;
+  /** What sending it will cost the platform. Null until they say how to be paid. */
+  transferFeeCents: number | null;
+  /** Outstanding has reached the threshold and there is somewhere to send it. */
+  payable: boolean;
   payout: {
     country: string;
     currency: string;
@@ -90,6 +96,9 @@ export async function sellerBalances(): Promise<SellerBalance[]> {
       const profile = profileById.get(id);
       const d = payoutById.get(id);
       const earned = t.gross - t.fee;
+      const outstanding = earned - t.paid;
+      const method = (d?.method ?? null) as PayoutMethod | null;
+      const thresholdCents = payoutThresholdCents(method, d?.country ?? null);
       return {
         sellerId: id,
         username: profile?.username ?? null,
@@ -99,8 +108,12 @@ export async function sellerBalances(): Promise<SellerBalance[]> {
         feeCents: t.fee,
         earnedCents: earned,
         paidCents: t.paid,
-        outstandingCents: earned - t.paid,
+        outstandingCents: outstanding,
         salesCount: t.sales,
+        thresholdCents,
+        transferFeeCents: method ? transferCostCents(method, d?.country ?? '') : null,
+        // Below the threshold the transfer could cost more than the sales behind it earned.
+        payable: !!d && outstanding >= thresholdCents,
         payout: d
           ? {
               country: d.country,
@@ -117,7 +130,9 @@ export async function sellerBalances(): Promise<SellerBalance[]> {
 }
 
 /** One seller's own view: earned, paid and outstanding, for the sell dashboard. */
-export async function sellerBalance(sellerId: string): Promise<{ earnedCents: number; paidCents: number; outstandingCents: number }> {
+export async function sellerBalance(
+  sellerId: string
+): Promise<{ earnedCents: number; paidCents: number; outstandingCents: number; thresholdCents: number; payable: boolean }> {
   const db = admin();
   const [{ data: purchases, error: pErr }, { data: runs, error: rErr }] = await Promise.all([
     db.from('purchases').select('amount_cents, fee_cents').eq('seller_id', sellerId),
@@ -128,7 +143,11 @@ export async function sellerBalance(sellerId: string): Promise<{ earnedCents: nu
 
   const earned = (purchases ?? []).reduce((s: number, p: Row) => s + (p.amount_cents ?? 0) - (p.fee_cents ?? 0), 0);
   const paid = (runs ?? []).reduce((s: number, r: Row) => s + (r.amount_cents ?? 0), 0);
-  return { earnedCents: earned, paidCents: paid, outstandingCents: earned - paid };
+  const outstanding = earned - paid;
+
+  const { data: d } = await db.from('seller_payouts').select('method, country').eq('user_id', sellerId).maybeSingle();
+  const thresholdCents = payoutThresholdCents((d?.method ?? null) as PayoutMethod | null, d?.country ?? null);
+  return { earnedCents: earned, paidCents: paid, outstandingCents: outstanding, thresholdCents, payable: !!d && outstanding >= thresholdCents };
 }
 
 export interface RecordPayoutInput {

@@ -40,10 +40,16 @@ export default async function adminPayoutRoutes(app: FastifyInstance) {
     if (!(await requireAdmin(req, reply))) return;
     const rows = await sellerBalances();
     const owed = rows.filter((r) => r.outstandingCents > 0);
+    // Below its threshold a balance is still owed, just not yet worth a transfer: sending it
+    // would cost more than the sales behind it earned.
+    const payable = owed.filter((r) => r.payable);
+    const accruing = owed.filter((r) => r.payout && !r.payable);
     return {
       sellers: rows,
       totalOutstandingCents: owed.reduce((s, r) => s + r.outstandingCents, 0),
-      payableCount: owed.filter((r) => r.payout).length,
+      payableNowCents: payable.reduce((s, r) => s + r.outstandingCents, 0),
+      payableCount: payable.length,
+      accruingCount: accruing.length,
       // Owed money with nowhere to send it. Publishing a paid vault is gated on payout
       // details, so this means a seller removed them after going live.
       missingDetailsCount: owed.filter((r) => !r.payout).length,
@@ -52,7 +58,8 @@ export default async function adminPayoutRoutes(app: FastifyInstance) {
 
   app.get('/admin/payouts.csv', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
-    const rows = (await sellerBalances()).filter((r) => r.outstandingCents > 0 && r.payout);
+    // Only sellers worth paying today; the rest keep accruing.
+    const rows = (await sellerBalances()).filter((r) => r.payable);
     return reply
       .header('Content-Type', 'text/csv; charset=utf-8')
       .header('Content-Disposition', `attachment; filename="payouts-${new Date().toISOString().slice(0, 10)}.csv"`)

@@ -203,6 +203,7 @@ export default async function catalogRoutes(app: FastifyInstance) {
       const balance = await sellerBalance(r.id);
       stats.paidOutCents = balance.paidCents;
       stats.outstandingCents = balance.outstandingCents;
+      stats.payoutThresholdCents = balance.thresholdCents;
     }
     return stats;
   });

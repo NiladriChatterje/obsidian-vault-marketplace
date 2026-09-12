@@ -141,6 +141,27 @@ function Sell() {
             <div className="label">Net earnings</div>
             <div className="value">{formatPrice(stats.data.netCents)}</div>
           </div>
+          {/* Earned and paid are separate events: the platform transfers a balance once it is
+              worth the transfer fee, so a seller should see where they stand. */}
+          {stats.data.outstandingCents !== undefined ? (
+            <div className="stat">
+              <div className="label">Awaiting payout</div>
+              <div className="value">{formatPrice(stats.data.outstandingCents)}</div>
+              {stats.data.payoutThresholdCents ? (
+                <div className="label" style={{ marginTop: 4 }}>
+                  {stats.data.outstandingCents >= stats.data.payoutThresholdCents
+                    ? 'Ready to be sent'
+                    : `Sent once you reach ${formatPrice(stats.data.payoutThresholdCents)}`}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {stats.data.paidOutCents ? (
+            <div className="stat">
+              <div className="label">Paid out</div>
+              <div className="value">{formatPrice(stats.data.paidOutCents)}</div>
+            </div>
+          ) : null}
           <div className="stat">
             <div className="label">Sales</div>
             <div className="value">{stats.data.salesCount}</div>

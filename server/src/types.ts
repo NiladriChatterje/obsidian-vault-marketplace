@@ -132,6 +132,8 @@ export interface SellerStats {
   paidOutCents?: number;
   /** Earned but not yet transferred. Negative after a refund on an already-paid sale. */
   outstandingCents?: number;
+  /** What they must reach before a transfer is worth its fee. Depends on how they are paid. */
+  payoutThresholdCents?: number;
 }
 
 export type SortMode = 'new' | 'popular' | 'top';
