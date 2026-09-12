@@ -21,8 +21,8 @@ export function useSanityClientFactory(f: ClientFactory): void {
 
 const env = (k: string) => (typeof process !== 'undefined' ? process.env[k] : undefined) ?? '';
 
-export const SANITY_PROJECT_ID = env('SANITY_PROJECT_ID') || env('EXPO_PUBLIC_SANITY_PROJECT_ID') || '8775uk5l';
-export const SANITY_DATASET = env('SANITY_DATASET') || env('EXPO_PUBLIC_SANITY_DATASET') || 'production';
+export const SANITY_PROJECT_ID = env('SANITY_PROJECT_ID') || env('NEXT_PUBLIC_SANITY_PROJECT_ID') || env('EXPO_PUBLIC_SANITY_PROJECT_ID') || '8775uk5l';
+export const SANITY_DATASET = env('SANITY_DATASET') || env('NEXT_PUBLIC_SANITY_DATASET') || env('EXPO_PUBLIC_SANITY_DATASET') || 'production';
 export const SANITY_API_TOKEN = env('SANITY_API_TOKEN');
 export const SANITY_API_VERSION = '2025-02-19';
 

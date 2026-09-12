@@ -6,8 +6,8 @@
  * marketplace with seed data, fake auth and instant "purchases". This makes the
  * UI fully usable in Expo Go before any backend exists.
  */
-export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-export const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+export const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 export const IS_DEMO = !SUPABASE_URL || !SUPABASE_ANON_KEY;
 
@@ -21,16 +21,16 @@ export const IS_DEMO = !SUPABASE_URL || !SUPABASE_ANON_KEY;
  *
  * Mirrors feePercentFor() in server/src/config.ts, which is authoritative.
  */
-export const PLATFORM_COUNTRY = (process.env.EXPO_PUBLIC_PLATFORM_COUNTRY ?? 'IN').toUpperCase();
-export const PLATFORM_FEE_PERCENT_DOMESTIC = Number(process.env.EXPO_PUBLIC_PLATFORM_FEE_PERCENT_DOMESTIC ?? 8);
-export const PLATFORM_FEE_PERCENT_INTERNATIONAL = Number(process.env.EXPO_PUBLIC_PLATFORM_FEE_PERCENT_INTERNATIONAL ?? 12);
+export const PLATFORM_COUNTRY = (process.env.NEXT_PUBLIC_PLATFORM_COUNTRY ?? 'IN').toUpperCase();
+export const PLATFORM_FEE_PERCENT_DOMESTIC = Number(process.env.NEXT_PUBLIC_PLATFORM_FEE_PERCENT_DOMESTIC ?? 8);
+export const PLATFORM_FEE_PERCENT_INTERNATIONAL = Number(process.env.NEXT_PUBLIC_PLATFORM_FEE_PERCENT_INTERNATIONAL ?? 12);
 
 export function feePercentFor(sellerCountry?: string | null): number {
   const domestic = (sellerCountry ?? PLATFORM_COUNTRY).trim().toUpperCase() === PLATFORM_COUNTRY;
   return domestic ? PLATFORM_FEE_PERCENT_DOMESTIC : PLATFORM_FEE_PERCENT_INTERNATIONAL;
 }
 
-export const PLATFORM_FEE_FIXED_CENTS = Number(process.env.EXPO_PUBLIC_PLATFORM_FEE_FIXED_CENTS ?? 4000);
+export const PLATFORM_FEE_FIXED_CENTS = Number(process.env.NEXT_PUBLIC_PLATFORM_FEE_FIXED_CENTS ?? 4000);
 
 /** Mirrors platformFee() in server/src/config.ts, which is authoritative; keep them in step. */
 export function platformFee(amountCents: number, sellerCountry?: string | null): number {
@@ -48,8 +48,8 @@ export const DEFAULT_CURRENCY = 'INR';
  * cost the platform money. Expressed in the listing currency with a little headroom over
  * the live exchange rate.
  */
-export const PROVIDER_PERCENT_FEE = Number(process.env.EXPO_PUBLIC_PROVIDER_PERCENT_FEE ?? 4);
-export const PROVIDER_FIXED_FEE_CENTS = Number(process.env.EXPO_PUBLIC_PROVIDER_FIXED_FEE_CENTS ?? 3500);
+export const PROVIDER_PERCENT_FEE = Number(process.env.NEXT_PUBLIC_PROVIDER_PERCENT_FEE ?? 4);
+export const PROVIDER_FIXED_FEE_CENTS = Number(process.env.NEXT_PUBLIC_PROVIDER_FIXED_FEE_CENTS ?? 3500);
 
 /**
  * The cheapest paid vault that may be listed.
@@ -91,7 +91,7 @@ export const APP_SCHEME = 'vaultmarket';
  * hosts the checkout page, verifies signatures and onboards sellers.
  * Empty means "no server": paid checkout is unavailable outside demo mode.
  */
-export const API_URL = (process.env.SERVER_API_URL ?? '').replace(/\/$/, '');
+export const API_URL = (process.env.NEXT_PUBLIC_SERVER_API_URL ?? '').replace(/\/$/, '');
 
 /**
  * Where listings and notes come from. 'sanity' routes the catalog through the
@@ -99,7 +99,7 @@ export const API_URL = (process.env.SERVER_API_URL ?? '').replace(/\/$/, '');
  * built-in demo data / Supabase tables. Defaults to sanity whenever a server is configured.
  */
 export const CATALOG_SOURCE: 'sanity' | 'local' =
-  process.env.EXPO_PUBLIC_CATALOG_SOURCE === 'local' || !API_URL ? 'local' : 'sanity';
+  process.env.NEXT_PUBLIC_CATALOG_SOURCE === 'local' || !API_URL ? 'local' : 'sanity';
 
 /**
  * Where the payment server sends the buyer after checkout.
@@ -108,7 +108,7 @@ export const CATALOG_SOURCE: 'sanity' | 'local' =
  * browser's location when running in a browser.
  */
 export const REDIRECT_ORIGIN: string =
-  process.env.EXPO_PUBLIC_REDIRECT_ORIGIN ||
+  process.env.NEXT_PUBLIC_REDIRECT_ORIGIN ||
   (typeof location !== 'undefined' && /^https?:/.test(location.origin ?? '') ? location.origin : `${APP_SCHEME}:/`);
 
 export const STORAGE_BUCKETS = {
