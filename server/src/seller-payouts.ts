@@ -87,6 +87,17 @@ export function validatePayoutDetails(d: Partial<PayoutDetails>): string | null 
   if (d.method !== 'bank' && !looksLikeEmail) return 'That does not look like an email address. Transfer services are addressed by the account email.';
   if (d.method === 'bank' && looksLikeEmail) return 'Enter the account number or IBAN here, not an email address.';
 
+  // An IBAN names its country in its first two letters, so it can be held to the country
+  // given. The country sets the commission and the payout threshold: one that says the
+  // account is domestic while the IBAN says otherwise would be charged the domestic rate
+  // and paid at the domestic threshold, then cost an international wire to actually reach.
+  if (d.method === 'bank') {
+    const iban = ref.replace(/\s+/g, '').toUpperCase();
+    if (/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban) && iban.slice(0, 2) !== country) {
+      return `That IBAN is for an account in ${iban.slice(0, 2)}, but the country is set to ${country}. Set the country to where the account is held.`;
+    }
+  }
+
   return null;
 }
 
