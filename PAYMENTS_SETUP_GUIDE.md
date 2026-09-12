@@ -73,36 +73,43 @@ form rather than after someone has bought from them.
 Nothing splits a payment. Dodo settles every sale to the platform in full, so a seller's
 share is a debt the platform carries until it transfers the money itself.
 
-**The seller's share is 90% of the list price** at a 10% commission, so the payment
-provider's fee comes entirely out of the platform's share. That has a sharp edge: Dodo's
-fixed $0.40 per sale does not shrink with the price, so below a certain price every sale
-costs the platform money.
+**The commission is a percentage plus a fixed amount**, currently 10% + Rs 40, and the
+seller keeps the rest of the list price.
 
-That threshold is now derived rather than guessed:
+The fixed half is the whole point. Dodo charges 4% + $0.40, and a commission that is only a
+percentage is guaranteed to lose money below some price: the percentage shrinks with the
+price, the provider's flat fee does not. At a flat 10% every sale under about Rs 587 cost
+the platform money, and the minimum listing price was Rs 49. Matching the provider's shape
+fixes it at the root:
 
 ```
-kept = price x (commission - provider%) / 100 - providerFixed
+kept = price x (commission% - provider%) / 100 + (commissionFixed - providerFixed)
+     = price x 0.06 + Rs 5
 ```
 
-which is zero at `providerFixed x 100 / (commission - provider%)`. `minPriceCents()` in
-`server/src/config.ts` adds 20% of headroom, rounds up to a round Rs 50 and refuses any
-paid listing below it. `web/src/lib/config.ts` mirrors it so the seller sees the same
-number. Change `EXPO_PUBLIC_PLATFORM_FEE_PERCENT` and the floor follows:
+Positive at every price, because each sale now carries its own processing cost instead of
+being subsidised by larger ones.
 
-| Commission | Break-even | Minimum price | Platform keeps on a Rs 2,499 sale |
+| List | Seller gets | Seller's share | Platform keeps |
 | ---: | ---: | ---: | ---: |
-| 8% | Rs 1,000 | Rs 1,200 | Rs 60 |
-| 10% | Rs 667 | Rs 800 | Rs 110 |
-| **15% (current)** | **Rs 364** | **Rs 450** | **Rs 235** |
-| 20% | Rs 250 | Rs 300 | Rs 360 |
+| Rs 199 | 139 | 70% | Rs 17 |
+| Rs 499 | 409 | 82% | Rs 35 |
+| Rs 999 | 859 | 86% | Rs 65 |
+| Rs 2,499 | 2,209 | 88% | Rs 155 |
 
-The commission was 10% with a Rs 49 floor, which lost Rs 32 on every sale at that floor.
-It is 15% with a Rs 450 floor. Free vaults are unaffected: they never reach checkout, so
-they cost nothing to give away, which is what makes them the top of the funnel.
+Sellers keep a **larger** share on expensive vaults than a flat 15% would give them, and the
+platform is solvent on cheap ones. Free vaults never reach the provider, so they cost
+nothing and are charged nothing.
 
-`EXPO_PUBLIC_PROVIDER_PERCENT_FEE` and `EXPO_PUBLIC_PROVIDER_FIXED_FEE_CENTS` describe the
-provider and default to Dodo's 4% and Rs 40, the latter being $0.40 with headroom over the
-exchange rate. Revisit the fixed one if the rupee moves a long way.
+`MIN_PRICE_CENTS` is Rs 199. It is a product choice now rather than a solvency one: at a
+very low price the flat part is most of the sale and the seller is left with almost nothing.
+`minPriceCents()` keeps the old derivation as a backstop, in case the commission is ever
+configured so its fixed half no longer covers the provider's.
+
+Both halves must cover the provider's or the platform loses money:
+`EXPO_PUBLIC_PLATFORM_FEE_PERCENT` >= `EXPO_PUBLIC_PROVIDER_PERCENT_FEE`, and
+`EXPO_PUBLIC_PLATFORM_FEE_FIXED_CENTS` >= `EXPO_PUBLIC_PROVIDER_FIXED_FEE_CENTS`. Revisit the
+fixed ones if the rupee moves a long way against the dollar.
 
 The ledger is at `/admin/payouts`, gated on `ADMIN_USER_IDS` (a comma-separated list of
 Supabase user ids; unset closes the routes rather than opening them):

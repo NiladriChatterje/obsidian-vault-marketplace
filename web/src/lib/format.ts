@@ -1,6 +1,10 @@
+import { DEFAULT_CURRENCY } from './config';
 const fmtCache = new Map<string, Intl.NumberFormat>();
 
-export function formatPrice(cents: number, currency = 'USD'): string {
+// Defaults to the marketplace currency, not USD. Every caller that omits it is formatting a
+// platform-side amount: the minimum price, the commission, a seller's earnings. Callers with
+// a vault in hand pass that vault's currency.
+export function formatPrice(cents: number, currency = DEFAULT_CURRENCY): string {
   if (cents === 0) return 'Free';
   try {
     let fmt = fmtCache.get(currency);

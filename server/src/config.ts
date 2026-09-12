@@ -42,10 +42,18 @@ export const cfg = {
     senderName: env('BREVO_EMAIL_FROM_NAME', 'Vault Market'),
   },
 
-  feePercent: Number(env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT', env('PLATFORM_FEE_PERCENT', '15'))),
+  feePercent: Number(env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT', env('PLATFORM_FEE_PERCENT', '10'))),
+  /**
+   * The fixed half of the commission, which exists to cancel the provider's fixed fee. A
+   * percentage-only commission always loses below some price, because a percentage shrinks
+   * with the price and the provider's flat charge does not.
+   */
+  feeFixedCents: Number(env('EXPO_PUBLIC_PLATFORM_FEE_FIXED_CENTS', '4000')),
   /** What the payment provider takes per sale: Dodo is 4% + $0.40, here in the listing currency. */
   providerPercentFee: Number(env('EXPO_PUBLIC_PROVIDER_PERCENT_FEE', '4')),
-  providerFixedFeeCents: Number(env('EXPO_PUBLIC_PROVIDER_FIXED_FEE_CENTS', '4000')),
+  providerFixedFeeCents: Number(env('EXPO_PUBLIC_PROVIDER_FIXED_FEE_CENTS', '3500')),
+  /** Cheapest paid listing allowed. A product choice now, not a solvency one. */
+  minPriceCents: Number(env('MIN_PRICE_CENTS', '19900')),
   /** Signs short-lived download links. Falls back to the Dodo key so nothing extra is required. */
   downloadSecret: env('DOWNLOAD_SECRET') || env('DODO_API_KEY') || 'dev-download-secret',
   /**
@@ -80,27 +88,44 @@ if (IS_DEMO && IS_HOSTED && env('ALLOW_PUBLIC_DEMO') !== 'yes') {
   );
 }
 
+/**
+ * The platform's cut of a sale: a percentage plus a fixed amount.
+ *
+ * The fixed part is the point. The provider charges a percentage plus a flat fee, so a
+ * commission that is only a percentage is guaranteed to lose money below some price, however
+ * high the percentage. Matching the shape makes every sale carry its own processing cost:
+ *
+ *   kept = price x (commission% - provider%) / 100 + (commissionFixed - providerFixed)
+ *
+ * which stays positive at any price as long as both halves cover the provider's.
+ *
+ * Free vaults are free: they never reach the provider, so they cost nothing and are charged
+ * nothing. The clamp is a guard, not a normal path; minPriceCents keeps prices well above it.
+ */
 export function platformFee(amount: number): number {
-  return Math.round((amount * cfg.feePercent) / 100);
+  if (amount <= 0) return 0;
+  return Math.min(amount, Math.round((amount * cfg.feePercent) / 100) + cfg.feeFixedCents);
 }
 
 /**
- * The cheapest paid vault that does not lose the platform money.
+ * The cheapest paid vault that may be listed.
  *
- * The seller takes their share of the **list** price, so the provider's fee comes wholly
- * out of the commission, and the provider's fixed part does not shrink with the price:
- *
- *   kept = price x (commission - provider%) / 100 - providerFixed
- *
- * Below the break-even every sale is a loss. This used to be hardcoded at Rs 49 while
- * break-even at a 10% commission was about Rs 587, so a seller could list a price that cost
- * the platform Rs 32 each time it sold. Deriving it means the floor follows the commission.
+ * With a percentage-plus-fixed commission the platform is solvent at any price, so this is
+ * a product decision rather than a solvency one: at a very low price the fixed part is most
+ * of the sale and the seller is left with almost nothing, which is true but reads badly.
+ * The derivation stays as a backstop, in case the commission is ever configured so that it
+ * no longer covers the provider's fixed fee.
  *
  * Mirrored in web/src/lib/config.ts, which shows it to the seller; keep the two in step.
  */
 export function minPriceCents(): number {
   const margin = cfg.feePercent - cfg.providerPercentFee;
+  // A commission below the provider's own percentage can never break even at any price.
   if (margin <= 0) return 100_000;
-  const breakEven = (cfg.providerFixedFeeCents * 100) / margin;
-  return Math.ceil((breakEven * 1.2) / 5000) * 5000;
+  // Only the shortfall between the two fixed fees still has to be earned back out of the
+  // price. Cover theirs fully and there is nothing left for the price to cover, so the
+  // floor stops being a solvency question and becomes a product one.
+  const shortfall = Math.max(0, cfg.providerFixedFeeCents - cfg.feeFixedCents);
+  const breakEven = (shortfall * 100) / margin;
+  return Math.max(cfg.minPriceCents, Math.ceil((breakEven * 1.2) / 5000) * 5000);
 }

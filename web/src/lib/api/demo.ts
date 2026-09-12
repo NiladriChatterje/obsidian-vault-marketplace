@@ -16,7 +16,7 @@ const AsyncStorage = {
   },
 };
 import type { PayoutDetails, Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
-import { API_URL, PLATFORM_FEE_PERCENT, REDIRECT_ORIGIN } from '../config';
+import { API_URL, REDIRECT_ORIGIN, platformFee } from '../config';
 import { DEMO_REVIEWS, DEMO_SELLERS, DEMO_VAULTS } from '../demo-data';
 import type { AuthUser, Backend } from './types';
 
@@ -93,7 +93,7 @@ export const demoStore = {
     const s = await load();
     const u = requireUser(s);
     if (s.purchases.some((p) => p.vaultId === vaultId && p.buyerId === u.id)) return;
-    const fee = Math.round((amountCents * PLATFORM_FEE_PERCENT) / 100);
+    const fee = platformFee(amountCents);
     s.purchases.push({ id: uid(), vaultId, buyerId: u.id, amountCents, feeCents: fee, createdAt: new Date().toISOString() });
     await persist();
   },
@@ -327,7 +327,7 @@ export const demoBackend: Backend = {
       await wait(700);
     }
     if (!s.purchases.some((p) => p.vaultId === vaultId && p.buyerId === u.id)) {
-      const fee = Math.round((vault.priceCents * PLATFORM_FEE_PERCENT) / 100);
+      const fee = platformFee(vault.priceCents);
       s.purchases.push({
         id: uid(),
         vaultId,
