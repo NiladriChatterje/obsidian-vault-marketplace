@@ -99,7 +99,8 @@ export default function VaultPage() {
     <div className="detail">
       <div className="stack" style={{ gap: 20 }}>
         <Cover vault={v} hero />
-        <div>
+        {/* Named so one column can place the buy box directly after it. */}
+        <div className="vault-head">
           <div className="row between" style={{ alignItems: 'flex-start' }}>
             <h1>{v.title}</h1>
             <Price cents={v.priceCents} currency={v.currency} large />
