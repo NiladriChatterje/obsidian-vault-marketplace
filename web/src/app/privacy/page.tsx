@@ -21,8 +21,8 @@ export default function PrivacyPage() {
 
       <h3>When you buy a vault</h3>
       <p>
-        The vault purchased, the amount, our commission, the payment identifier returned by the payment provider, and the time of purchase. Card numbers,
-        UPI IDs and bank credentials are entered on the payment provider&rsquo;s own checkout page and never reach our servers.
+        The vault purchased, the amount, our commission, the payment identifier returned by Dodo Payments, the country the payment came from, and the time of
+        purchase. Card numbers, UPI IDs and bank credentials are entered on Dodo&rsquo;s own checkout page and never reach our servers.
       </p>
 
       <h3>When you sell a vault</h3>
@@ -55,8 +55,9 @@ export default function PrivacyPage() {
       <h2>Who else sees it</h2>
       <ul>
         <li>
-          <strong>Dodo Payments</strong> — merchant of record for payments outside India: it takes the payment, issues the invoice and handles sales tax and VAT.
-          Governed by Dodo Payments&rsquo; own privacy policy.
+          <strong>Dodo Payments</strong> — the merchant of record for every sale. It takes the payment, issues the invoice, and registers and remits sales
+          tax and VAT in the buyer&rsquo;s country. It receives your email address and the billing details you enter at checkout. Governed by Dodo
+          Payments&rsquo; own privacy policy.
         </li>
         <li>
           <strong>Supabase</strong> — accounts, purchases and orders.
