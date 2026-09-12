@@ -15,6 +15,7 @@ import { IS_DEMO, cfg } from './config.ts';
 import { EMAIL_ENABLED } from './email.ts';
 import { DODO_ENABLED } from './dodo.ts';
 import { startKeepAwake } from './keepalive.ts';
+import { startPayoutWatch } from './payout-watch.ts';
 import catalogRoutes from './routes/catalog.ts';
 import adminPayoutRoutes from './routes/admin-payouts.ts';
 import dodoWebhookRoutes from './routes/dodo.ts';
@@ -54,3 +55,4 @@ app.setErrorHandler((err: Error & { statusCode?: number }, req, reply) => {
 await app.listen({ port: cfg.port, host: '0.0.0.0' });
 app.log.info(`Vault Market API on ${cfg.apiUrl} (${IS_DEMO ? 'demo' : 'supabase'} mode)`);
 startKeepAwake(app.log); // free tiers idle the instance out; see keepalive.ts
+startPayoutWatch(app.log); // mails when a seller has cleared enough to be worth paying
