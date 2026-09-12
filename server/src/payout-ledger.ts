@@ -229,8 +229,16 @@ export async function payoutHistory(sellerId: string): Promise<Row[]> {
 }
 
 /** Batch payment files want one row per seller, so this is the shape a bank or Wise expects. */
+/**
+ * The batch file an operator uploads to their bank.
+ *
+ * The amount is `availableCents`, not `outstandingCents`: only money past the buyer's
+ * reversal window may be sent. Outstanding includes sales still inside that window, and a
+ * bank file built on it would pay out money that can still be clawed back, which is the
+ * exposure the clearing window exists to prevent.
+ */
 export function balancesToCsv(rows: SellerBalance[]): string {
-  const head = ['seller_id', 'username', 'name', 'outstanding_minor_units', 'currency', 'country', 'method', 'account_name', 'account_ref', 'bank_code'];
+  const head = ['seller_id', 'username', 'name', 'payable_minor_units', 'currency', 'country', 'method', 'account_name', 'account_ref', 'bank_code'];
   const esc = (v: unknown) => {
     const s = v === null || v === undefined ? '' : String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -240,7 +248,7 @@ export function balancesToCsv(rows: SellerBalance[]): string {
       r.sellerId,
       r.username,
       r.payout?.accountName ?? r.displayName,
-      r.outstandingCents,
+      r.availableCents,
       r.payout?.currency ?? r.currency,
       r.payout?.country,
       r.payout?.method,
