@@ -42,8 +42,13 @@ export interface SellerBalance {
   clearedCents: number;
   /** Cleared minus paid: what could actually be transferred today. */
   availableCents: number;
-  /** Still inside the buyer's reversal window. Owed, but not yet safe to send. */
+  /** Not yet cleared: inside the buyer's reversal window, or not yet settled to us by Dodo. */
   holdingCents: number;
+  /**
+   * Past the buyer's window but Dodo has not paid us for it yet. Owed and safe from
+   * reversal, but not yet ours to send: paying it would be lending the seller our money.
+   */
+  unsettledCents: number;
   salesCount: number;
   /** What they must accrue before a transfer is worth making. Derived from their method. */
   thresholdCents: number;
@@ -65,6 +70,24 @@ export interface SellerBalance {
 type Row = Record<string, any>;
 
 /**
+ * Whether a sale may be paid on. Two things have to be true: the buyer can no longer
+ * reverse it, and Dodo has settled it to us. The first protects against a refund landing on
+ * money already sent; the second against sending money we have not yet received.
+ *
+ * No clears_at means the row predates the clearing window; its window has long passed.
+ */
+function saleCleared(p: Row, now: number): boolean {
+  const pastWindow = !p.clears_at || new Date(p.clears_at).getTime() <= now;
+  return pastWindow && (!cfg.payoutRequireSettlement || !!p.settled_at);
+}
+
+/** Past the buyer's window, so only the settlement is outstanding. */
+function saleAwaitingSettlement(p: Row, now: number): boolean {
+  const pastWindow = !p.clears_at || new Date(p.clears_at).getTime() <= now;
+  return pastWindow && cfg.payoutRequireSettlement && !p.settled_at;
+}
+
+/**
  * Every seller with either sales or payments, and what is outstanding for each.
  *
  * Purchases made before the seller was recorded on the row are skipped rather than guessed
@@ -74,16 +97,16 @@ export async function sellerBalances(): Promise<SellerBalance[]> {
   const db = admin();
 
   const [{ data: purchases, error: pErr }, { data: runs, error: rErr }] = await Promise.all([
-    db.from('purchases').select('seller_id, amount_cents, fee_cents, clears_at').not('seller_id', 'is', null),
+    db.from('purchases').select('seller_id, amount_cents, fee_cents, clears_at, settled_at').not('seller_id', 'is', null),
     db.from('seller_payout_runs').select('seller_id, amount_cents, currency, status'),
   ]);
   if (pErr) throw new Error(pErr.message);
   if (rErr) throw new Error(rErr.message);
 
-  const totals = new Map<string, { gross: number; fee: number; cleared: number; paid: number; pending: number; sales: number }>();
+  const totals = new Map<string, { gross: number; fee: number; cleared: number; unsettled: number; paid: number; pending: number; sales: number }>();
   const get = (id: string) => {
     let t = totals.get(id);
-    if (!t) totals.set(id, (t = { gross: 0, fee: 0, cleared: 0, paid: 0, pending: 0, sales: 0 }));
+    if (!t) totals.set(id, (t = { gross: 0, fee: 0, cleared: 0, unsettled: 0, paid: 0, pending: 0, sales: 0 }));
     return t;
   };
 
@@ -92,8 +115,9 @@ export async function sellerBalances(): Promise<SellerBalance[]> {
     const t = get(p.seller_id);
     t.gross += p.amount_cents ?? 0;
     t.fee += p.fee_cents ?? 0;
-    // No clears_at means the row predates the clearing window; its window has long passed.
-    if (!p.clears_at || new Date(p.clears_at).getTime() <= now) t.cleared += (p.amount_cents ?? 0) - (p.fee_cents ?? 0);
+    const net = (p.amount_cents ?? 0) - (p.fee_cents ?? 0);
+    if (saleCleared(p, now)) t.cleared += net;
+    else if (saleAwaitingSettlement(p, now)) t.unsettled += net;
     // Free claims are purchases too; they are not sales and should not inflate the count.
     if ((p.amount_cents ?? 0) > 0) t.sales++;
   }
@@ -141,6 +165,7 @@ export async function sellerBalances(): Promise<SellerBalance[]> {
         clearedCents: t.cleared,
         availableCents: available,
         holdingCents: earned - t.cleared,
+        unsettledCents: t.unsettled,
         salesCount: t.sales,
         thresholdCents,
         transferFeeCents: method ? transferCostCents(method, d?.country ?? '') : null,
@@ -174,7 +199,7 @@ export async function sellerBalance(sellerId: string): Promise<{
 }> {
   const db = admin();
   const [{ data: purchases, error: pErr }, { data: runs, error: rErr }] = await Promise.all([
-    db.from('purchases').select('amount_cents, fee_cents, clears_at').eq('seller_id', sellerId),
+    db.from('purchases').select('amount_cents, fee_cents, clears_at, settled_at').eq('seller_id', sellerId),
     db.from('seller_payout_runs').select('amount_cents, status').eq('seller_id', sellerId),
   ]);
   if (pErr) throw new Error(pErr.message);
@@ -186,8 +211,7 @@ export async function sellerBalance(sellerId: string): Promise<{
   for (const p of (purchases ?? []) as Row[]) {
     const net = (p.amount_cents ?? 0) - (p.fee_cents ?? 0);
     earned += net;
-    // No clears_at means the row predates the clearing window; its window has long passed.
-    if (!p.clears_at || new Date(p.clears_at).getTime() <= now) cleared += net;
+    if (saleCleared(p, now)) cleared += net;
   }
   // Only a confirmed run is money the seller has. Pending is promised but not sent, and a
   // cancelled one never happened; showing either as paid would tell a seller they had been
