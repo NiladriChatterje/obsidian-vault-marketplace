@@ -342,6 +342,16 @@ export async function pendingPayoutRuns(): Promise<Row[]> {
 }
 
 /**
+ * Stamps the runs the operator has just been told about, so the next check knows not to
+ * tell them again until a full cadence has passed.
+ */
+export async function markRunsNotified(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const { error } = await admin().from('seller_payout_runs').update({ notified_at: new Date().toISOString() }).in('id', ids);
+  if (error) throw new Error(error.message);
+}
+
+/**
  * Marks a prepared run as actually transferred. Only now does the amount count against the
  * seller's balance, because only now has it left the platform's account.
  */
