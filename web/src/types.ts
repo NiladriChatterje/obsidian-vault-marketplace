@@ -154,6 +154,10 @@ export interface SellerStats {
   outstandingCents?: number;
   /** What they must reach before a transfer is worth its fee. Depends on how they are paid. */
   payoutThresholdCents?: number;
+  /** Past its clearing window and payable. */
+  availableCents?: number;
+  /** Earned, but still inside the buyer's reversal window. */
+  holdingCents?: number;
 }
 
 export type SortMode = 'new' | 'popular' | 'top';

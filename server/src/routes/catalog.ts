@@ -204,6 +204,8 @@ export default async function catalogRoutes(app: FastifyInstance) {
       stats.paidOutCents = balance.paidCents;
       stats.outstandingCents = balance.outstandingCents;
       stats.payoutThresholdCents = balance.thresholdCents;
+      stats.availableCents = balance.availableCents;
+      stats.holdingCents = balance.holdingCents;
     }
     return stats;
   });

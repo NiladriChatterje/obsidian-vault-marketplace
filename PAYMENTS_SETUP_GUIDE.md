@@ -60,6 +60,22 @@ refunded and deletes the buyer's `purchases` row, so access goes back with the m
 the seller's balance is corrected. Remove that handler and a refunded buyer keeps the vault
 while the ledger still shows the seller owed money that was returned.
 
+**And a refund only costs the platform if that sale was already paid out**, which is what
+the clearing window in `clearing.ts` prevents. A sale is not payable until the buyer can no
+longer reverse it: 14 days for a buyer in the EU, the EEA or the UK, who has a statutory
+right of withdrawal on digital goods whatever this site's policy says, and 3 days elsewhere.
+An unknown buyer country gets the longer window. The buyer's country comes from the Dodo
+payment's billing address, falling back to the card's issuing country, and is stored on the
+purchase with the date it clears.
+
+A seller therefore sees two numbers: **Awaiting payout**, which is cleared and payable, and
+**Clearing**, which is earned but still reversible. Set the windows with
+`HOLDBACK_DAYS_WITHDRAWAL` and `HOLDBACK_DAYS_DEFAULT`.
+
+This does not cover a card chargeback, which can arrive months later, and nothing reasonable
+would: holding every sale for the full chargeback window would mean paying sellers twice a
+year. It covers the reversals that actually happen.
+
 Keep the page itself too: providers check that a refund and cancellation policy exists
 before activating an account.
 
