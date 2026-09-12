@@ -13,6 +13,6 @@ export function getSupabase(): SupabaseClient | null {
 
 export function requireSupabase(): SupabaseClient {
   const c = getSupabase();
-  if (!c) throw new Error('Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
+  if (!c) throw new Error('Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
   return c;
 }

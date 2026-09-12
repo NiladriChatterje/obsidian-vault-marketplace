@@ -1,5 +1,5 @@
 /**
- * Runtime configuration. All values come from EXPO_PUBLIC_* env vars so they
+ * Runtime configuration. All values come from NEXT_PUBLIC_* env vars so they
  * are safe to ship in the client bundle (anon key only, never the service key).
  *
  * When SUPABASE_URL is missing the app runs in demo mode: an in-memory
@@ -104,7 +104,7 @@ export const CATALOG_SOURCE: 'sanity' | 'local' =
 /**
  * Where the payment server sends the buyer after checkout.
  * Native builds use the deep-link scheme; the Next.js site (web/) sets
- * EXPO_PUBLIC_REDIRECT_ORIGIN to its own https origin, falling back to the
+ * NEXT_PUBLIC_REDIRECT_ORIGIN to its own https origin, falling back to the
  * browser's location when running in a browser.
  */
 export const REDIRECT_ORIGIN: string =
