@@ -23,7 +23,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { IS_DEMO, cfg } from './config.ts';
 import { EMAIL_ENABLED, sendEmail } from './email.ts';
-import { balancesToCsv, sellerBalances, type SellerBalance } from './payout-ledger.ts';
+import { pendingPayoutRuns, preparePayoutRuns, runsToCsv } from './payout-ledger.ts';
 
 const env = (key: string, fallback = '') => (process.env[key] ?? fallback).trim();
 
@@ -39,47 +39,62 @@ function money(minor: number, currency: string): string {
  * Totals are per currency. Sellers are paid in their own, so adding a rupee balance to a
  * euro one would produce a number that means nothing.
  */
-function subjectFor(due: SellerBalance[]): string {
+type Run = Record<string, any>;
+
+/**
+ * Totals are per currency. Sellers are paid in their own, so adding a rupee balance to a
+ * euro one would produce a number that means nothing.
+ */
+function subjectFor(runs: Run[]): string {
   const totals = new Map<string, number>();
-  for (const r of due) {
-    const cur = r.payout?.currency ?? r.currency;
-    totals.set(cur, (totals.get(cur) ?? 0) + r.availableCents);
-  }
-  const who = due.length === 1 ? '1 seller' : `${due.length} sellers`;
-  const sums = [...totals].map(([cur, n]) => money(n, cur)).join(' + ');
-  return `Payouts due: ${who}, ${sums}`;
+  for (const r of runs) totals.set(r.currency, (totals.get(r.currency) ?? 0) + r.amount_cents);
+  const who = runs.length === 1 ? '1 seller' : `${runs.length} sellers`;
+  return `Payouts due: ${who}, ${[...totals].map(([cur, n]) => money(n, cur)).join(' + ')}`;
 }
 
-function bodyFor(due: SellerBalance[], adminUrl: string): { html: string; text: string } {
-  const rows = due.map((r) => {
-    const name = r.payout?.accountName ?? r.displayName ?? r.username ?? r.sellerId;
-    const cur = r.payout?.currency ?? r.currency;
+/** Whole days a run has been waiting for its transfer. */
+function waitingDays(run: Run): number {
+  return Math.floor((Date.now() - new Date(run.prepared_at).getTime()) / 86_400_000);
+}
+
+function bodyFor(runs: Run[], adminUrl: string): { html: string; text: string } {
+  const rows = runs.map((r) => {
+    const days = waitingDays(r);
     return {
-      name,
-      where: `${r.payout?.method ?? '?'} / ${r.payout?.country ?? '?'}`,
-      amount: money(r.availableCents, cur),
-      cost: r.transferFeeCents === null ? '-' : money(r.transferFeeCents, cur),
-      holding: r.holdingCents > 0 ? money(r.holdingCents, cur) : '-',
+      name: r.profiles?.display_name ?? r.profiles?.username ?? r.seller_id,
+      where: `${r.method ?? '?'} ${r.account_ref ?? ''}`.trim(),
+      amount: money(r.amount_cents, r.currency),
+      // The number that matters if a week was missed: a seller has been promised this for
+      // that long and has not had it.
+      waiting: days === 0 ? 'today' : days === 1 ? '1 day' : `${days} days`,
+      late: days >= 7,
     };
   });
 
   const html = `
-    <p>These sellers have cleared enough to be worth paying. Nothing has been sent; this is a reminder.</p>
+    <p>These payouts are prepared and waiting on a transfer. The money has cleared its buyer's
+    reversal window and is above the threshold for the seller's region. Nothing has been sent.</p>
     <table cellpadding="6" style="border-collapse:collapse" border="1">
-      <tr><th align="left">Seller</th><th align="left">Send via</th><th align="right">Pay now</th><th align="right">Transfer cost</th><th align="right">Still clearing</th></tr>
-      ${rows.map((r) => `<tr><td>${r.name}</td><td>${r.where}</td><td align="right">${r.amount}</td><td align="right">${r.cost}</td><td align="right">${r.holding}</td></tr>`).join('')}
+      <tr><th align="left">Seller</th><th align="left">Send via</th><th align="right">Amount</th><th align="left">Waiting</th></tr>
+      ${rows
+        .map(
+          (r) =>
+            `<tr${r.late ? ' style="background:#fff4f4"' : ''}><td>${r.name}</td><td>${r.where}</td><td align="right">${r.amount}</td><td>${r.waiting}${r.late ? ' &#9888;' : ''}</td></tr>`
+        )
+        .join('')}
     </table>
-    <p>Make the transfers, then record them at <a href="${adminUrl}">${adminUrl}</a> so the balances clear.</p>
-    <p>A batch file for your bank is at <a href="${adminUrl}.csv">${adminUrl}.csv</a>.</p>`;
+    <p>Make the transfers, then confirm each one at <a href="${adminUrl}/runs">${adminUrl}/runs</a>.
+    A run stays on this list until it is confirmed, so nothing falls off the end.</p>
+    <p>Batch file for your bank: <a href="${adminUrl}.csv">${adminUrl}.csv</a></p>`;
 
   const text = [
-    'These sellers have cleared enough to be worth paying. Nothing has been sent; this is a reminder.',
+    'These payouts are prepared and waiting on a transfer. Nothing has been sent.',
     '',
-    ...rows.map((r) => `  ${r.name}  ${r.amount}  via ${r.where}  (transfer costs ${r.cost}, ${r.holding} still clearing)`),
+    ...rows.map((r) => `  ${r.name}  ${r.amount}  via ${r.where}  waiting ${r.waiting}${r.late ? '  <-- overdue' : ''}`),
     '',
-    `Record the transfers at ${adminUrl}. Batch file: ${adminUrl}.csv`,
+    `Confirm each transfer at ${adminUrl}/runs. Batch file: ${adminUrl}.csv`,
     '',
-    balancesToCsv(due),
+    runsToCsv(runs),
   ].join('\n');
 
   return { html, text };
@@ -110,14 +125,18 @@ export function startPayoutWatch(log: FastifyBaseLogger): NodeJS.Timeout | null 
 
   const check = async () => {
     try {
-      const due = (await sellerBalances()).filter((r) => r.payable);
-      if (!due.length) {
+      // Prepare first, then report everything outstanding: runs from earlier passes that
+      // were never confirmed stay on the list, which is the point. A missed week does not
+      // drop a seller, it makes their wait visible and growing.
+      const prepared = await preparePayoutRuns();
+      const waiting = await pendingPayoutRuns();
+      if (!waiting.length) {
         log.info('Payout watch: nothing due');
         return;
       }
-      const { html, text } = bodyFor(due, adminUrl);
-      const sent = await sendEmail({ to, subject: subjectFor(due), html, text, tag: 'payout-due' }, log);
-      log.info(`Payout watch: ${due.length} due, email ${sent ? 'sent' : 'failed'}`);
+      const { html, text } = bodyFor(waiting, adminUrl);
+      const sent = await sendEmail({ to, subject: subjectFor(waiting), html, text, tag: 'payout-due' }, log);
+      log.info(`Payout watch: ${prepared.length} newly prepared, ${waiting.length} awaiting transfer, email ${sent ? 'sent' : 'failed'}`);
     } catch (e) {
       // A reminder failing must never take the server down with it.
       log.warn(`Payout watch failed: ${e instanceof Error ? e.message : e}`);
