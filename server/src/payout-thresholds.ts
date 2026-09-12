@@ -50,9 +50,10 @@ export function transferCostCents(method: PayoutMethod, country: string): number
  * Derived from the commission so changing either half moves every threshold with it.
  */
 export function commissionRatio(): number {
-  const margin = cfg.feePercent - cfg.providerPercentFee;
+  // The domestic rate is the lower of the two, so a threshold that clears it clears both.
+  const margin = cfg.feePercentDomestic - cfg.providerPercentFee;
   if (margin <= 0) return 0;
-  return margin / (100 - cfg.feePercent);
+  return margin / (100 - cfg.feePercentDomestic);
 }
 
 /**

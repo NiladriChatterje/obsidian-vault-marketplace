@@ -7,7 +7,7 @@ import { Cover, Field, Loading, Toast } from '@/components/ui';
 import { errorMessage, fileToUri, releaseUri } from '@/lib/web';
 import { inspectVaultZip } from '@/lib/vault-zip';
 import { api } from '@/lib/api';
-import { MAX_VAULT_ZIP_BYTES, MIN_PRICE_CENTS, PLATFORM_FEE_FIXED_CENTS, PLATFORM_FEE_PERCENT, platformFee } from '@/lib/config';
+import { MAX_VAULT_ZIP_BYTES, MIN_PRICE_CENTS, PLATFORM_FEE_FIXED_CENTS, feePercentFor, platformFee } from '@/lib/config';
 import { formatBytes, formatPrice, parsePriceToCents, parseTags } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 import { CATEGORIES, type CategorySlug, type Vault, type VaultInput } from '@/types';
@@ -47,6 +47,8 @@ export default function ListingEditorPage() {
   // Whether the seller can be paid at all. The server refuses to publish a paid vault
   // without it; checking here means the refusal arrives before the save round trip.
   const [canBePaid, setCanBePaid] = useState<boolean | null>(null);
+  // Where they bank sets their rate: a domestic payout costs the platform less to send.
+  const [payoutCountry, setPayoutCountry] = useState<string | null>(null);
 
   const zipInput = useRef<HTMLInputElement>(null);
   const coverInput = useRef<HTMLInputElement>(null);
@@ -79,7 +81,7 @@ export default function ListingEditorPage() {
 
   const priceCents = isPaid ? parsePriceToCents(priceText) : 0;
   const priceError = isPaid && (priceCents === null || priceCents < MIN_PRICE_CENTS) ? `Minimum price is ${formatPrice(MIN_PRICE_CENTS)}` : null;
-  const youKeep = priceCents ? priceCents - platformFee(priceCents) : 0;
+  const youKeep = priceCents ? priceCents - platformFee(priceCents, payoutCountry) : 0;
 
   const pickCover = async (file: File | undefined) => {
     if (!file) return;
@@ -100,7 +102,10 @@ export default function ListingEditorPage() {
     if (!user || isDemo) return setCanBePaid(true);
     api
       .getPayoutDetails()
-      .then(({ details }) => setCanBePaid(!!details))
+      .then(({ details }) => {
+        setCanBePaid(!!details);
+        setPayoutCountry(details?.country ?? null);
+      })
       // Unknown rather than false, so a failed check never blocks a publish the server allows.
       .catch(() => setCanBePaid(null));
   }, [user?.id, isDemo]);
@@ -263,7 +268,7 @@ export default function ListingEditorPage() {
           <input type="checkbox" checked={isPaid} onChange={(e) => setIsPaid(e.target.checked)} /> Paid vault
         </label>
         {isPaid ? (
-          <Field label="Price (INR)" hint={priceError ?? (priceCents ? `You keep ${formatPrice(youKeep)} per sale, after the ${PLATFORM_FEE_PERCENT}% + ${formatPrice(PLATFORM_FEE_FIXED_CENTS)} fee.` : undefined)}>
+          <Field label="Price (INR)" hint={priceError ?? (priceCents ? `You keep ${formatPrice(youKeep)} per sale, after the ${feePercentFor(payoutCountry)}% + ${formatPrice(PLATFORM_FEE_FIXED_CENTS)} fee.` : undefined)}>
             <input className="input" inputMode="decimal" value={priceText} onChange={(e) => setPriceText(e.target.value)} />
           </Field>
         ) : (

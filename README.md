@@ -13,7 +13,7 @@ A two-sided marketplace for Obsidian vaults, built with Expo (React Native) and 
 
 | Stream | How |
 | --- | --- |
-| Commission | 10% + ₹40 of every paid sale, settled to sellers outside the checkout. The fixed half mirrors Dodo's own 4% + $0.40: a percentage-only commission always loses money below some price, because the percentage shrinks with the price and the provider's flat fee does not. This way every sale carries its own processing cost. See `PAYMENTS_SETUP_GUIDE.md`. |
+| Commission | 8% + ₹40 per sale for sellers paid in India, 12% + ₹40 for sellers paid abroad, settled outside the checkout. The fixed half mirrors Dodo's own 4% + $0.40, so no sale can cost more than it earns; the split rate reflects that reaching a seller abroad costs a transfer fee and a conversion spread. See `PAYMENTS_SETUP_GUIDE.md`. |
 | Featured placement | The `featured` flag drives the home carousel. Sell slots to sellers weekly. |
 | Seller Pro (future) | Analytics, coupons, early-access releases for a monthly fee. |
 

@@ -54,6 +54,17 @@ export async function hasPayoutDetails(userId: string): Promise<boolean> {
   return !!data;
 }
 
+/**
+ * Whether the seller can be paid, and where they bank. The country sets the commission
+ * rate, so checkout needs both and should not ask twice.
+ */
+export async function payoutRegion(userId: string): Promise<{ has: boolean; country: string | null }> {
+  if (IS_DEMO) return { has: true, country: null };
+  const { data, error } = await admin().from('seller_payouts').select('country').eq('user_id', userId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return { has: !!data, country: data?.country ?? null };
+}
+
 /** Returns the problem as a sentence for the seller, or null when the details are usable. */
 export function validatePayoutDetails(d: Partial<PayoutDetails>): string | null {
   const country = (d.country ?? '').trim().toUpperCase();

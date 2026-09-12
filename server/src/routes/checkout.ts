@@ -13,7 +13,7 @@ import type { FastifyInstance } from 'fastify';
 import { IS_DEMO, platformFee } from '../config.ts';
 import { DODO_ENABLED, dodo, dodoError, productForVault } from '../dodo.ts';
 import { getOrder, saveOrder, type Order } from '../orders.ts';
-import { hasPayoutDetails } from '../seller-payouts.ts';
+import { payoutRegion } from '../seller-payouts.ts';
 import { resolveReturnOrigin, returnUrl } from '../redirect.ts';
 import { admin, userFromRequest } from '../supabase.ts';
 import { SANITY_ENABLED, getVault } from '../sanity/index.ts';
@@ -84,8 +84,10 @@ export default async function checkoutRoutes(app: FastifyInstance) {
 
         // Last line of defence. Publishing already requires this, but a seller could have
         // gone live and then had their details removed, and taking money we cannot pass on
-        // is worse than refusing the sale.
-        if (!(await hasPayoutDetails(v.sellerId))) {
+        // is worse than refusing the sale. The same lookup gives the country, which sets
+        // the commission rate, so the sale is priced from where the money has to reach.
+        const region = await payoutRegion(v.sellerId);
+        if (!region.has) {
           return reply.code(400).send({ error: 'This vault is temporarily unavailable: the seller has not finished their payout setup.' });
         }
 
@@ -98,7 +100,7 @@ export default async function checkoutRoutes(app: FastifyInstance) {
           title: v.title,
           amount: v.priceCents,
           currency: v.currency.toUpperCase(),
-          fee: platformFee(v.priceCents),
+          fee: platformFee(v.priceCents, region.country),
           returnOrigin,
         };
       }

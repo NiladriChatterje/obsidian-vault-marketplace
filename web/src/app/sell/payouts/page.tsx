@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { Empty, Field, Loading, Toast } from '@/components/ui';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/lib/api';
-import { PLATFORM_FEE_FIXED_CENTS, PLATFORM_FEE_PERCENT } from '@/lib/config';
+import { PLATFORM_COUNTRY, PLATFORM_FEE_FIXED_CENTS, feePercentFor } from '@/lib/config';
 import { formatPrice } from '@/lib/format';
 import { errorMessage } from '@/lib/web';
 import { useAuth } from '@/store/auth';
@@ -94,13 +94,20 @@ export default function PayoutDetailsPage() {
         <h1>Payout details</h1>
         <p className="muted">
           Buyers pay Vault Market, which is the seller of record for every sale and handles the tax. Your share, the price less our{' '}
-          {PLATFORM_FEE_PERCENT}% + {formatPrice(PLATFORM_FEE_FIXED_CENTS)} fee, is sent to you separately, so we need to know where. A paid vault cannot go live until this is filled in; free vaults can be published
-          without it.
+          {feePercentFor(form.country)}% + {formatPrice(PLATFORM_FEE_FIXED_CENTS)} fee, is sent to you separately, so we need to know where. A paid
+          vault cannot go live until this is filled in; free vaults can be published without it.
         </p>
       </div>
 
       <form className="card stack" onSubmit={submit}>
-        <Field label="Country" hint="Two-letter code for where your account is held, for example IN, US or DE.">
+        <Field
+          label="Country"
+          hint={
+            form.country.length === 2
+              ? `Paid in ${form.country}, your rate is ${feePercentFor(form.country)}% + ${formatPrice(PLATFORM_FEE_FIXED_CENTS)} per sale.`
+              : `Two-letter code for where your account is held, for example ${PLATFORM_COUNTRY}, US or DE. It sets your rate: sending money abroad costs more.`
+          }
+        >
           <input
             className="input"
             value={form.country}
