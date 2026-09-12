@@ -47,7 +47,7 @@ An Obsidian vault is a folder of markdown files, so that is how it is stored. `s
 
 Uploading a zip does the conversion: the server unpacks it, strips the common root folder, parses each note, and writes `note`/`attachment` documents tagged with a bundle id. Saving the listing attaches the bundle to the vault and removes the previous contents. Downloads are zipped back together from Sanity on demand, so the original archive is never stored.
 
-**Access rules.** Note bodies are paid content, so the dataset should be **private** (`npx sanity dataset visibility set production private` in `sanity-studio/`). The app and site never call Sanity; they call the payment server, which holds `SANITY_API_TOKEN`, serves listings and note metadata publicly, and returns a note body only if it is a preview or the caller owns the vault (purchase row or seller). The MCP route uses the same shared module. `EXPO_PUBLIC_CATALOG_SOURCE=local` switches the app back to the built-in demo data.
+**Access rules.** Note bodies are paid content, so the dataset should be **private** (`npx sanity dataset visibility set production private` in `sanity-studio/`). The app and site never call Sanity; they call the payment server, which holds `SANITY_API_TOKEN`, serves listings and note metadata publicly, and returns a note body only if it is a preview or the caller owns the vault (purchase row or seller). The MCP route uses the same shared module. `NEXT_PUBLIC_CATALOG_SOURCE=local` switches the app back to the built-in demo data.
 
 ```bash
 cd sanity-studio
@@ -93,7 +93,7 @@ docker compose up --build      # web on :3000, api on :4000
 docker compose logs -f api
 ```
 
-`server/Dockerfile` runs the TypeScript sources directly on Node 24 (no build step). `web/Dockerfile` builds Next.js in standalone mode and inlines the `EXPO_PUBLIC_*` values as build args (compose passes them from `.env`). Each image builds from its own folder. Rebuild the web image after changing those; server values are read at runtime. The Expo app is not containerised: run it with `npm start` in `mobile/` against the running api.
+`server/Dockerfile` runs the TypeScript sources directly on Node 24 (no build step). `web/Dockerfile` builds Next.js in standalone mode and inlines the `NEXT_PUBLIC_*` values as build args (compose passes them from `.env`). Each image builds from its own folder. Rebuild the web image after changing those; server values are read at runtime. The Expo app is not containerised: run it with `npm start` in `mobile/` against the running api.
 
 ```bash
 cd mobile
@@ -135,8 +135,8 @@ The site reads the repo-root `.env` (and its own `web/.env*` files). Keys that m
 | Key | Purpose |
 | --- | --- |
 | `SERVER_API_URL` | Base URL of the payment server (`server/`); every data call from the browser goes there. |
-| `EXPO_PUBLIC_API_URL` | The same URL for the Expo app. Metro inlines only `EXPO_PUBLIC_*` names, so the app cannot read `SERVER_API_URL`. |
-| `EXPO_PUBLIC_REDIRECT_ORIGIN` | Optional. Where the payment server sends buyers back (defaults to the browser origin). Also list it in `ALLOWED_REDIRECT_ORIGINS`. |
+| `NEXT_PUBLIC_API_URL` | The same URL for the Expo app. Metro inlines only `NEXT_PUBLIC_*` names, so the app cannot read `SERVER_API_URL`. |
+| `NEXT_PUBLIC_REDIRECT_ORIGIN` | Optional. Where the payment server sends buyers back (defaults to the browser origin). Also list it in `ALLOWED_REDIRECT_ORIGINS`. |
 
 ### MCP access
 

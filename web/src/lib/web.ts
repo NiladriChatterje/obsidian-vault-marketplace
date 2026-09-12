@@ -32,6 +32,6 @@ export function errorMessage(e: unknown, fallback = 'Something went wrong. Pleas
 
 /** Base URL of this site, for showing the MCP endpoint. */
 export function siteOrigin(): string {
-  if (process.env.EXPO_PUBLIC_REDIRECT_ORIGIN) return process.env.EXPO_PUBLIC_REDIRECT_ORIGIN;
+  if (process.env.NEXT_PUBLIC_REDIRECT_ORIGIN) return process.env.NEXT_PUBLIC_REDIRECT_ORIGIN;
   return typeof location !== 'undefined' ? location.origin : '';
 }

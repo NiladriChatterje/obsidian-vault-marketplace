@@ -113,7 +113,7 @@ The split is not arbitrary. Dodo charges the same either way, but the money stil
 reach the seller: a domestic payout is a near-free local transfer with nothing converted,
 while reaching a seller abroad costs a transfer fee and a conversion spread. Charging one
 blended rate would make Indian sellers subsidise international payouts. Set
-`EXPO_PUBLIC_PLATFORM_COUNTRY` to whichever country counts as domestic.
+`NEXT_PUBLIC_PLATFORM_COUNTRY` to whichever country counts as domestic.
 
 | List | Indian seller keeps | Seller abroad keeps |
 | ---: | ---: | ---: |
@@ -156,9 +156,9 @@ very low price the flat part is most of the sale and the seller is left with alm
 configured so its fixed half no longer covers the provider's.
 
 Both halves must cover the provider's or the platform loses money. **Both** rates, since the
-lower one is what has to clear: `EXPO_PUBLIC_PLATFORM_FEE_PERCENT_DOMESTIC` and
-`EXPO_PUBLIC_PLATFORM_FEE_PERCENT_INTERNATIONAL` >= `EXPO_PUBLIC_PROVIDER_PERCENT_FEE`, and
-`EXPO_PUBLIC_PLATFORM_FEE_FIXED_CENTS` >= `EXPO_PUBLIC_PROVIDER_FIXED_FEE_CENTS`. Revisit the
+lower one is what has to clear: `NEXT_PUBLIC_PLATFORM_FEE_PERCENT_DOMESTIC` and
+`NEXT_PUBLIC_PLATFORM_FEE_PERCENT_INTERNATIONAL` >= `NEXT_PUBLIC_PROVIDER_PERCENT_FEE`, and
+`NEXT_PUBLIC_PLATFORM_FEE_FIXED_CENTS` >= `NEXT_PUBLIC_PROVIDER_FIXED_FEE_CENTS`. Revisit the
 fixed pair if the rupee moves a long way against the dollar: at roughly Rs 110 to the dollar
 Dodo's $0.40 passes Rs 40 and the fixed margin inverts.
 
@@ -213,12 +213,12 @@ off.
 
 ```
 SERVER_API_URL=https://<api-domain>
-EXPO_PUBLIC_API_URL=https://<api-domain>
+NEXT_PUBLIC_API_URL=https://<api-domain>
 ALLOWED_REDIRECT_ORIGINS=https://<site-domain>
-EXPO_PUBLIC_PLATFORM_COUNTRY=IN
-EXPO_PUBLIC_PLATFORM_FEE_PERCENT_DOMESTIC=8
-EXPO_PUBLIC_PLATFORM_FEE_PERCENT_INTERNATIONAL=12
-EXPO_PUBLIC_PLATFORM_FEE_FIXED_CENTS=4000
+NEXT_PUBLIC_PLATFORM_COUNTRY=IN
+NEXT_PUBLIC_PLATFORM_FEE_PERCENT_DOMESTIC=8
+NEXT_PUBLIC_PLATFORM_FEE_PERCENT_INTERNATIONAL=12
+NEXT_PUBLIC_PLATFORM_FEE_FIXED_CENTS=4000
 DODO_API_KEY=...
 DODO_WEBHOOK_SECRET=...
 DODO_ENVIRONMENT=live
@@ -227,7 +227,7 @@ DODO_ENVIRONMENT=live
 Apply migrations through `0012_purchase_clearing.sql` first. Every webhook returns 500 until
 the schema is in place, which makes Dodo retry rather than lose the event.
 
-Rebuild the web image after changing any `EXPO_PUBLIC_*` value; the server reads its own at
+Rebuild the web image after changing any `NEXT_PUBLIC_*` value; the server reads its own at
 runtime. Buy a cheap live vault once end to end and confirm the payment in the Dodo
 dashboard and the `purchases` row in Supabase.
 

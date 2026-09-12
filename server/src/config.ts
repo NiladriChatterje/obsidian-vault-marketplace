@@ -30,7 +30,7 @@ export const cfg = {
   },
 
   supabase: {
-    url: env('EXPO_PUBLIC_SUPABASE_URL'),
+    url: env('NEXT_PUBLIC_SUPABASE_URL') || env('EXPO_PUBLIC_SUPABASE_URL'),
     serviceKey: env('SUPABASE_SERVICE_ROLE_KEY'),
   },
 
@@ -50,17 +50,19 @@ export const cfg = {
    * transfer fee and a conversion spread, so that sale carries a higher rate rather than
    * being subsidised by domestic ones.
    */
-  feePercentDomestic: Number(env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT_DOMESTIC', env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT', '8'))),
-  feePercentInternational: Number(env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT_INTERNATIONAL', '12')),
+  feePercentDomestic: Number(
+    env('NEXT_PUBLIC_PLATFORM_FEE_PERCENT_DOMESTIC', env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT_DOMESTIC', env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT', '8')))
+  ),
+  feePercentInternational: Number(env('NEXT_PUBLIC_PLATFORM_FEE_PERCENT_INTERNATIONAL', env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT_INTERNATIONAL', '12'))),
   /**
    * The fixed half of the commission, which exists to cancel the provider's fixed fee. A
    * percentage-only commission always loses below some price, because a percentage shrinks
    * with the price and the provider's flat charge does not.
    */
-  feeFixedCents: Number(env('EXPO_PUBLIC_PLATFORM_FEE_FIXED_CENTS', '4000')),
+  feeFixedCents: Number(env('NEXT_PUBLIC_PLATFORM_FEE_FIXED_CENTS', env('EXPO_PUBLIC_PLATFORM_FEE_FIXED_CENTS', '4000'))),
   /** What the payment provider takes per sale: Dodo is 4% + $0.40, here in the listing currency. */
-  providerPercentFee: Number(env('EXPO_PUBLIC_PROVIDER_PERCENT_FEE', '4')),
-  providerFixedFeeCents: Number(env('EXPO_PUBLIC_PROVIDER_FIXED_FEE_CENTS', '3500')),
+  providerPercentFee: Number(env('NEXT_PUBLIC_PROVIDER_PERCENT_FEE', env('EXPO_PUBLIC_PROVIDER_PERCENT_FEE', '4'))),
+  providerFixedFeeCents: Number(env('NEXT_PUBLIC_PROVIDER_FIXED_FEE_CENTS', env('EXPO_PUBLIC_PROVIDER_FIXED_FEE_CENTS', '3500'))),
   /** Cheapest paid listing allowed. A product choice now, not a solvency one. */
   minPriceCents: Number(env('MIN_PRICE_CENTS', '14900')),
 
@@ -98,7 +100,7 @@ export const cfg = {
   /** Comma-separated http(s) origins buyers may be redirected to after checkout. Empty = any. */
   allowedRedirectOrigins: env('ALLOWED_REDIRECT_ORIGINS').split(',').map((s) => s.trim()).filter(Boolean),
   /** Site origin; native buyers land there before deep-linking back into the app. */
-  webOrigin: env('EXPO_PUBLIC_REDIRECT_ORIGIN').replace(/\/$/, ''),
+  webOrigin: (env('NEXT_PUBLIC_REDIRECT_ORIGIN') || env('EXPO_PUBLIC_REDIRECT_ORIGIN')).replace(/\/$/, ''),
 };
 
 /** No Supabase: orders live in memory and the client grants demo purchases itself. */
@@ -118,7 +120,7 @@ const IS_HOSTED =
 if (IS_DEMO && IS_HOSTED && env('ALLOW_PUBLIC_DEMO') !== 'yes') {
   throw new Error(
     'Refusing to start in demo mode on a hosted instance: demo mode grants every caller ownership of every vault. ' +
-    'Set EXPO_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, or ALLOW_PUBLIC_DEMO=yes to override.',
+    'Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, or ALLOW_PUBLIC_DEMO=yes to override.',
   );
 }
 
