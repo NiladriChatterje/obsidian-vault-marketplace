@@ -181,3 +181,8 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
 .toast .toast-close:hover { color: var(--text); }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+
+/* What a seller actually earns, spelled out under the price they are typing. */
+.payout-breakdown { border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 14px; background: var(--surface); font-size: 14px; }
+.payout-breakdown .row { padding: 3px 0; }
+.payout-breakdown .total { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 8px; }

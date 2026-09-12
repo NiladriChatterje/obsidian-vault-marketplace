@@ -7,7 +7,7 @@ import { Cover, Field, Loading, Toast } from '@/components/ui';
 import { errorMessage, fileToUri, releaseUri } from '@/lib/web';
 import { inspectVaultZip } from '@/lib/vault-zip';
 import { api } from '@/lib/api';
-import { MAX_VAULT_ZIP_BYTES, MIN_PRICE_CENTS, PLATFORM_FEE_FIXED_CENTS, feePercentFor, platformFee } from '@/lib/config';
+import { MAX_VAULT_ZIP_BYTES, MIN_PRICE_CENTS, PLATFORM_COUNTRY, PLATFORM_FEE_FIXED_CENTS, feePercentFor, platformFee } from '@/lib/config';
 import { formatBytes, formatPrice, parsePriceToCents, parseTags } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 import { CATEGORIES, type CategorySlug, type Vault, type VaultInput } from '@/types';
@@ -81,7 +81,8 @@ export default function ListingEditorPage() {
 
   const priceCents = isPaid ? parsePriceToCents(priceText) : 0;
   const priceError = isPaid && (priceCents === null || priceCents < MIN_PRICE_CENTS) ? `Minimum price is ${formatPrice(MIN_PRICE_CENTS)}` : null;
-  const youKeep = priceCents ? priceCents - platformFee(priceCents, payoutCountry) : 0;
+  const feeCents = priceCents ? platformFee(priceCents, payoutCountry) : 0;
+  const youKeep = priceCents ? priceCents - feeCents : 0;
 
   const pickCover = async (file: File | undefined) => {
     if (!file) return;
@@ -268,9 +269,37 @@ export default function ListingEditorPage() {
           <input type="checkbox" checked={isPaid} onChange={(e) => setIsPaid(e.target.checked)} /> Paid vault
         </label>
         {isPaid ? (
-          <Field label="Price (INR)" hint={priceError ?? (priceCents ? `You keep ${formatPrice(youKeep)} per sale, after the ${feePercentFor(payoutCountry)}% + ${formatPrice(PLATFORM_FEE_FIXED_CENTS)} fee.` : undefined)}>
-            <input className="input" inputMode="decimal" value={priceText} onChange={(e) => setPriceText(e.target.value)} />
-          </Field>
+          <>
+            <Field label="Price (INR)" hint={priceError ?? 'Buyers pay this. What reaches you is shown below.'}>
+              <input className="input" inputMode="decimal" value={priceText} onChange={(e) => setPriceText(e.target.value)} />
+            </Field>
+            {/* Spelled out rather than hinted at. A seller setting a price is deciding what they
+                earn, and they should not have to work the commission out themselves. */}
+            {priceCents && !priceError ? (
+              <div className="payout-breakdown">
+                <div className="row between">
+                  <span className="muted">Buyer pays</span>
+                  <span>{formatPrice(priceCents)}</span>
+                </div>
+                <div className="row between">
+                  <span className="muted">
+                    Platform fee ({feePercentFor(payoutCountry)}% + {formatPrice(PLATFORM_FEE_FIXED_CENTS)})
+                  </span>
+                  <span>-{formatPrice(feeCents)}</span>
+                </div>
+                <div className="row between total">
+                  <strong>You receive</strong>
+                  <strong>{formatPrice(youKeep)}</strong>
+                </div>
+                <p className="help" style={{ margin: '8px 0 0' }}>
+                  That is {Math.round((youKeep / priceCents) * 100)}% of the price, on every sale.{' '}
+                  {payoutCountry && payoutCountry.toUpperCase() !== PLATFORM_COUNTRY
+                    ? 'Your rate is higher because sending money outside India costs more.'
+                    : 'The flat part covers what the payment provider charges us per sale.'}
+                </p>
+              </div>
+            ) : null}
+          </>
         ) : (
           <p className="help">Free vaults are the best funnel to your paid ones.</p>
         )}
