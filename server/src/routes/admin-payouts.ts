@@ -5,6 +5,10 @@
  *   GET  /admin/payouts.csv        the same as a batch payment file
  *   POST /admin/payouts            record a transfer you have made
  *   GET  /admin/payouts/:sellerId  one seller's payment history
+ *   GET  /admin/payouts/runs       runs prepared and awaiting a transfer
+ *   POST /admin/payouts/runs       prepare runs now, instead of waiting for the timer
+ *   POST /admin/payouts/runs/:id/confirm  { reference } the transfer has been made
+ *   POST /admin/payouts/runs/:id/cancel   it has not, and will not be
  *
  * Gated on ADMIN_USER_IDS, a comma-separated list of Supabase user ids. With it unset every
  * route here is closed: an admin surface that defaults to open because a variable was
@@ -14,7 +18,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { cfg } from '../config.ts';
-import { balancesToCsv, payoutHistory, recordPayout, sellerBalances } from '../payout-ledger.ts';
+import { cancelPayoutRun, confirmPayoutRun, payoutHistory, pendingPayoutRuns, preparePayoutRuns, recordPayout, runsToCsv, sellerBalances } from '../payout-ledger.ts';
 import { userFromRequest } from '../supabase.ts';
 
 export default async function adminPayoutRoutes(app: FastifyInstance) {
@@ -58,14 +62,68 @@ export default async function adminPayoutRoutes(app: FastifyInstance) {
     };
   });
 
+  /**
+   * The work list: what has cleared, is worth sending, and is waiting on a transfer. The
+   * scheduled watcher writes these; this is the same list it mails.
+   */
+  app.get('/admin/payouts/runs', async (req, reply) => {
+    if (!(await requireAdmin(req, reply))) return;
+    const runs = await pendingPayoutRuns();
+    return {
+      runs,
+      count: runs.length,
+      // Per currency: sellers are paid in their own, so one total would mean nothing.
+      totals: runs.reduce<Record<string, number>>((acc, r) => {
+        acc[r.currency] = (acc[r.currency] ?? 0) + r.amount_cents;
+        return acc;
+      }, {}),
+    };
+  });
+
+  /** Prepares runs on demand. The timer does this daily; this is for doing it now. */
+  app.post('/admin/payouts/runs', async (req, reply) => {
+    if (!(await requireAdmin(req, reply))) return;
+    const prepared = await preparePayoutRuns();
+    return { prepared, count: prepared.length };
+  });
+
+  app.post<{ Params: { id: string }; Body: { reference?: string; note?: string } }>(
+    '/admin/payouts/runs/:id/confirm',
+    async (req, reply) => {
+      if (!(await requireAdmin(req, reply))) return;
+      try {
+        return { run: await confirmPayoutRun(req.params.id, req.body?.reference, req.body?.note) };
+      } catch (e) {
+        return reply.code(400).send({ error: e instanceof Error ? e.message : 'Could not confirm the run' });
+      }
+    }
+  );
+
+  app.post<{ Params: { id: string }; Body: { note?: string } }>('/admin/payouts/runs/:id/cancel', async (req, reply) => {
+    if (!(await requireAdmin(req, reply))) return;
+    try {
+      return { run: await cancelPayoutRun(req.params.id, req.body?.note) };
+    } catch (e) {
+      return reply.code(400).send({ error: e instanceof Error ? e.message : 'Could not cancel the run' });
+    }
+  });
+
+  /**
+   * The batch file, built from prepared runs rather than live balances. Preparing a run
+   * fixes the amount, so the file cannot change underneath an operator midway through
+   * paying it, and each line confirms back to exactly one run.
+   *
+   * Runs are prepared first if the timer has not got to it yet, so asking for the file is
+   * always enough on its own.
+   */
   app.get('/admin/payouts.csv', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
-    // Only sellers worth paying today; the rest keep accruing.
-    const rows = (await sellerBalances()).filter((r) => r.payable);
+    await preparePayoutRuns();
+    const runs = await pendingPayoutRuns();
     return reply
       .header('Content-Type', 'text/csv; charset=utf-8')
       .header('Content-Disposition', `attachment; filename="payouts-${new Date().toISOString().slice(0, 10)}.csv"`)
-      .send(balancesToCsv(rows));
+      .send(runsToCsv(runs));
   });
 
   app.post<{ Body: { sellerId: string; amountCents: number; currency?: string; reference?: string; note?: string } }>(
