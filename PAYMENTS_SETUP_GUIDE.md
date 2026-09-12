@@ -47,6 +47,22 @@ above it, register and file an annual LUT so exports stay zero-rated. Income tax
 profit is the only thing due below that threshold. Not legal advice — talk to a CA before
 launch, especially about how you pay creators abroad.
 
+## Refunds
+
+Vault Market does not offer them. The whole vault is delivered on payment, so there is
+nothing to return; the policy is stated at `/refunds`, in the terms, and next to the Buy
+button before the buyer pays rather than only in a page they will not open.
+
+**The refund webhook still has to work.** Not offering refunds is a policy, not a
+guarantee: Dodo is the merchant of record and may refund at its own discretion, and a card
+network can force one through a chargeback regardless. `refund.succeeded` marks the order
+refunded and deletes the buyer's `purchases` row, so access goes back with the money and
+the seller's balance is corrected. Remove that handler and a refunded buyer keeps the vault
+while the ledger still shows the seller owed money that was returned.
+
+Keep the page itself too: providers check that a refund and cancellation policy exists
+before activating an account.
+
 ## Paying sellers
 
 Dodo has no sub-merchant concept. `client.payouts` exposes only `list()`, and every payout

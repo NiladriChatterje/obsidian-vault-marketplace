@@ -226,7 +226,17 @@ export default function VaultPage() {
               {busy ? 'Working…' : v.priceCents === 0 ? 'Get for free' : `Buy for ${new Intl.NumberFormat(undefined, { style: 'currency', currency: v.currency }).format(v.priceCents / 100)}`}
             </button>
             <p className="help">
-              {v.priceCents === 0 ? 'Free vaults are added to your library instantly.' : 'Secure checkout in your own currency, tax included. Personal, non-transferable license. Download and MCP access forever.'}
+              {v.priceCents === 0 ? (
+                'Free vaults are added to your library instantly.'
+              ) : (
+                <>
+                  Secure checkout in your own currency, tax included. Personal, non-transferable license. Download and MCP access forever.{' '}
+                  {/* Said before paying, not afterwards in a policy page. The whole vault is
+                      delivered on payment, so there is nothing to give back. */}
+                  <strong>All sales are final</strong> and there are no refunds, so read the preview notes first.{' '}
+                  <Link href="/refunds">Why</Link>.
+                </>
+              )}
             </p>
           </>
         )}

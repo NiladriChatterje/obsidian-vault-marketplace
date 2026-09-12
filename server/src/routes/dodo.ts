@@ -58,6 +58,11 @@ export default async function dodoWebhookRoutes(app: FastifyInstance) {
       case 'payment.cancelled':
         await markOrderFailed(order.providerOrderId);
         break;
+      // Vault Market does not offer refunds, but this is not the same as refunds never
+      // happening: Dodo is the merchant of record and may refund at its own discretion, and
+      // a card network can force one through a chargeback whatever the policy says. Dropping
+      // this would leave a refunded buyer with access and the seller still owed money that
+      // was handed back.
       case 'refund.succeeded':
       case 'refund.created': {
         try {

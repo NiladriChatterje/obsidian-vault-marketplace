@@ -4,73 +4,57 @@ import { BUSINESS } from '@/lib/legal';
 
 export const metadata: Metadata = {
   title: 'Refund & Cancellation Policy',
-  description: 'When a Vault Market purchase can be cancelled or refunded, and how to request one.',
+  description: 'Vault Market sales are final. Cancel before paying; after payment there are no refunds.',
 };
 
+/**
+ * All sales final. The page stays because payment providers check that a refund and
+ * cancellation policy exists before activating an account, and because a buyer is entitled
+ * to know the position before they pay rather than after.
+ */
 export default function RefundsPage() {
   return (
     <LegalPage title="Refund & Cancellation Policy">
       <p>
-        Vaults are digital goods delivered immediately. This page sets out the narrow cases where a purchase can be cancelled or refunded, and how to ask for
-        one.
+        <strong>Sales are final.</strong> A vault is delivered the moment you pay: the whole contents are downloadable and readable straight away, so there is
+        nothing to return. Please read the listing, open the preview notes and check the plugin requirements before buying.
       </p>
 
       <h2>Cancelling before payment</h2>
       <p>
-        You can abandon checkout at any point before paying. Closing the checkout window cancels the order and no money is taken. Nothing is added to your
-        library.
+        You can abandon checkout at any point before paying. Closing the checkout window cancels the order, no money is taken and nothing is added to your
+        library. This is the only point at which a purchase can be called off.
       </p>
 
-      <h2>After payment: sales are final</h2>
+      <h2>After payment</h2>
       <p>
-        Once a paid vault has been downloaded or opened over MCP, the content is in your hands and cannot be returned, so the sale is final. Free vaults involve
-        no payment and nothing to refund.
+        We do not offer refunds, returns or exchanges once a payment has gone through. That includes changing your mind, buying the wrong vault, finding the
+        vault does not suit your workflow, or not having the Obsidian plugins the listing names as requirements. Free vaults involve no payment and so have
+        nothing to refund.
+      </p>
+      <p>
+        Every paid listing shows preview notes you can read without buying, the note count, the size and the plugins it needs. Use them. They exist so that what
+        you get is clear beforehand.
       </p>
 
-      <h2>When we do refund</h2>
-      <ul>
-        <li>
-          <strong>Duplicate or failed payment.</strong> You were charged twice, or money left your account but the vault never appeared in your library. Refunded
-          in full.
-        </li>
-        <li>
-          <strong>Undelivered vault.</strong> The download or MCP access does not work and we cannot fix it within {BUSINESS.responseDays} working days.
-          Refunded in full.
-        </li>
-        <li>
-          <strong>Materially misdescribed vault.</strong> What you received is substantially different from the listing, for example a fraction of the promised
-          notes or a corrupt archive. Reported within 7 days of purchase and refunded in full after we check the vault.
-        </li>
-        <li>
-          <strong>Unauthorised payment.</strong> Confirmed fraud on your card or account. Refunded and the account is secured.
-        </li>
-      </ul>
-
-      <h2>When we do not</h2>
-      <ul>
-        <li>You changed your mind, or bought the wrong vault by mistake.</li>
-        <li>The vault works as described but does not suit your workflow or taste.</li>
-        <li>You lack the Obsidian plugins the listing names as requirements.</li>
-        <li>You can no longer access the vault because your own account was deleted or suspended for abuse.</li>
-      </ul>
-
-      <h2>How to request one</h2>
+      <h2>If something has gone wrong</h2>
       <p>
-        Email <a href={`mailto:${BUSINESS.supportEmail}`}>{BUSINESS.supportEmail}</a> with the email on your account, the vault name and the payment
-        identifier from your receipt. We reply within {BUSINESS.responseDays} working days. Approved refunds go back to the original payment method within{' '}
-        {BUSINESS.refundDays} working days; how quickly it appears is then up to your bank.
+        This policy is about buyer&rsquo;s remorse, not about us failing to deliver. If you were charged and the vault never appeared in your library, or you
+        were charged more than once, that is a fault on our side and not a refund request. Write to{' '}
+        <a href={`mailto:${BUSINESS.supportEmail}`}>{BUSINESS.supportEmail}</a> with the email on your account, the vault name and the payment identifier from
+        your receipt, and we will look into it and put it right. We reply within {BUSINESS.responseDays} working days.
+      </p>
+
+      <h2>Chargebacks</h2>
+      <p>
+        Please write to us before raising a chargeback with your bank. If a payment genuinely failed we can usually sort it out the same day, and a chargeback
+        is slower for everyone. Accounts used to charge back completed purchases are closed and lose access to everything bought through them.
       </p>
 
       <h2>Sellers</h2>
       <p>
-        A refunded sale is reversed against the seller&rsquo;s earnings, and our commission on it is reversed too. Sellers who repeatedly misdescribe vaults are
-        removed from the marketplace.
-      </p>
-
-      <h2>Disputes</h2>
-      <p>
-        Please write to us before raising a chargeback with your bank. Most problems are payment failures we can fix the same day, and a chargeback is slower for
-        everyone.
+        If a payment is ever reversed, whether by the payment provider or by a card network, the sale is reversed against the seller&rsquo;s earnings and our
+        commission on it is reversed too. Sellers who misdescribe what a vault contains are removed from the marketplace.
       </p>
     </LegalPage>
   );
