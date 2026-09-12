@@ -68,13 +68,26 @@ An unknown buyer country gets the longer window. The buyer's country comes from 
 payment's billing address, falling back to the card's issuing country, and is stored on the
 purchase with the date it clears.
 
-A seller therefore sees two numbers: **Awaiting payout**, which is cleared and payable, and
-**Clearing**, which is earned but still reversible. Set the windows with
-`HOLDBACK_DAYS_WITHDRAWAL` and `HOLDBACK_DAYS_DEFAULT`.
+**And the window is not enough on its own: a sale is also held until Dodo has actually paid
+us for it.** The window says the buyer can no longer take the money back; it says nothing
+about whether the money has arrived. Dodo settles to the platform twice a month, and only
+once the balance passes its floor, so at low volume a sale can sit at Dodo for weeks after
+its window has passed. Paying the seller then is lending them the platform's money against a
+settlement that has not come. Each Dodo payout carries a breakup naming the payments it was
+made of, so when `payout.success` arrives the sales in it are marked settled exactly, and
+the daily payout check walks Dodo's payout list to catch any the webhook missed (on its
+first run, everything before it existed). `PAYOUT_REQUIRE_SETTLEMENT=no` drops this back to
+the window alone; it exists for test mode, where Dodo never pays out.
 
-This does not cover a card chargeback, which can arrive months later, and nothing reasonable
-would: holding every sale for the full chargeback window would mean paying sellers twice a
-year. It covers the reversals that actually happen.
+A seller therefore sees two numbers: **Awaiting payout**, which is cleared, settled and
+payable, and **Clearing**, which is earned but still reversible or not yet settled to us.
+Set the windows with `HOLDBACK_DAYS_WITHDRAWAL` and `HOLDBACK_DAYS_DEFAULT`.
+
+The window does not cover a card chargeback, which can arrive months later, and nothing
+reasonable would: holding every sale for the full chargeback window would mean paying
+sellers twice a year. It covers the reversals that actually happen. A chargeback that does
+land arrives as `dispute.lost` and is handled like a refund: the purchase goes, and if the
+seller was already paid their balance carries the shortfall against their next sale.
 
 Keep the page itself too: providers check that a refund and cancellation policy exists
 before activating an account.
@@ -172,38 +185,78 @@ transfer.
 The threshold is derived, not chosen. Per sale the platform keeps at least
 `(fee% - provider%) / (100 - fee%)` of what the seller accrues, which is 4/92 at an 8%
 commission against a 4% provider. So by the time a seller has accrued T, the platform has
-earned at least T/15 whatever mix of prices got them there. Pay at 15x the transfer fee and
-it is always covered; `PAYOUT_SAFETY_FACTOR` adds 35% on top.
+earned at least T/23 whatever mix of prices got them there. Pay at 23x the transfer fee and
+it is always covered; `PAYOUT_SAFETY_FACTOR` adds 35% on top, and `PAYOUT_MIN_CENTS` puts a
+floor of Rs 500 under every route.
 
 | Seller | Route | Costs to send | Paid once they reach |
 | --- | --- | ---: | ---: |
 | India, bank | IMPS / NEFT | Rs 5 | Rs 500 |
-| Anywhere, PayPal | PayPal | Rs 150 | Rs 3,100 |
-| Anywhere, Wise or Payoneer | Wise / Payoneer | Rs 200 | Rs 4,100 |
-| Outside India, bank | international wire | Rs 1,500 | Rs 30,400 |
+| Anywhere, PayPal | PayPal | Rs 150 | Rs 4,700 |
+| Anywhere, Wise or Payoneer | Wise / Payoneer | Rs 200 | Rs 6,300 |
+| Outside India, bank | international wire | Rs 1,500 | Rs 46,600 |
+
+The threshold uses the domestic rate's ratio for everyone, although a seller abroad paid 12%
+has earned the platform 8/88 of their accrual, not 4/92. That is deliberate: the rate is set
+from where the seller banks at the time of each sale, and a seller who moved country would
+have a mix. The lower ratio is the one that is true of every sale.
 
 An Indian seller is paid almost immediately because the transfer is nearly free. A seller
 abroad who picks a plain bank wire waits a long time, which is deliberate: the payout form
 says so, and Wise gets them paid roughly seven times sooner. The cost of the route falls on
 whoever chooses it, in waiting rather than in a deduction.
 
-`/admin/payouts` splits sellers into payable and accruing, and the CSV carries only the
-payable ones. Adjust the estimates with `TRANSFER_COST_*` if your bank charges differently;
-they are pessimistic on purpose, because guessing high only delays a payout while guessing
-low loses money on it.
+`/admin/payouts` splits sellers into payable and accruing. Adjust the estimates with
+`TRANSFER_COST_*` if your bank charges differently; they are pessimistic on purpose, because
+guessing high only delays a payout while guessing low loses money on it.
+
+### What runs on its own
+
+The server does the noticing. Shortly after boot and then every `PAYOUT_WATCH_HOURS` (a
+day) it first applies any Dodo payout it has not yet applied, so the sales in it become
+payable, then looks at every seller and writes a **prepared run** for each whose balance has
+cleared its buyers' reversal windows, been settled to us by Dodo, and reached the threshold
+for their route. A run fixes
+the amount at that moment, and a unique index allows one pending run per seller, so the
+check can fire twice, or fire again before you have acted, without promising the same money
+twice. If Brevo is configured it mails `PAYOUT_WATCH_EMAIL` the full list of runs awaiting a
+transfer, once per cadence however often the process restarts, with anything waiting more
+than a week marked overdue. Without mail it prepares the runs anyway and logs a warning.
+
+What it does not do is move money. Dodo settles only to the platform and no payout rail is
+wired in, so the transfer is yours to make. The loop is:
+
+1. The mail arrives, or you open `GET /admin/payouts/runs`. Fetch the batch file,
+   `GET /admin/payouts.csv`: one line per run.
+2. Make the transfers. Each line carries `amount_minor_units` in `currency`, which is the
+   platform's (INR), and `pay_in`, the currency the seller asked for. For a bank or Wise
+   batch that pair is the source amount and the target currency; the conversion happens on
+   the way. The amount is never in `pay_in`.
+3. Confirm each run with its transaction id:
+   `POST /admin/payouts/runs/:id/confirm {"reference":"wise-123"}`. Only now does the amount
+   count as paid. A transfer that failed is `POST /admin/payouts/runs/:id/cancel`, which
+   returns the balance to available so the next check prepares it again.
+
+A run stays on the list, and in every mail, until it is confirmed or cancelled.
+
+When a payout rail is added, step 2 is the only one that changes: the check would hand each
+prepared run to the rail and confirm it with the rail's transaction id, and steps 1 and 3
+would happen without anyone. The runs table is already the shape a rail wants, one fixed
+amount, one destination, one status, so nothing above it needs to move.
 
 The ledger is at `/admin/payouts`, gated on `ADMIN_USER_IDS` (a comma-separated list of
 Supabase user ids; unset closes the routes rather than opening them):
 
 ```bash
 curl -H "Authorization: Bearer <your supabase token>" https://<api>/admin/payouts
+curl -H "Authorization: Bearer <token>" https://<api>/admin/payouts/runs
 curl -H "Authorization: Bearer <token>" https://<api>/admin/payouts.csv -o payouts.csv
-curl -X POST https://<api>/admin/payouts -H "Authorization: Bearer <token>"   -H 'Content-Type: application/json'   -d '{"sellerId":"<uuid>","amountCents":449820,"reference":"wise-123"}'
+curl -X POST https://<api>/admin/payouts/runs/<run id>/confirm -H "Authorization: Bearer <token>"   -H 'Content-Type: application/json'   -d '{"reference":"wise-123"}'
 ```
 
-The CSV carries one row per seller with an outstanding balance and full account details,
-ready for a batch transfer. Record the payment afterwards; `POST /admin/payouts` only
-writes down a transfer that already happened, it never sends one.
+`POST /admin/payouts` still records a transfer made outside a run. It takes the amount in the
+platform's currency and refuses any other: the ledger is kept in one currency, and an amount
+in another would be subtracted from a balance as though it were rupees.
 
 A refund deletes the purchase, so the debt goes with it. If that seller was already paid,
 their balance goes negative and carries against their next sale rather than being written
