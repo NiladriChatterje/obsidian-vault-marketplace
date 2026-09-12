@@ -58,7 +58,7 @@ function CheckoutResult() {
       {paymentId ? <p className="mono muted">Payment {paymentId}</p> : null}
       <p className="muted">
         {failed
-          ? 'The payment could not be confirmed. If money left your account it will be refunded automatically; contact support with the payment id.'
+          ? 'The payment could not be confirmed. If money left your account, contact support with the payment id below and we will sort it out.'
           : !ok
           ? 'No charge was made. You can come back to the vault any time.'
           : state === 'checking'

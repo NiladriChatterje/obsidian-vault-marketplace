@@ -29,7 +29,7 @@ export default function ContactPage() {
       <h2>What to include</h2>
       <ul>
         <li>
-          <strong>A purchase or refund:</strong> the email on your account, the vault name and the payment identifier from your receipt.
+          <strong>A purchase:</strong> the email on your account, the vault name and the payment identifier from your receipt.
         </li>
         <li>
           <strong>Your seller earnings:</strong> your seller username and the date of the sale in question.

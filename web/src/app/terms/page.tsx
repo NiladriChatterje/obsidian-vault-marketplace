@@ -33,7 +33,7 @@ export default function TermsPage() {
       <p>
         Prices are shown before payment and charged by our payment provider, who is the merchant of record for the sale. A purchase gives you a personal, non-exclusive, non-transferable licence to use the vault
         yourself: read it, edit it, build on it. You may not resell it, republish it, or share it publicly in whole or in substantial part. Access to download and
-        to read the vault over MCP lasts as long as your account and the listing exist. Refunds are covered by the{' '}
+        to read the vault over MCP lasts as long as your account and the listing exist. <strong>Sales are final and we do not offer refunds</strong>; see the{' '}
         <Link href="/refunds">Refund &amp; Cancellation Policy</Link>.
       </p>
 
