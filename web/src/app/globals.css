@@ -175,8 +175,16 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
 
 /* Also catches a phone held sideways, which is too short for a sticky sidebar to earn its width. */
 @media (max-width: 900px) {
-  .detail { grid-template-columns: 1fr; }
+  .detail { grid-template-columns: 1fr; gap: 20px; }
   .sticky { position: static; }
+
+  /* The buy box is the last thing in the markup, so one column would bury it under the
+     reviews. Unwrapping the left column makes its sections siblings of the box, which can
+     then take its place straight after the title rather than at the foot of the page. */
+  .detail > .stack { display: contents; }
+  .detail > .stack > .cover { order: -3; }
+  .detail > .stack > .vault-head { order: -2; }
+  .detail > aside { order: -1; }
   .nav-inner { gap: 12px; }
   .nav-links a { padding: 6px 8px; font-size: 12.5px; }
 }
