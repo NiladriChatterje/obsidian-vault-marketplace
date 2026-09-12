@@ -69,6 +69,11 @@ export const cfg = {
   /** Where the platform banks. A payout inside this country is a cheap domestic transfer. */
   platformCountry: env('PLATFORM_COUNTRY', 'IN').toUpperCase(),
   /**
+   * What every listing is priced in and every balance is held in. A seller paid in another
+   * currency is sent this amount converted at transfer time; the ledger never holds theirs.
+   */
+  platformCurrency: env('PLATFORM_CURRENCY', 'INR').toUpperCase(),
+  /**
    * What one payout costs to send, in the listing currency's minor units. Pessimistic on
    * purpose: guessing high only delays a payout, guessing low loses money on it.
    */

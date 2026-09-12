@@ -14,6 +14,7 @@
  * balance can still go negative if a reversal arrives after the window, and is then carried
  * against the seller's next sale rather than written off.
  */
+import { cfg } from './config.ts';
 import { payoutThresholdCents, transferCostCents, type PayoutMethod } from './payout-thresholds.ts';
 import { admin } from './supabase.ts';
 
@@ -21,6 +22,7 @@ export interface SellerBalance {
   sellerId: string;
   username: string | null;
   displayName: string | null;
+  /** What every amount below is in: the platform's currency, which every listing is priced in. */
   currency: string;
   /** List price of every settled sale. */
   grossCents: number;
@@ -51,6 +53,7 @@ export interface SellerBalance {
   payable: boolean;
   payout: {
     country: string;
+    /** What they asked to receive. The transfer converts into it; nothing here is in it. */
     currency: string;
     method: string;
     accountName: string;
@@ -128,7 +131,7 @@ export async function sellerBalances(): Promise<SellerBalance[]> {
         sellerId: id,
         username: profile?.username ?? null,
         displayName: profile?.display_name ?? null,
-        currency: d?.currency ?? 'INR',
+        currency: cfg.platformCurrency,
         grossCents: t.gross,
         feeCents: t.fee,
         earnedCents: earned,
@@ -211,7 +214,9 @@ export async function sellerBalance(sellerId: string): Promise<{
 
 export interface RecordPayoutInput {
   sellerId: string;
+  /** In the platform's currency: what left the account, not what the seller received. */
   amountCents: number;
+  /** Optional, and only accepted if it names the platform's currency. */
   currency?: string;
   reference?: string | null;
   note?: string | null;
@@ -223,6 +228,12 @@ export interface RecordPayoutInput {
  */
 export async function recordPayout(input: RecordPayoutInput): Promise<Row> {
   if (!Number.isInteger(input.amountCents) || input.amountCents <= 0) throw new Error('Amount must be a positive whole number of minor units');
+  // The ledger is kept in one currency. An amount in any other would be subtracted from a
+  // balance as though it were that one, so it is refused rather than converted or trusted.
+  const currency = (input.currency ?? cfg.platformCurrency).toUpperCase();
+  if (currency !== cfg.platformCurrency) {
+    throw new Error(`Record the ${cfg.platformCurrency} amount that left the account. What the seller received in ${currency} belongs in the note.`);
+  }
   const db = admin();
   const { data: d } = await db.from('seller_payouts').select('*').eq('user_id', input.sellerId).maybeSingle();
 
@@ -231,7 +242,8 @@ export async function recordPayout(input: RecordPayoutInput): Promise<Row> {
     .insert({
       seller_id: input.sellerId,
       amount_cents: input.amountCents,
-      currency: (input.currency ?? d?.currency ?? 'INR').toUpperCase(),
+      currency,
+      payout_currency: d?.currency ?? null,
       method: d?.method ?? null,
       account_ref: d?.account_ref ?? null,
       reference: input.reference?.trim() || null,
@@ -272,7 +284,10 @@ export async function preparePayoutRuns(): Promise<Row[]> {
       .insert({
         seller_id: r.sellerId,
         amount_cents: r.availableCents,
-        currency: (r.payout?.currency ?? r.currency).toUpperCase(),
+        // A sum of listing prices, so in the platform's currency. What the seller receives
+        // is a separate instruction: convert into this on the way.
+        currency: r.currency,
+        payout_currency: r.payout?.currency ?? null,
         method: r.payout?.method ?? null,
         account_ref: r.payout?.accountRef ?? null,
         status: 'pending',
@@ -358,13 +373,15 @@ export async function payoutHistory(sellerId: string): Promise<Row[]> {
  * acted on, and confirming the runs afterwards matches the file line for line.
  */
 export function runsToCsv(runs: Row[]): string {
-  const head = ['run_id', 'seller_id', 'name', 'amount_minor_units', 'currency', 'method', 'account_ref', 'prepared_at'];
+  // `currency` is what the amount is in; `pay_in` is what the seller receives. A bank or
+  // Wise batch takes exactly that pair: a source amount, and a target currency to convert to.
+  const head = ['run_id', 'seller_id', 'name', 'amount_minor_units', 'currency', 'pay_in', 'method', 'account_ref', 'prepared_at'];
   const esc = (v: unknown) => {
     const s = v === null || v === undefined ? '' : String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lines = runs.map((r) =>
-    [r.id, r.seller_id, r.profiles?.display_name ?? r.profiles?.username, r.amount_cents, r.currency, r.method, r.account_ref, r.prepared_at]
+    [r.id, r.seller_id, r.profiles?.display_name ?? r.profiles?.username, r.amount_cents, r.currency, r.payout_currency ?? r.currency, r.method, r.account_ref, r.prepared_at]
       .map(esc)
       .join(',')
   );
@@ -380,7 +397,7 @@ export function runsToCsv(runs: Row[]): string {
  * exposure the clearing window exists to prevent.
  */
 export function balancesToCsv(rows: SellerBalance[]): string {
-  const head = ['seller_id', 'username', 'name', 'payable_minor_units', 'currency', 'country', 'method', 'account_name', 'account_ref', 'bank_code'];
+  const head = ['seller_id', 'username', 'name', 'payable_minor_units', 'currency', 'pay_in', 'country', 'method', 'account_name', 'account_ref', 'bank_code'];
   const esc = (v: unknown) => {
     const s = v === null || v === undefined ? '' : String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -391,6 +408,7 @@ export function balancesToCsv(rows: SellerBalance[]): string {
       r.username,
       r.payout?.accountName ?? r.displayName,
       r.availableCents,
+      r.currency,
       r.payout?.currency ?? r.currency,
       r.payout?.country,
       r.payout?.method,
