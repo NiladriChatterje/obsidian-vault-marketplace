@@ -163,7 +163,15 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
 .legal li { margin-bottom: 8px; line-height: 1.6; }
 .legal a { text-decoration: underline; text-underline-offset: 2px; }
 
-@media (max-width: 800px) {
+/* Tablets. Room for a sidebar and a denser grid, but not for a desktop's proportions.
+   Listed before the narrower queries so those still win where they apply. */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .detail { grid-template-columns: 1fr 280px; gap: 24px; }
+}
+
+/* Also catches a phone held sideways, which is too short for a sticky sidebar to earn its width. */
+@media (max-width: 900px) {
   .detail { grid-template-columns: 1fr; }
   .sticky { position: static; }
   .nav-inner { gap: 12px; }
