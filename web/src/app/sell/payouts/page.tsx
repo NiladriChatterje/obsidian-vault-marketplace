@@ -6,7 +6,8 @@ import { useEffect, useState } from 'react';
 import { Empty, Field, Loading, Toast } from '@/components/ui';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/lib/api';
-import { PLATFORM_FEE_PERCENT } from '@/lib/config';
+import { PLATFORM_FEE_FIXED_CENTS, PLATFORM_FEE_PERCENT } from '@/lib/config';
+import { formatPrice } from '@/lib/format';
 import { errorMessage } from '@/lib/web';
 import { useAuth } from '@/store/auth';
 import type { PayoutDetails, PayoutMethod } from '@/types';
@@ -80,8 +81,8 @@ export default function PayoutDetailsPage() {
       <div>
         <h1>Payout details</h1>
         <p className="muted">
-          Buyers pay Vault Market, which is the seller of record for every sale and handles the tax. Your share ({100 - PLATFORM_FEE_PERCENT}%) is
-          sent to you separately, so we need to know where. A paid vault cannot go live until this is filled in; free vaults can be published
+          Buyers pay Vault Market, which is the seller of record for every sale and handles the tax. Your share, the price less our{' '}
+          {PLATFORM_FEE_PERCENT}% + {formatPrice(PLATFORM_FEE_FIXED_CENTS)} fee, is sent to you separately, so we need to know where. A paid vault cannot go live until this is filled in; free vaults can be published
           without it.
         </p>
       </div>

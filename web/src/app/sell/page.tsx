@@ -7,7 +7,7 @@ import { Empty, ErrorBox, Loading, StatusPill, VaultRow } from '@/components/ui'
 import { errorMessage } from '@/lib/web';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/lib/api';
-import { PLATFORM_FEE_PERCENT } from '@/lib/config';
+import { PLATFORM_FEE_FIXED_CENTS, PLATFORM_FEE_PERCENT } from '@/lib/config';
 import { formatCount, formatPrice } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 import type { Vault, VaultStatus } from '@/types';
@@ -89,7 +89,10 @@ function Sell() {
           <p className="muted">Turn the Obsidian vault you already maintain into income. List it at your price, we handle checkout, delivery and MCP access.</p>
         </div>
         <div className="perks">
-          <Perk title={`Keep ${100 - PLATFORM_FEE_PERCENT}% of every sale`} body={`A flat ${PLATFORM_FEE_PERCENT}% only when you sell. Free vaults cost nothing to list.`} />
+          <Perk
+            title="Keep most of every sale"
+            body={`${PLATFORM_FEE_PERCENT}% + ${formatPrice(PLATFORM_FEE_FIXED_CENTS)} per sale, only when you sell, and the flat part covers what the payment provider charges us. Free vaults cost nothing to list.`}
+          />
           <Perk title="Paid worldwide" body="Buyers pay in their own currency and we handle the tax. Your share is settled to you separately." />
           <Perk title="Upload a zip, that is it" body="Export your vault folder as a .zip, add a description and a cover, publish." />
           <Perk title="Download or MCP" body="Buyers unzip into Obsidian or connect the vault to their AI assistant. You do nothing extra." />

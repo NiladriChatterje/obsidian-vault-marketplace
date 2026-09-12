@@ -7,7 +7,7 @@ import { Cover, Field, Loading, Toast } from '@/components/ui';
 import { errorMessage, fileToUri, releaseUri } from '@/lib/web';
 import { inspectVaultZip } from '@/lib/vault-zip';
 import { api } from '@/lib/api';
-import { MAX_VAULT_ZIP_BYTES, MIN_PRICE_CENTS, PLATFORM_FEE_PERCENT } from '@/lib/config';
+import { MAX_VAULT_ZIP_BYTES, MIN_PRICE_CENTS, PLATFORM_FEE_FIXED_CENTS, PLATFORM_FEE_PERCENT, platformFee } from '@/lib/config';
 import { formatBytes, formatPrice, parsePriceToCents, parseTags } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 import { CATEGORIES, type CategorySlug, type Vault, type VaultInput } from '@/types';
@@ -79,7 +79,7 @@ export default function ListingEditorPage() {
 
   const priceCents = isPaid ? parsePriceToCents(priceText) : 0;
   const priceError = isPaid && (priceCents === null || priceCents < MIN_PRICE_CENTS) ? `Minimum price is ${formatPrice(MIN_PRICE_CENTS)}` : null;
-  const youKeep = priceCents ? Math.round(priceCents * (1 - PLATFORM_FEE_PERCENT / 100)) : 0;
+  const youKeep = priceCents ? priceCents - platformFee(priceCents) : 0;
 
   const pickCover = async (file: File | undefined) => {
     if (!file) return;
@@ -263,7 +263,7 @@ export default function ListingEditorPage() {
           <input type="checkbox" checked={isPaid} onChange={(e) => setIsPaid(e.target.checked)} /> Paid vault
         </label>
         {isPaid ? (
-          <Field label="Price (INR)" hint={priceError ?? (priceCents ? `You keep ${formatPrice(youKeep)} per sale after the ${PLATFORM_FEE_PERCENT}% fee.` : undefined)}>
+          <Field label="Price (INR)" hint={priceError ?? (priceCents ? `You keep ${formatPrice(youKeep)} per sale, after the ${PLATFORM_FEE_PERCENT}% + ${formatPrice(PLATFORM_FEE_FIXED_CENTS)} fee.` : undefined)}>
             <input className="input" inputMode="decimal" value={priceText} onChange={(e) => setPriceText(e.target.value)} />
           </Field>
         ) : (
