@@ -8,9 +8,11 @@
  * which is a percentage plus a fixed amount so that no sale can cost the platform money.
  * A payout has its own fixed cost, which is what payout-thresholds.ts amortises.
  *
- * A refund deletes the purchase row, so the debt disappears with it. If the seller has
- * already been paid for that sale, the balance goes negative and is carried against their
- * next sale rather than being written off.
+ * A refund deletes the purchase row, so the debt disappears with it. That is only safe
+ * while the sale has not been paid out yet, which is what the clearing window in
+ * clearing.ts guarantees: a sale is not payable until it can no longer be reversed. A
+ * balance can still go negative if a reversal arrives after the window, and is then carried
+ * against the seller's next sale rather than written off.
  */
 import { payoutThresholdCents, transferCostCents, type PayoutMethod } from './payout-thresholds.ts';
 import { admin } from './supabase.ts';
@@ -27,8 +29,14 @@ export interface SellerBalance {
   /** What the seller has earned: gross minus commission. */
   earnedCents: number;
   paidCents: number;
-  /** Earned minus paid. Negative means they were overpaid, usually after a refund. */
+  /** Earned minus paid. Everything owed, cleared or not. */
   outstandingCents: number;
+  /** Past its clearing window, so safe to send. */
+  clearedCents: number;
+  /** Cleared minus paid: what could actually be transferred today. */
+  availableCents: number;
+  /** Still inside the buyer's reversal window. Owed, but not yet safe to send. */
+  holdingCents: number;
   salesCount: number;
   /** What they must accrue before a transfer is worth making. Derived from their method. */
   thresholdCents: number;
@@ -58,23 +66,26 @@ export async function sellerBalances(): Promise<SellerBalance[]> {
   const db = admin();
 
   const [{ data: purchases, error: pErr }, { data: runs, error: rErr }] = await Promise.all([
-    db.from('purchases').select('seller_id, amount_cents, fee_cents').not('seller_id', 'is', null),
+    db.from('purchases').select('seller_id, amount_cents, fee_cents, clears_at').not('seller_id', 'is', null),
     db.from('seller_payout_runs').select('seller_id, amount_cents, currency'),
   ]);
   if (pErr) throw new Error(pErr.message);
   if (rErr) throw new Error(rErr.message);
 
-  const totals = new Map<string, { gross: number; fee: number; paid: number; sales: number }>();
+  const totals = new Map<string, { gross: number; fee: number; cleared: number; paid: number; sales: number }>();
   const get = (id: string) => {
     let t = totals.get(id);
-    if (!t) totals.set(id, (t = { gross: 0, fee: 0, paid: 0, sales: 0 }));
+    if (!t) totals.set(id, (t = { gross: 0, fee: 0, cleared: 0, paid: 0, sales: 0 }));
     return t;
   };
 
+  const now = Date.now();
   for (const p of (purchases ?? []) as Row[]) {
     const t = get(p.seller_id);
     t.gross += p.amount_cents ?? 0;
     t.fee += p.fee_cents ?? 0;
+    // No clears_at means the row predates the clearing window; its window has long passed.
+    if (!p.clears_at || new Date(p.clears_at).getTime() <= now) t.cleared += (p.amount_cents ?? 0) - (p.fee_cents ?? 0);
     // Free claims are purchases too; they are not sales and should not inflate the count.
     if ((p.amount_cents ?? 0) > 0) t.sales++;
   }
@@ -97,6 +108,8 @@ export async function sellerBalances(): Promise<SellerBalance[]> {
       const d = payoutById.get(id);
       const earned = t.gross - t.fee;
       const outstanding = earned - t.paid;
+      // Only cleared money may be sent; the rest is still inside a buyer's reversal window.
+      const available = t.cleared - t.paid;
       const method = (d?.method ?? null) as PayoutMethod | null;
       const thresholdCents = payoutThresholdCents(method, d?.country ?? null);
       return {
@@ -109,11 +122,14 @@ export async function sellerBalances(): Promise<SellerBalance[]> {
         earnedCents: earned,
         paidCents: t.paid,
         outstandingCents: outstanding,
+        clearedCents: t.cleared,
+        availableCents: available,
+        holdingCents: earned - t.cleared,
         salesCount: t.sales,
         thresholdCents,
         transferFeeCents: method ? transferCostCents(method, d?.country ?? '') : null,
-        // Below the threshold the transfer could cost more than the sales behind it earned.
-        payable: !!d && outstanding >= thresholdCents,
+        // Payable means both safe to send and worth the transfer fee.
+        payable: !!d && available >= thresholdCents,
         payout: d
           ? {
               country: d.country,
@@ -130,24 +146,46 @@ export async function sellerBalances(): Promise<SellerBalance[]> {
 }
 
 /** One seller's own view: earned, paid and outstanding, for the sell dashboard. */
-export async function sellerBalance(
-  sellerId: string
-): Promise<{ earnedCents: number; paidCents: number; outstandingCents: number; thresholdCents: number; payable: boolean }> {
+export async function sellerBalance(sellerId: string): Promise<{
+  earnedCents: number;
+  paidCents: number;
+  outstandingCents: number;
+  availableCents: number;
+  holdingCents: number;
+  thresholdCents: number;
+  payable: boolean;
+}> {
   const db = admin();
   const [{ data: purchases, error: pErr }, { data: runs, error: rErr }] = await Promise.all([
-    db.from('purchases').select('amount_cents, fee_cents').eq('seller_id', sellerId),
+    db.from('purchases').select('amount_cents, fee_cents, clears_at').eq('seller_id', sellerId),
     db.from('seller_payout_runs').select('amount_cents').eq('seller_id', sellerId),
   ]);
   if (pErr) throw new Error(pErr.message);
   if (rErr) throw new Error(rErr.message);
 
-  const earned = (purchases ?? []).reduce((s: number, p: Row) => s + (p.amount_cents ?? 0) - (p.fee_cents ?? 0), 0);
+  const now = Date.now();
+  let earned = 0;
+  let cleared = 0;
+  for (const p of (purchases ?? []) as Row[]) {
+    const net = (p.amount_cents ?? 0) - (p.fee_cents ?? 0);
+    earned += net;
+    // No clears_at means the row predates the clearing window; its window has long passed.
+    if (!p.clears_at || new Date(p.clears_at).getTime() <= now) cleared += net;
+  }
   const paid = (runs ?? []).reduce((s: number, r: Row) => s + (r.amount_cents ?? 0), 0);
-  const outstanding = earned - paid;
 
   const { data: d } = await db.from('seller_payouts').select('method, country').eq('user_id', sellerId).maybeSingle();
   const thresholdCents = payoutThresholdCents((d?.method ?? null) as PayoutMethod | null, d?.country ?? null);
-  return { earnedCents: earned, paidCents: paid, outstandingCents: outstanding, thresholdCents, payable: !!d && outstanding >= thresholdCents };
+  const available = cleared - paid;
+  return {
+    earnedCents: earned,
+    paidCents: paid,
+    outstandingCents: earned - paid,
+    availableCents: available,
+    holdingCents: earned - cleared,
+    thresholdCents,
+    payable: !!d && available >= thresholdCents,
+  };
 }
 
 export interface RecordPayoutInput {

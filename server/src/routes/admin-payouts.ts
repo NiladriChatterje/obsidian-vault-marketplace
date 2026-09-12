@@ -47,7 +47,9 @@ export default async function adminPayoutRoutes(app: FastifyInstance) {
     return {
       sellers: rows,
       totalOutstandingCents: owed.reduce((s, r) => s + r.outstandingCents, 0),
-      payableNowCents: payable.reduce((s, r) => s + r.outstandingCents, 0),
+      payableNowCents: payable.reduce((s, r) => s + r.availableCents, 0),
+      // Owed, but still inside a buyer's reversal window and not safe to send yet.
+      holdingCents: owed.reduce((s, r) => s + r.holdingCents, 0),
       payableCount: payable.length,
       accruingCount: accruing.length,
       // Owed money with nowhere to send it. Publishing a paid vault is gated on payout

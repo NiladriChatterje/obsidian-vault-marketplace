@@ -7,6 +7,7 @@
  * and creators are paid outside the checkout, so there is no transfer to track or reverse.
  */
 import { IS_DEMO } from './config.ts';
+import { clearsAt } from './clearing.ts';
 import { dodo } from './dodo.ts';
 import { admin } from './supabase.ts';
 
@@ -119,7 +120,8 @@ export async function settleOrder(order: Order, paymentId: string, signature: st
   if (order.status === 'paid' && order.paymentId === paymentId) return order;
 
   if (order.provider !== 'dodo') throw new Error('This order predates Dodo Payments and cannot be settled.');
-  await confirmDodoPayment(order, paymentId);
+  // Where the buyer is decides how long this sale is held before the seller can be paid.
+  const buyerCountry = await confirmDodoPayment(order, paymentId);
 
   await updateOrder(order.providerOrderId, { status: 'paid', paymentId, signature });
 
@@ -134,6 +136,8 @@ export async function settleOrder(order: Order, paymentId: string, signature: st
           amount_cents: order.amount,
           fee_cents: order.fee,
           provider_payment_id: paymentId,
+          buyer_country: buyerCountry,
+          clears_at: clearsAt(buyerCountry).toISOString(),
         },
         { onConflict: 'vault_id,buyer_id' }
       );
@@ -149,12 +153,14 @@ export async function settleOrder(order: Order, paymentId: string, signature: st
  * their own currency after tax and any purchasing-power adjustment, so what they paid is
  * legitimately not what the listing says in INR.
  */
-async function confirmDodoPayment(order: Order, paymentId: string): Promise<void> {
-  if (IS_DEMO) return;
+async function confirmDodoPayment(order: Order, paymentId: string): Promise<string | null> {
+  if (IS_DEMO) return null;
   const payment = (await dodo().payments.retrieve(paymentId)) as Row;
   if (payment.status !== 'succeeded') throw new Error(`Payment is ${payment.status}, not succeeded`);
   const metadataVault = payment.metadata?.vault_id;
   if (metadataVault && metadataVault !== order.vaultId) throw new Error('Payment does not belong to this order');
+  // Billing address first; the issuing country is a reasonable fallback when it is absent.
+  return payment.billing?.country ?? payment.card_issuing_country ?? null;
 }
 
 /** Refunds arrive by webhook keyed on the payment, not the order. */

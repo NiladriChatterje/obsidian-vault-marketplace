@@ -81,6 +81,13 @@ export const cfg = {
   payoutSafetyFactor: Number(env('PAYOUT_SAFETY_FACTOR', '1.35')),
   /** No payout below this however cheap the transfer, so payouts stay worth processing. */
   payoutMinCents: Number(env('PAYOUT_MIN_CENTS', '50000')),
+  /**
+   * Days a sale is held before it can be paid out. The longer window covers the statutory
+   * right of withdrawal on digital goods in the EU, the EEA and the UK; everywhere else a
+   * short hold against ordinary reversals is enough and the seller is paid sooner.
+   */
+  holdbackDaysWithdrawal: Number(env('HOLDBACK_DAYS_WITHDRAWAL', '14')),
+  holdbackDaysDefault: Number(env('HOLDBACK_DAYS_DEFAULT', '3')),
   /** Signs short-lived download links. Falls back to the Dodo key so nothing extra is required. */
   downloadSecret: env('DOWNLOAD_SECRET') || env('DODO_API_KEY') || 'dev-download-secret',
   /**

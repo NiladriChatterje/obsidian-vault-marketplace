@@ -177,7 +177,8 @@ export default function PayoutDetailsPage() {
 
       <p className="muted small">
         Earnings build up and are sent once they are worth transferring, because every transfer costs a fee and a tiny payout would
-        be mostly fee. Cheaper routes reach that point sooner. Your seller dashboard shows how far along you are. These details are
+        be mostly fee. Cheaper routes reach that point sooner. A sale also clears for a few days first, longer for buyers in the EU,
+        EEA or UK who have a statutory right to withdraw, so that a reversed payment is never one we have already paid out. Your seller dashboard shows how far along you are. These details are
         stored for paying you and are never shown publicly or shared with buyers.
       </p>
 

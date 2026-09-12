@@ -143,17 +143,26 @@ function Sell() {
           </div>
           {/* Earned and paid are separate events: the platform transfers a balance once it is
               worth the transfer fee, so a seller should see where they stand. */}
-          {stats.data.outstandingCents !== undefined ? (
+          {stats.data.availableCents !== undefined ? (
             <div className="stat">
               <div className="label">Awaiting payout</div>
-              <div className="value">{formatPrice(stats.data.outstandingCents)}</div>
+              <div className="value">{formatPrice(stats.data.availableCents)}</div>
               {stats.data.payoutThresholdCents ? (
                 <div className="label" style={{ marginTop: 4 }}>
-                  {stats.data.outstandingCents >= stats.data.payoutThresholdCents
+                  {stats.data.availableCents >= stats.data.payoutThresholdCents
                     ? 'Ready to be sent'
                     : `Sent once you reach ${formatPrice(stats.data.payoutThresholdCents)}`}
                 </div>
               ) : null}
+            </div>
+          ) : null}
+          {/* Recent sales are held until the buyer can no longer reverse them, so a seller
+              should see that this money exists rather than wonder where it went. */}
+          {stats.data.holdingCents ? (
+            <div className="stat">
+              <div className="label">Clearing</div>
+              <div className="value">{formatPrice(stats.data.holdingCents)}</div>
+              <div className="label" style={{ marginTop: 4 }}>Recent sales, payable once they clear</div>
             </div>
           ) : null}
           {stats.data.paidOutCents ? (
