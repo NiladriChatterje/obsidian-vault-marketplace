@@ -23,7 +23,7 @@ body {
   display: flex;
   flex-direction: column;
   font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
+  -webkit-font-smoothing: antialiased;  overflow-wrap: break-word;
 }
 a { color: inherit; text-decoration: none; }
 button { font: inherit; color: inherit; }
@@ -49,7 +49,7 @@ p { margin: 0; }
 .section-title { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
 .section-title a { color: var(--muted); font-size: 12.5px; }
 .section-title a:hover { color: var(--text); }
-.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .prose { white-space: pre-wrap; line-height: 1.6; color: var(--text); }
 
@@ -97,6 +97,7 @@ p { margin: 0; }
 .vault-row:hover { border-color: var(--muted); }
 .vault-row .cover { width: 96px; aspect-ratio: 16 / 9; flex-shrink: 0; }
 .vault-row .cover .monogram { font-size: 18px; }
+.vault-row > :last-child { margin-left: auto; }
 
 /* chips */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -109,6 +110,7 @@ p { margin: 0; }
 
 /* forms */
 .field { display: flex; flex-direction: column; gap: 6px; }
+.row > .field { flex: 1; min-width: 120px; }
 .label { font-size: 12.5px; font-weight: 600; color: var(--muted); }
 .input, .textarea, .select {
   width: 100%; background: var(--raised); border: 1px solid var(--border); color: var(--text);
@@ -166,6 +168,39 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
   .sticky { position: static; }
   .nav-inner { gap: 12px; }
   .nav-links a { padding: 6px 8px; font-size: 12.5px; }
+}
+
+/* Phones. Anything that cannot fit folds onto the next line: nothing scrolls sideways. */
+@media (max-width: 640px) {
+  body { font-size: 13.5px; }
+  h1 { font-size: 21px; }
+  h2 { font-size: 17px; }
+  h3 { font-size: 14.5px; }
+  .container { padding: 16px 14px 48px; }
+  .card { padding: 14px; }
+  .section { margin-top: 24px; }
+
+  /* Four links will not sit beside the brand, so they take a line of their own. */
+  .nav-inner { height: auto; min-height: 52px; padding: 8px 14px; flex-wrap: wrap; gap: 8px; }
+  .brand { margin-right: auto; }
+  .nav-links { order: 3; flex-basis: 100%; gap: 2px; justify-content: space-between; }
+
+  /* A row stays a row while it fits and stacks the moment it does not. */
+  .row { flex-wrap: wrap; }
+  .vault-row .cover { width: 72px; }
+  .vault-row .grow { min-width: 55%; }
+  .tabs button { padding: 8px 10px; }
+  .textarea { min-height: 110px; }
+  .empty { padding: 28px 12px; }
+  .site-footer-inner { padding: 16px 14px; }
+  .legal h2 { margin: 22px 0 8px; }
+
+  /* A long token or id wraps rather than handing the page a sideways scrollbar. */
+  pre.code { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .mono { overflow-wrap: anywhere; }
+
+  /* Under 16px iOS zooms the page in when a field takes focus, and never zooms back out. */
+  .input, .textarea, .select, .search input { font-size: 16px; }
 }
 
 /* Toast: for a refusal that happens away from the page's error banner, such as a zip
