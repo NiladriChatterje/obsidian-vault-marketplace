@@ -11,6 +11,6 @@ const base: Backend = IS_DEMO ? demoBackend : supabaseBackend;
 /**
  * The active backend for this build. Auth and purchases come from Supabase (or
  * the in-memory demo); listings and notes come from Sanity via the payment
- * server unless EXPO_PUBLIC_CATALOG_SOURCE=local.
+ * server unless NEXT_PUBLIC_CATALOG_SOURCE=local.
  */
 export const api: Backend = CATALOG_SOURCE === 'sanity' ? withServerCatalog(base) : base;
