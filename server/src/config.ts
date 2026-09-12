@@ -95,6 +95,13 @@ export const cfg = {
    */
   holdbackDaysWithdrawal: Number(env('HOLDBACK_DAYS_WITHDRAWAL', '14')),
   holdbackDaysDefault: Number(env('HOLDBACK_DAYS_DEFAULT', '3')),
+  /**
+   * A sale is payable only once Dodo has settled it to us, not merely once the buyer can no
+   * longer reverse it; otherwise a seller is paid from the platform's pocket while the money
+   * sits at Dodo. 'no' falls back to the time window alone. That is for test mode, where
+   * Dodo never pays out and nothing would ever become payable.
+   */
+  payoutRequireSettlement: env('PAYOUT_REQUIRE_SETTLEMENT', 'yes') !== 'no',
   /** Signs short-lived download links. Falls back to the Dodo key so nothing extra is required. */
   downloadSecret: env('DOWNLOAD_SECRET') || env('DODO_API_KEY') || 'dev-download-secret',
   /**

@@ -52,8 +52,10 @@ export default async function adminPayoutRoutes(app: FastifyInstance) {
       sellers: rows,
       totalOutstandingCents: owed.reduce((s, r) => s + r.outstandingCents, 0),
       payableNowCents: payable.reduce((s, r) => s + r.availableCents, 0),
-      // Owed, but still inside a buyer's reversal window and not safe to send yet.
+      // Owed, but still inside a buyer's reversal window or not yet settled to us by Dodo.
       holdingCents: owed.reduce((s, r) => s + r.holdingCents, 0),
+      // The part of that which only waits on Dodo paying us: safe from reversal, not yet ours.
+      unsettledCents: owed.reduce((s, r) => s + r.unsettledCents, 0),
       payableCount: payable.length,
       accruingCount: accruing.length,
       // Owed money with nowhere to send it. Publishing a paid vault is gated on payout

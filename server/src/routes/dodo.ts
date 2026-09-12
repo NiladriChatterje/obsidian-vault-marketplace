@@ -10,12 +10,14 @@
  * route.
  *
  * Configure at Dodo → Developer → Webhooks with events payment.succeeded, payment.failed,
- * refund.succeeded, and put the signing secret in DODO_WEBHOOK_SECRET.
+ * refund.succeeded, dispute.lost and payout.success, and put the signing secret in
+ * DODO_WEBHOOK_SECRET.
  */
 import type { FastifyInstance } from 'fastify';
 import { cfg } from '../config.ts';
 import { verifyDodoWebhook } from '../dodo.ts';
 import { getOrder, getOrderByPayment, markOrderFailed, refundOrder, settleOrder } from '../orders.ts';
+import { recordDodoPayout, settleDodoPayout } from '../settlement.ts';
 
 interface DodoEvent {
   type: string;
@@ -35,6 +37,20 @@ export default async function dodoWebhookRoutes(app: FastifyInstance) {
 
     const event = JSON.parse(req.body) as DodoEvent;
     const data = event.data ?? {};
+
+    // A payout is Dodo paying us, so it belongs to no order. On success the sales it was
+    // made of become payable to their sellers; until then they were money at Dodo, not here.
+    if (event.type.startsWith('payout.') && data.payout_id) {
+      try {
+        await recordDodoPayout(data as Parameters<typeof recordDodoPayout>[0]);
+        if (event.type === 'payout.success') await settleDodoPayout(data.payout_id);
+      } catch (e) {
+        req.log.error(e);
+        return reply.code(500).send({ error: e instanceof Error ? e.message : 'payout handling failed' });
+      }
+      return { received: true };
+    }
+
     const paymentId: string | undefined = data.payment_id;
 
     // A payment carries the session it came from; a refund only carries the payment.
@@ -63,6 +79,11 @@ export default async function dodoWebhookRoutes(app: FastifyInstance) {
       // a card network can force one through a chargeback whatever the policy says. Dropping
       // this would leave a refunded buyer with access and the seller still owed money that
       // was handed back.
+      // A chargeback the card network decided against us is a refund by another route: the
+      // buyer has the money back and, if the seller was already paid, so does the seller.
+      // The purchase goes, and the balance carries the shortfall against their next sale.
+      case 'dispute.lost':
+      case 'dispute.accepted':
       case 'refund.succeeded':
       case 'refund.created': {
         try {
