@@ -73,8 +73,25 @@ form rather than after someone has bought from them.
 Nothing splits a payment. Dodo settles every sale to the platform in full, so a seller's
 share is a debt the platform carries until it transfers the money itself.
 
-**The commission is a percentage plus a fixed amount**, currently 10% + Rs 40, and the
-seller keeps the rest of the list price.
+**The commission is a percentage plus a fixed amount, and the percentage depends on where
+the seller banks**: 8% + Rs 40 for a seller paid in India, 12% + Rs 40 for one paid abroad.
+The seller keeps the rest of the list price.
+
+The split is not arbitrary. Dodo charges the same either way, but the money still has to
+reach the seller: a domestic payout is a near-free local transfer with nothing converted,
+while reaching a seller abroad costs a transfer fee and a conversion spread. Charging one
+blended rate would make Indian sellers subsidise international payouts. Set
+`EXPO_PUBLIC_PLATFORM_COUNTRY` to whichever country counts as domestic.
+
+| List | Indian seller keeps | Seller abroad keeps |
+| ---: | ---: | ---: |
+| Rs 149 | Rs 97 (65%) | Rs 91 (61%) |
+| Rs 999 | Rs 879 (88%) | Rs 839 (84%) |
+| Rs 2,499 | Rs 2,259 (90%) | Rs 2,159 (86%) |
+
+Note the commission does not change what a **buyer** pays. The seller sets the price; the
+commission only decides how it splits. `MIN_PRICE_CENTS` is what governs how cheap a vault
+can be, and it is Rs 149.
 
 The fixed half is the whole point. Dodo charges 4% + $0.40, and a commission that is only a
 percentage is guaranteed to lose money below some price: the percentage shrinks with the
@@ -119,7 +136,7 @@ same treatment: hold the balance until the sales behind it have earned enough to
 transfer.
 
 The threshold is derived, not chosen. Per sale the platform keeps at least
-`(fee% - provider%) / (100 - fee%)` of what the seller accrues, which is 6/90 at a 10%
+`(fee% - provider%) / (100 - fee%)` of what the seller accrues, which is 4/92 at an 8%
 commission against a 4% provider. So by the time a seller has accrued T, the platform has
 earned at least T/15 whatever mix of prices got them there. Pay at 15x the transfer fee and
 it is always covered; `PAYOUT_SAFETY_FACTOR` adds 35% on top.

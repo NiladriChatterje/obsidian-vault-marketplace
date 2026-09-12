@@ -12,18 +12,30 @@ export const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? ''
 export const IS_DEMO = !SUPABASE_URL || !SUPABASE_ANON_KEY;
 
 /** Platform commission on every paid sale, in percent. Enforced by the payment server (server/). */
-export const PLATFORM_FEE_PERCENT = Number(process.env.EXPO_PUBLIC_PLATFORM_FEE_PERCENT ?? 10);
 /**
- * The fixed half of the commission. It exists to cancel the provider's own fixed fee: a
- * percentage-only commission always loses money below some price, because the percentage
- * shrinks with the price and the provider's flat charge does not.
+ * The commission's percentage half, split by where the seller banks.
+ *
+ * A domestic payout is a near-free local transfer with nothing converted; reaching a seller
+ * abroad costs a transfer fee and a conversion spread. That sale carries the higher rate
+ * rather than being subsidised by domestic ones.
+ *
+ * Mirrors feePercentFor() in server/src/config.ts, which is authoritative.
  */
+export const PLATFORM_COUNTRY = (process.env.EXPO_PUBLIC_PLATFORM_COUNTRY ?? 'IN').toUpperCase();
+export const PLATFORM_FEE_PERCENT_DOMESTIC = Number(process.env.EXPO_PUBLIC_PLATFORM_FEE_PERCENT_DOMESTIC ?? 8);
+export const PLATFORM_FEE_PERCENT_INTERNATIONAL = Number(process.env.EXPO_PUBLIC_PLATFORM_FEE_PERCENT_INTERNATIONAL ?? 12);
+
+export function feePercentFor(sellerCountry?: string | null): number {
+  const domestic = (sellerCountry ?? PLATFORM_COUNTRY).trim().toUpperCase() === PLATFORM_COUNTRY;
+  return domestic ? PLATFORM_FEE_PERCENT_DOMESTIC : PLATFORM_FEE_PERCENT_INTERNATIONAL;
+}
+
 export const PLATFORM_FEE_FIXED_CENTS = Number(process.env.EXPO_PUBLIC_PLATFORM_FEE_FIXED_CENTS ?? 4000);
 
 /** Mirrors platformFee() in server/src/config.ts, which is authoritative; keep them in step. */
-export function platformFee(amountCents: number): number {
+export function platformFee(amountCents: number, sellerCountry?: string | null): number {
   if (amountCents <= 0) return 0;
-  return Math.min(amountCents, Math.round((amountCents * PLATFORM_FEE_PERCENT) / 100) + PLATFORM_FEE_FIXED_CENTS);
+  return Math.min(amountCents, Math.round((amountCents * feePercentFor(sellerCountry)) / 100) + PLATFORM_FEE_FIXED_CENTS);
 }
 
 /** Default currency listings are priced in. */
@@ -50,10 +62,11 @@ export const PROVIDER_FIXED_FEE_CENTS = Number(process.env.EXPO_PUBLIC_PROVIDER_
  *
  * Mirrored in server/src/config.ts, which enforces it; keep the two in step.
  */
-const MIN_PRICE_FLOOR_CENTS = 19900;
+const MIN_PRICE_FLOOR_CENTS = 14900;
 
 function deriveMinPriceCents(): number {
-  const margin = PLATFORM_FEE_PERCENT - PROVIDER_PERCENT_FEE;
+  // The domestic rate is the lower of the two, so it is the one that has to clear.
+  const margin = PLATFORM_FEE_PERCENT_DOMESTIC - PROVIDER_PERCENT_FEE;
   // A commission that does not even cover the provider's percentage can never break even.
   if (margin <= 0) return 100_000;
   // Only the shortfall between the two fixed fees still has to come out of the price.

@@ -42,7 +42,16 @@ export const cfg = {
     senderName: env('BREVO_EMAIL_FROM_NAME', 'Vault Market'),
   },
 
-  feePercent: Number(env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT', env('PLATFORM_FEE_PERCENT', '10'))),
+  /**
+   * The commission's percentage half, split by where the seller banks.
+   *
+   * A sale to a domestic seller costs the platform less once the money moves: the payout is
+   * a near-free local transfer and nothing is converted. Reaching a seller abroad costs a
+   * transfer fee and a conversion spread, so that sale carries a higher rate rather than
+   * being subsidised by domestic ones.
+   */
+  feePercentDomestic: Number(env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT_DOMESTIC', env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT', '8'))),
+  feePercentInternational: Number(env('EXPO_PUBLIC_PLATFORM_FEE_PERCENT_INTERNATIONAL', '12')),
   /**
    * The fixed half of the commission, which exists to cancel the provider's fixed fee. A
    * percentage-only commission always loses below some price, because a percentage shrinks
@@ -53,7 +62,7 @@ export const cfg = {
   providerPercentFee: Number(env('EXPO_PUBLIC_PROVIDER_PERCENT_FEE', '4')),
   providerFixedFeeCents: Number(env('EXPO_PUBLIC_PROVIDER_FIXED_FEE_CENTS', '3500')),
   /** Cheapest paid listing allowed. A product choice now, not a solvency one. */
-  minPriceCents: Number(env('MIN_PRICE_CENTS', '19900')),
+  minPriceCents: Number(env('MIN_PRICE_CENTS', '14900')),
 
   /** Where the platform banks. A payout inside this country is a cheap domestic transfer. */
   platformCountry: env('PLATFORM_COUNTRY', 'IN').toUpperCase(),
@@ -120,9 +129,15 @@ if (IS_DEMO && IS_HOSTED && env('ALLOW_PUBLIC_DEMO') !== 'yes') {
  * Free vaults are free: they never reach the provider, so they cost nothing and are charged
  * nothing. The clamp is a guard, not a normal path; minPriceCents keeps prices well above it.
  */
-export function platformFee(amount: number): number {
+/** The rate for a seller banking in `country`; domestic sales cost less to settle. */
+export function feePercentFor(sellerCountry?: string | null): number {
+  const domestic = (sellerCountry ?? cfg.platformCountry).trim().toUpperCase() === cfg.platformCountry;
+  return domestic ? cfg.feePercentDomestic : cfg.feePercentInternational;
+}
+
+export function platformFee(amount: number, sellerCountry?: string | null): number {
   if (amount <= 0) return 0;
-  return Math.min(amount, Math.round((amount * cfg.feePercent) / 100) + cfg.feeFixedCents);
+  return Math.min(amount, Math.round((amount * feePercentFor(sellerCountry)) / 100) + cfg.feeFixedCents);
 }
 
 /**
@@ -137,7 +152,8 @@ export function platformFee(amount: number): number {
  * Mirrored in web/src/lib/config.ts, which shows it to the seller; keep the two in step.
  */
 export function minPriceCents(): number {
-  const margin = cfg.feePercent - cfg.providerPercentFee;
+  // The domestic rate is the lower of the two, so it is the one that has to clear.
+  const margin = cfg.feePercentDomestic - cfg.providerPercentFee;
   // A commission below the provider's own percentage can never break even at any price.
   if (margin <= 0) return 100_000;
   // Only the shortfall between the two fixed fees still has to be earned back out of the

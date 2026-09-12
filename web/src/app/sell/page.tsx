@@ -7,7 +7,7 @@ import { Empty, ErrorBox, Loading, StatusPill, VaultRow } from '@/components/ui'
 import { errorMessage } from '@/lib/web';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/lib/api';
-import { PLATFORM_FEE_FIXED_CENTS, PLATFORM_FEE_PERCENT } from '@/lib/config';
+import { PLATFORM_FEE_FIXED_CENTS, PLATFORM_FEE_PERCENT_DOMESTIC, PLATFORM_FEE_PERCENT_INTERNATIONAL } from '@/lib/config';
 import { formatCount, formatPrice } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 import type { Vault, VaultStatus } from '@/types';
@@ -91,7 +91,7 @@ function Sell() {
         <div className="perks">
           <Perk
             title="Keep most of every sale"
-            body={`${PLATFORM_FEE_PERCENT}% + ${formatPrice(PLATFORM_FEE_FIXED_CENTS)} per sale, only when you sell, and the flat part covers what the payment provider charges us. Free vaults cost nothing to list.`}
+            body={`${PLATFORM_FEE_PERCENT_DOMESTIC}% + ${formatPrice(PLATFORM_FEE_FIXED_CENTS)} per sale if you are paid in India, ${PLATFORM_FEE_PERCENT_INTERNATIONAL}% + ${formatPrice(PLATFORM_FEE_FIXED_CENTS)} elsewhere, because sending money abroad costs more. Only when you sell, and free vaults cost nothing to list.`}
           />
           <Perk title="Paid worldwide" body="Buyers pay in their own currency and we handle the tax. Your share is settled to you separately." />
           <Perk title="Upload a zip, that is it" body="Export your vault folder as a .zip, add a description and a cover, publish." />
