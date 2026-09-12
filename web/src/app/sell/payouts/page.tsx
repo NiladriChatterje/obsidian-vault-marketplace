@@ -19,6 +19,18 @@ const METHODS: { value: PayoutMethod; label: string; hint: string }[] = [
   { value: 'paypal', label: 'PayPal', hint: 'The email address on your PayPal account.' },
 ];
 
+/**
+ * Sending money costs something, and it varies enormously by route: a transfer inside India
+ * is nearly free while an international bank wire is not. Rather than absorb that quietly,
+ * the cheaper routes simply pay out sooner, so the choice is worth showing before it is made.
+ */
+const PAYOUT_SPEED: Record<PayoutMethod, string> = {
+  bank: 'Inside India this is the cheapest route and pays out soonest. To another country it is a wire, which is the most expensive and pays out last.',
+  wise: 'Cheap internationally, so you are paid well before an international bank transfer would reach you.',
+  payoneer: 'Cheap internationally, so you are paid well before an international bank transfer would reach you.',
+  paypal: 'Cheap internationally. Note PayPal takes its own cut from what arrives.',
+};
+
 const EMPTY: PayoutDetails = { country: '', currency: '', method: 'bank', accountName: '', accountRef: '', bankCode: '', notes: '' };
 
 /**
@@ -110,7 +122,7 @@ export default function PayoutDetailsPage() {
           </select>
         </Field>
 
-        <Field label="How you want to be paid">
+        <Field label="How you want to be paid" hint={PAYOUT_SPEED[form.method]}>
           <select className="input" value={form.method} onChange={(e) => set({ method: e.target.value as PayoutMethod, accountRef: '' })}>
             {METHODS.map((m) => (
               <option key={m.value} value={m.value}>
@@ -157,7 +169,9 @@ export default function PayoutDetailsPage() {
       </form>
 
       <p className="muted small">
-        These details are stored for paying you and are never shown publicly or shared with buyers.
+        Earnings build up and are sent once they are worth transferring, because every transfer costs a fee and a tiny payout would
+        be mostly fee. Cheaper routes reach that point sooner. Your seller dashboard shows how far along you are. These details are
+        stored for paying you and are never shown publicly or shared with buyers.
       </p>
 
       {saved ? <Toast title="Payout details saved" message="You can now publish paid vaults." onClose={() => setSaved(false)} /> : null}

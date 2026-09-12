@@ -111,6 +111,36 @@ Both halves must cover the provider's or the platform loses money:
 `EXPO_PUBLIC_PLATFORM_FEE_FIXED_CENTS` >= `EXPO_PUBLIC_PROVIDER_FIXED_FEE_CENTS`. Revisit the
 fixed ones if the rupee moves a long way against the dollar.
 
+### When a seller is paid
+
+Sending money costs a fixed fee per payout, while the commission is earned per sale. That is
+the same shape mismatch the fixed half of the commission fixed one level down, so it gets the
+same treatment: hold the balance until the sales behind it have earned enough to cover the
+transfer.
+
+The threshold is derived, not chosen. Per sale the platform keeps at least
+`(fee% - provider%) / (100 - fee%)` of what the seller accrues, which is 6/90 at a 10%
+commission against a 4% provider. So by the time a seller has accrued T, the platform has
+earned at least T/15 whatever mix of prices got them there. Pay at 15x the transfer fee and
+it is always covered; `PAYOUT_SAFETY_FACTOR` adds 35% on top.
+
+| Seller | Route | Costs to send | Paid once they reach |
+| --- | --- | ---: | ---: |
+| India, bank | IMPS / NEFT | Rs 5 | Rs 500 |
+| Anywhere, PayPal | PayPal | Rs 150 | Rs 3,100 |
+| Anywhere, Wise or Payoneer | Wise / Payoneer | Rs 200 | Rs 4,100 |
+| Outside India, bank | international wire | Rs 1,500 | Rs 30,400 |
+
+An Indian seller is paid almost immediately because the transfer is nearly free. A seller
+abroad who picks a plain bank wire waits a long time, which is deliberate: the payout form
+says so, and Wise gets them paid roughly seven times sooner. The cost of the route falls on
+whoever chooses it, in waiting rather than in a deduction.
+
+`/admin/payouts` splits sellers into payable and accruing, and the CSV carries only the
+payable ones. Adjust the estimates with `TRANSFER_COST_*` if your bank charges differently;
+they are pessimistic on purpose, because guessing high only delays a payout while guessing
+low loses money on it.
+
 The ledger is at `/admin/payouts`, gated on `ADMIN_USER_IDS` (a comma-separated list of
 Supabase user ids; unset closes the routes rather than opening them):
 

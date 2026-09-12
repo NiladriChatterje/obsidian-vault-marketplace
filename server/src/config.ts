@@ -54,6 +54,24 @@ export const cfg = {
   providerFixedFeeCents: Number(env('EXPO_PUBLIC_PROVIDER_FIXED_FEE_CENTS', '3500')),
   /** Cheapest paid listing allowed. A product choice now, not a solvency one. */
   minPriceCents: Number(env('MIN_PRICE_CENTS', '19900')),
+
+  /** Where the platform banks. A payout inside this country is a cheap domestic transfer. */
+  platformCountry: env('PLATFORM_COUNTRY', 'IN').toUpperCase(),
+  /**
+   * What one payout costs to send, in the listing currency's minor units. Pessimistic on
+   * purpose: guessing high only delays a payout, guessing low loses money on it.
+   */
+  transferCost: {
+    bankDomestic: Number(env('TRANSFER_COST_BANK_DOMESTIC', '500')),
+    bankInternational: Number(env('TRANSFER_COST_BANK_INTERNATIONAL', '150000')),
+    wise: Number(env('TRANSFER_COST_WISE', '20000')),
+    payoneer: Number(env('TRANSFER_COST_PAYONEER', '20000')),
+    paypal: Number(env('TRANSFER_COST_PAYPAL', '15000')),
+  },
+  /** Headroom over the break-even threshold, so a payout is never marginal. */
+  payoutSafetyFactor: Number(env('PAYOUT_SAFETY_FACTOR', '1.35')),
+  /** No payout below this however cheap the transfer, so payouts stay worth processing. */
+  payoutMinCents: Number(env('PAYOUT_MIN_CENTS', '50000')),
   /** Signs short-lived download links. Falls back to the Dodo key so nothing extra is required. */
   downloadSecret: env('DOWNLOAD_SECRET') || env('DODO_API_KEY') || 'dev-download-secret',
   /**
