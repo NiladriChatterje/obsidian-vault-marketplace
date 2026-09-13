@@ -62,6 +62,23 @@ p { margin: 0; }
 .nav-links a:hover, .nav-links a.active { color: var(--text); background: var(--raised); }
 .demo-pill { font-size: 11px; font-weight: 600; color: var(--muted); border: 1px solid var(--border); padding: 2px 8px; border-radius: 999px; }
 
+/* Phone menu. Everything here is inert until the phone breakpoint switches it on below;
+   the hamburger is two lines that meet and cross, the pane slides in from the right. */
+.nav-toggle, .nav-backdrop, .nav-pane { display: none; }
+.nav-toggle {
+  position: relative; width: 40px; height: 40px; margin-right: -10px; padding: 0;
+  background: none; border: 0; border-radius: var(--r-md); cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.nav-toggle:active { background: var(--raised); }
+.nav-toggle span {
+  position: absolute; left: 11px; top: 50%; width: 18px; height: 1.5px; background: var(--text); border-radius: 1px;
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.nav-toggle span:first-child { transform: translateY(-4px); }
+.nav-toggle span:last-child { transform: translateY(3px); }
+.nav[data-open] .nav-toggle span:first-child { transform: rotate(45deg); }
+.nav[data-open] .nav-toggle span:last-child { transform: rotate(-45deg); }
+
 /* buttons */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -199,10 +216,53 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
   .card { padding: 14px; }
   .section { margin-top: 24px; }
 
-  /* Four links will not sit beside the brand, so they take a line of their own. */
-  .nav-inner { height: auto; min-height: 52px; padding: 8px 14px; flex-wrap: wrap; gap: 8px; }
+  /* Four links will not sit beside the brand, so the bar keeps only the brand, the avatar and a
+     hamburger; the links move into a pane that slides in over the page. */
+  .nav { --nav-h: 52px; }
+  .nav-inner { height: var(--nav-h); padding: 0 14px; gap: 10px; }
   .brand { margin-right: auto; }
-  .nav-links { order: 3; flex-basis: 100%; gap: 2px; justify-content: space-between; }
+  .nav-links, .nav-desktop { display: none; }
+  .nav-toggle { display: block; }
+
+  .nav-backdrop {
+    display: block; position: fixed; inset: var(--nav-h) 0 0; z-index: 39; background: rgba(0, 0, 0, 0.55);
+    opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0s 0.3s;
+  }
+  .nav-pane {
+    display: flex; flex-direction: column; position: fixed; top: var(--nav-h); right: 0; bottom: 0; z-index: 40;
+    width: min(320px, 82vw); background: var(--bg); border-left: 1px solid var(--border);
+    transform: translateX(100%); visibility: hidden; overscroll-behavior: contain;
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), visibility 0s 0.3s;
+  }
+  .nav[data-open] .nav-backdrop { opacity: 1; visibility: visible; transition-delay: 0s; }
+  .nav[data-open] .nav-pane { transform: none; visibility: visible; transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1); }
+
+  /* Each item settles a beat after the one above it, so the pane reads as arriving rather than appearing. */
+  .nav-pane-links { display: flex; flex-direction: column; padding: 20px 8px 0; flex: 1; overflow-y: auto; }
+  .nav-pane-links a, .nav-pane-foot {
+    opacity: 0; transform: translateX(14px);
+    transition: opacity 0.2s ease, transform 0.2s ease, color 0.15s, background 0.15s;
+  }
+  .nav[data-open] .nav-pane-links a, .nav[data-open] .nav-pane-foot {
+    opacity: 1; transform: none;
+    transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.32, 0.72, 0, 1), color 0.15s, background 0.15s;
+    transition-delay: calc(0.1s + var(--i) * 0.045s);
+  }
+  .nav-pane-links a {
+    display: flex; align-items: baseline; gap: 14px; padding: 14px 16px; border-radius: var(--r-md);
+    font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--muted);
+  }
+  .nav-pane-links a:active { background: var(--raised); }
+  .nav-pane-links a.active { color: var(--text); }
+  .nav-pane-index { font-size: 11px; color: var(--faint); min-width: 18px; }
+  .nav-pane-links a.active .nav-pane-index { color: var(--muted); }
+
+  .nav-pane-foot { display: flex; flex-direction: column; gap: 14px; padding: 16px 24px calc(20px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
+  .nav-pane-foot .demo-pill { align-self: flex-start; }
+  .nav-account { display: flex; align-items: center; gap: 12px; margin: 0 -8px; padding: 8px; border-radius: var(--r-md); }
+  .nav-account:active { background: var(--raised); }
+  .nav-account .grow { display: flex; flex-direction: column; min-width: 0; }
+  .nav-account-name { font-weight: 600; }
 
   /* A row stays a row while it fits and stacks the moment it does not. */
   .row { flex-wrap: wrap; }
@@ -233,7 +293,12 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
 .toast .toast-close { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 0 2px; }
 .toast .toast-close:hover { color: var(--text); }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+  .nav-toggle span, .nav-backdrop, .nav-pane, .nav-pane-links a, .nav-pane-foot,
+  .nav[data-open] .nav-pane, .nav[data-open] .nav-pane-links a, .nav[data-open] .nav-pane-foot { transition-duration: 0.01s; transition-delay: 0s; }
+  .nav-pane, .nav-pane-links a, .nav-pane-foot { transform: none; }
+}
 
 /* What a seller actually earns, spelled out under the price they are typing. */
 .payout-breakdown { border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 14px; background: var(--surface); font-size: 13.5px; }
