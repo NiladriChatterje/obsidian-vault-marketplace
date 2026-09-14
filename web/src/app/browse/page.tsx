@@ -78,9 +78,9 @@ function Browse() {
           </label>
         </div>
 
-        {results.error && results.items.length === 0 ? <ErrorBox message={results.error} onRetry={results.refresh} /> : null}
-        {results.loading && results.items.length === 0 ? <Loading /> : null}
-        {!results.loading && !results.error && results.items.length === 0 ? (
+        {results.error && results.total === 0 ? <ErrorBox message={results.error} onRetry={results.retry} /> : null}
+        {results.loading && results.total === 0 && !results.error ? <Loading /> : null}
+        {results.done && results.total === 0 ? (
           <Empty
             title="No vaults match"
             message="Try another search or category."
@@ -91,9 +91,7 @@ function Browse() {
             }
           />
         ) : null}
-        {results.items.length > 0 ? (
-          <VaultGrid vaults={results.items} hasMore={!results.done} loading={results.loading} error={results.error} onLoadMore={results.loadMore} />
-        ) : null}
+        {results.total > 0 ? <VaultGrid list={results} /> : null}
       </div>
     </>
   );

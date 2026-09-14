@@ -7,7 +7,7 @@ import { Empty, ErrorBox, Loading, Section, VaultTile } from '@/components/ui';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/lib/api';
 import { useAuth } from '@/store/auth';
-import { CATEGORIES } from '@/types';
+import { CATEGORIES, type VaultPage } from '@/types';
 
 export default function ExplorePage() {
   const router = useRouter();
@@ -60,15 +60,15 @@ export default function ExplorePage() {
   );
 }
 
-function Block({ title, href, state }: { title: string; href: string; state: ReturnType<typeof useAsync<Awaited<ReturnType<typeof api.listVaults>>>> }) {
+function Block({ title, href, state }: { title: string; href: string; state: ReturnType<typeof useAsync<VaultPage>> }) {
   return (
     <Section title={title} href={href}>
       {state.error ? <ErrorBox message={state.error} onRetry={state.refresh} /> : null}
       {state.loading && !state.data ? <Loading /> : null}
-      {state.data && state.data.length === 0 ? <Empty title="Nothing here yet" /> : null}
-      {state.data && state.data.length > 0 ? (
+      {state.data && state.data.items.length === 0 ? <Empty title="Nothing here yet" /> : null}
+      {state.data && state.data.items.length > 0 ? (
         <div className="grid">
-          {state.data.map((v) => (
+          {state.data.items.map((v) => (
             <VaultTile key={v.id} vault={v} />
           ))}
         </div>

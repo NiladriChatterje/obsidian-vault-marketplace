@@ -169,6 +169,12 @@ export interface ListVaultsParams {
   featured?: boolean;
   freeOnly?: boolean;
   limit?: number;
-  /** How many matching vaults to skip, for paging through a long list. */
-  offset?: number;
+  /** Opaque token from a previous page's `nextCursor`; returns the vaults after it in the same order. */
+  cursor?: string;
+}
+
+/** One page of the catalog list. `nextCursor` is null on the last page. */
+export interface VaultPage {
+  items: Vault[];
+  nextCursor: string | null;
 }

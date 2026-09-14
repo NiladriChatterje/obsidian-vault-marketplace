@@ -2,7 +2,8 @@
  * Typed reads and writes over the Sanity vault catalog. Returns the app's own
  * `Vault` shape so the rest of the code does not know about Sanity documents.
  */
-import type { ListVaultsParams, SellerSummary, Vault, VaultInput, VaultNote, VaultStatus } from '../types.ts';
+import { decodeCursor, encodeCursor } from '../cursor.ts';
+import type { ListVaultsParams, SellerSummary, Vault, VaultInput, VaultNote, VaultPage, VaultStatus } from '../types.ts';
 import { requireWriteToken, sanity } from './client.ts';
 import { MARKDOWN_EXT, isIgnoredPath, parseNote, stripCommonRoot } from './markdown.ts';
 import * as Q from './queries.ts';
@@ -55,11 +56,18 @@ function toNote(d: Doc): VaultNote {
 
 /* ---------- reads ---------- */
 
-export async function listVaults(params: ListVaultsParams = {}): Promise<Vault[]> {
-  const { query, params: p } = Q.vaultListQuery(params);
-  const offset = params.offset ?? 0;
-  const docs = await sanity().fetch<Doc[]>(query, { ...p, offset, end: offset + (params.limit ?? 50) });
-  return docs.map(toVault);
+/** One page, keyset-paged: fetches one row past the limit to learn whether a next page exists. */
+export async function listVaults(params: ListVaultsParams = {}): Promise<VaultPage> {
+  const sort = params.sort ?? 'popular';
+  const limit = params.limit ?? 50;
+  const cursor = decodeCursor(params.cursor, Q.SORT_KEYS[sort].length);
+  if (params.cursor && !cursor) throw Object.assign(new Error('Bad cursor'), { statusCode: 400 });
+  const { query, params: p } = Q.vaultListQuery({ ...params, sort, cursor });
+  const docs = await sanity().fetch<Doc[]>(query, { ...p, limit: limit + 1 });
+  const page = docs.slice(0, limit);
+  const last = page[page.length - 1];
+  const nextCursor = docs.length > limit && last ? encodeCursor({ values: Q.SORT_FIELDS[sort].map((f) => f(last)), id: last._id }) : null;
+  return { items: page.map(toVault), nextCursor };
 }
 
 export async function getVault(id: string): Promise<Vault | null> {

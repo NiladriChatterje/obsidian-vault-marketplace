@@ -109,6 +109,10 @@ p { margin: 0; }
 .cover.hero .monogram { font-size: 48px; }
 .tile-title { font-weight: 600; font-size: 14px; }
 .tile-meta { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--muted); }
+/* A tile-shaped placeholder while its page loads: same box, same cover ratio, grey bars for the text. */
+.tile.skeleton { pointer-events: none; }
+.tile.skeleton:hover { border-color: var(--border); }
+.skeleton-line { height: 11px; border-radius: var(--r-sm); background: var(--raised); margin: 5px 0; }
 .price { font-weight: 700; color: var(--text); }
 .price.large { font-size: 20px; }
 .vault-row { display: flex; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); }

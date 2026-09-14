@@ -11,16 +11,44 @@ export const VAULT_PROJECTION = `{
 
 export const NOTE_META_PROJECTION = `{ _id, path, title, folder, isPreview, sizeBytes, tags, links }`;
 
+export type ListSort = 'new' | 'popular' | 'top';
+
+/**
+ * The GROQ expressions each sort orders by, most significant first. Optional fields are coalesced
+ * so a document missing one still has a definite place in the order, which keyset paging needs.
+ * `_id` is always the final tie-break.
+ */
+export const SORT_KEYS: Record<ListSort, string[]> = {
+  popular: ['coalesce(downloads, 0)'],
+  new: ['_createdAt'],
+  top: ['coalesce(ratingAvg, 0)', 'coalesce(ratingCount, 0)'],
+};
+
+/** The raw document fields the sort keys read, in the same order, for building the next cursor. */
+export const SORT_FIELDS: Record<ListSort, ((d: Record<string, any>) => number | string)[]> = {
+  popular: [(d) => d.downloads ?? 0],
+  new: [(d) => d._createdAt],
+  top: [(d) => Number(d.ratingAvg ?? 0), (d) => d.ratingCount ?? 0],
+};
+
+/** "Rows after the cursor" for a descending sort: k0 < c0, or equal and the next key decides, ending on _id. */
+function afterCursor(keys: string[], i = 0): string {
+  if (i === keys.length) return '_id > $cid';
+  return `(${keys[i]} < $c${i} || (${keys[i]} == $c${i} && ${afterCursor(keys, i + 1)}))`;
+}
+
 /** Builds the filter + ordering for the public catalog list. */
 export function vaultListQuery(opts: {
   category?: string;
   search?: string;
   featured?: boolean;
   freeOnly?: boolean;
-  sort?: 'new' | 'popular' | 'top';
+  sort?: ListSort;
+  cursor?: { values: (number | string)[]; id: string } | null;
 }): { query: string; params: Record<string, unknown> } {
   const where = ['_type == "vault"', 'status == "published"'];
   const params: Record<string, unknown> = {};
+  const keys = SORT_KEYS[opts.sort ?? 'popular'];
   if (opts.category) {
     where.push('category == $category');
     params.category = opts.category;
@@ -32,13 +60,13 @@ export function vaultListQuery(opts: {
     params.q = `${opts.search.trim()}*`;
     params.tag = opts.search.trim().toLowerCase();
   }
-  const order =
-    opts.sort === 'new'
-      ? 'order(_createdAt desc)'
-      : opts.sort === 'top'
-        ? 'order(ratingAvg desc, ratingCount desc)'
-        : 'order(downloads desc)';
-  return { query: `*[${where.join(' && ')}] | ${order} [$offset...$end] ${VAULT_PROJECTION}`, params };
+  if (opts.cursor) {
+    where.push(afterCursor(keys));
+    opts.cursor.values.forEach((v, i) => (params[`c${i}`] = v));
+    params.cid = opts.cursor.id;
+  }
+  const order = `order(${keys.map((k) => `${k} desc`).join(', ')}, _id asc)`;
+  return { query: `*[${where.join(' && ')}] | ${order} [0...$limit] ${VAULT_PROJECTION}`, params };
 }
 
 export const VAULT_BY_ID = `*[_type == "vault" && _id == $id][0] ${VAULT_PROJECTION}`;

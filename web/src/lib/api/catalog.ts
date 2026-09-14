@@ -4,7 +4,7 @@
  * wrapper points the catalog half of a Backend at that server while auth,
  * purchases and reviews keep using the wrapped backend (Supabase or demo).
  */
-import type { Purchase, SellerStats, Vault, VaultInput, VaultNote, VaultNoteContent, VaultStatus } from '../../types';
+import type { Purchase, SellerStats, Vault, VaultInput, VaultNote, VaultNoteContent, VaultPage, VaultStatus } from '../../types';
 import { API_URL } from '../config';
 import { getSupabase } from '../supabase';
 import { fileFromUri } from '../web';
@@ -71,7 +71,7 @@ export function withServerCatalog(base: Backend): Backend {
 
     // ---- catalog
     listVaults: (params = {}) =>
-      get<Vault[]>(`/vaults${qs({ category: params.category, q: params.search, sort: params.sort, featured: params.featured ? 1 : undefined, free: params.freeOnly ? 1 : undefined, limit: params.limit, offset: params.offset || undefined })}`),
+      get<VaultPage>(`/vaults${qs({ category: params.category, q: params.search, sort: params.sort, featured: params.featured ? 1 : undefined, free: params.freeOnly ? 1 : undefined, limit: params.limit, cursor: params.cursor })}`),
     getVault,
     getSellerVaults: (sellerId) => get<Vault[]>(`/sellers/${encodeURIComponent(sellerId)}/vaults`),
     getVaultNotes: (vaultId) => get<VaultNote[]>(`/vaults/${encodeURIComponent(vaultId)}/notes`),
