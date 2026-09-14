@@ -6,7 +6,7 @@ import { Empty, ErrorBox, Loading, VaultRow } from '@/components/ui';
 import { errorMessage } from '@/lib/web';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/lib/api';
-import { timeAgo } from '@/lib/format';
+import { formatPrice, timeAgo } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 
 export default function LibraryPage() {
@@ -46,7 +46,7 @@ export default function LibraryPage() {
 
   return (
     <div className="stack" style={{ gap: 16 }}>
-      <div className="row between">
+      <div className="row between wrap">
         <h1>Library</h1>
         <Link href="/connect" className="btn secondary small">
           Connect over MCP
@@ -71,22 +71,21 @@ export default function LibraryPage() {
           p.vault ? (
             <VaultRow
               key={p.id}
+              className="library-row"
               vault={p.vault}
               href={`/vault/${p.vault.id}`}
+              subtitle={
+                <>
+                  {p.vault.seller?.displayName ? <>{p.vault.seller.displayName} · </> : null}
+                  Added {timeAgo(p.createdAt)} · {formatPrice(p.amountCents, p.vault.currency)}
+                </>
+              }
               right={
-                <div className="row" onClick={(e) => e.stopPropagation()}>
-                  <span className="muted small">{timeAgo(p.createdAt)}</span>
-                  <button
-                    className="btn small secondary"
-                    disabled={busyId === p.vaultId}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      download(p.vaultId);
-                    }}
-                  >
-                    {busyId === p.vaultId ? '…' : 'Download'}
+                <div className="row library-actions">
+                  <button className="btn small secondary" disabled={busyId === p.vaultId} onClick={() => download(p.vaultId)}>
+                    {busyId === p.vaultId ? 'Preparing…' : 'Download'}
                   </button>
-                  <Link href={`/connect?vault=${p.vaultId}`} className="btn small secondary" onClick={(e) => e.stopPropagation()}>
+                  <Link href={`/connect?vault=${p.vaultId}`} className="btn small secondary">
                     MCP
                   </Link>
                 </div>

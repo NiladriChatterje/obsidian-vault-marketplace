@@ -115,11 +115,18 @@ p { margin: 0; }
 .skeleton-line { height: 11px; border-radius: var(--r-sm); background: var(--raised); margin: 5px 0; }
 .price { font-weight: 700; color: var(--text); }
 .price.large { font-size: 20px; }
-.vault-row { display: flex; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); }
+.vault-row { position: relative; display: flex; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); }
 .vault-row:hover { border-color: var(--muted); }
+.vault-row-link { display: flex; gap: 12px; align-items: center; flex: 1; min-width: 0; }
+/* The link's hit area is the whole row; the aside is raised above it so its own controls win. */
+.vault-row-link::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+.vault-row-aside { position: relative; z-index: 1; margin-left: auto; flex-shrink: 0; }
 .vault-row .cover { width: 96px; aspect-ratio: 16 / 9; flex-shrink: 0; }
 .vault-row .cover .monogram { font-size: 18px; }
-.vault-row > :last-child { margin-left: auto; }
+/* Library rows: the actions never wrap among themselves, and the download button keeps one width
+   whichever label it shows, so the column of buttons lines up down the page. */
+.library-actions { flex-wrap: nowrap; }
+.library-actions .btn:first-child { min-width: 96px; }
 
 /* chips */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -236,14 +243,22 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
     display: block; position: fixed; inset: var(--nav-h) 0 0; z-index: 39; background: rgba(0, 0, 0, 0.55);
     opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0s 0.3s;
   }
+  /* Closed, the pane is display: none rather than parked past the right edge: phone browsers let
+     you pan to a fixed element that sits off-screen, which made every page scroll sideways. The
+     slide survives through a discrete display transition on the way out and a starting style on
+     the way in; a browser without either simply snaps. */
   .nav-pane {
-    display: flex; flex-direction: column; position: fixed; top: var(--nav-h); right: 0; bottom: 0; z-index: 40;
+    display: none; flex-direction: column; position: fixed; top: var(--nav-h); right: 0; bottom: 0; z-index: 40;
     width: min(320px, 82vw); background: var(--bg); border-left: 1px solid var(--border);
-    transform: translateX(100%); visibility: hidden; overscroll-behavior: contain;
-    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), visibility 0s 0.3s;
+    transform: translateX(100%); overscroll-behavior: contain;
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), display 0.3s allow-discrete;
   }
   .nav[data-open] .nav-backdrop { opacity: 1; visibility: visible; transition-delay: 0s; }
-  .nav[data-open] .nav-pane { transform: none; visibility: visible; transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1); }
+  .nav[data-open] .nav-pane { display: flex; transform: none; transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1), display 0.4s allow-discrete; }
+  @starting-style {
+    .nav[data-open] .nav-pane { transform: translateX(100%); }
+    .nav[data-open] .nav-pane-links a, .nav[data-open] .nav-pane-foot { opacity: 0; transform: translateX(14px); }
+  }
 
   /* Each item settles a beat after the one above it, so the pane reads as arriving rather than appearing. */
   .nav-pane-links { display: flex; flex-direction: column; padding: 14px 8px 0 16px; flex: 1; overflow-y: auto; }
@@ -287,7 +302,12 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
   /* A row stays a row while it fits and stacks the moment it does not. */
   .row { flex-wrap: wrap; }
   .vault-row .cover { width: 72px; }
-  .vault-row .grow { min-width: 55%; }
+  .vault-row-link { min-width: 55%; }
+  /* Two buttons will not sit beside the text on a phone, so a library row puts them on a second
+     line, indented to the text column (cover width plus the row gap). */
+  .library-row { flex-wrap: wrap; row-gap: 8px; }
+  .library-row .vault-row-link { flex-basis: 100%; }
+  .library-row .vault-row-aside { margin-left: 0; padding-left: 84px; }
   .tabs button { padding: 8px 10px; }
   .textarea { min-height: 110px; }
   .empty { padding: 28px 12px; }
@@ -324,3 +344,4 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
 .payout-breakdown { border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 14px; background: var(--surface); font-size: 13.5px; }
 .payout-breakdown .row { padding: 3px 0; }
 .payout-breakdown .total { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 8px; }
+

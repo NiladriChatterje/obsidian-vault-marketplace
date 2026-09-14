@@ -49,23 +49,45 @@ export function VaultTile({ vault }: { vault: Vault }) {
   );
 }
 
-export function VaultRow({ vault, href, right }: { vault: Vault; href?: string; right?: ReactNode }) {
+/**
+ * A vault as one line: cover, title and tagline, then whatever `right` holds. Only the cover and
+ * text are the link; `right` sits beside it, so buttons and links placed there nest in no anchor.
+ * The link still claims the whole row for clicks through a pseudo-element that `right` sits above.
+ */
+export function VaultRow({
+  vault,
+  href,
+  right,
+  subtitle,
+  className,
+}: {
+  vault: Vault;
+  href?: string;
+  right?: ReactNode;
+  /** Replaces the tagline under the title, for pages where something else matters more. */
+  subtitle?: ReactNode;
+  className?: string;
+}) {
   const body = (
     <>
       <Cover vault={vault} />
       <div className="grow">
         <div className="tile-title truncate">{vault.title}</div>
-        <div className="muted small clamp2">{vault.tagline}</div>
+        <div className="muted small clamp2">{subtitle ?? vault.tagline}</div>
       </div>
-      {right ?? <Price cents={vault.priceCents} currency={vault.currency} />}
     </>
   );
-  return href ? (
-    <Link href={href} className="vault-row">
-      {body}
-    </Link>
-  ) : (
-    <div className="vault-row">{body}</div>
+  return (
+    <div className={`vault-row${className ? ` ${className}` : ''}`}>
+      {href ? (
+        <Link href={href} className="vault-row-link">
+          {body}
+        </Link>
+      ) : (
+        <div className="vault-row-link">{body}</div>
+      )}
+      <div className="vault-row-aside">{right ?? <Price cents={vault.priceCents} currency={vault.currency} />}</div>
+    </div>
   );
 }
 
