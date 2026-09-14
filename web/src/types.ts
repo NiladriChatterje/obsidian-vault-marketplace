@@ -178,3 +178,92 @@ export interface VaultPage {
   items: Vault[];
   nextCursor: string | null;
 }
+
+/** What someone says they are here for when they create an account. Sellers are asked where to pay them next. */
+export type AccountRole = 'buyer' | 'seller';
+
+/* ---------- who bought what, and what they said ---------- */
+
+/** Someone named on a record: a buyer on a purchase, an author on a review. */
+export type UserSummary = SellerSummary;
+
+/** How one vault has sold, across every purchase of it. */
+export interface VaultSales {
+  vaultId: string;
+  /** Paid purchases. */
+  sales: number;
+  /** Free claims. */
+  freeClaims: number;
+  /** Distinct people who own it, paid or free. */
+  buyers: number;
+  /** List price of every paid purchase. */
+  grossCents: number;
+  /** The platform's commission across them. */
+  feeCents: number;
+  /** What the seller earned: gross minus commission. */
+  netCents: number;
+  lastPurchaseAt: string | null;
+}
+
+/** One purchase as the seller or the operator sees it. */
+export interface PurchaseRecord {
+  id: string;
+  vaultId: string;
+  /** Null when the buyer's profile is gone. */
+  buyer: UserSummary | null;
+  amountCents: number;
+  feeCents: number;
+  /** ISO 3166-1 alpha-2, from checkout. Null for free claims and older rows. */
+  buyerCountry: string | null;
+  createdAt: string;
+  /** When the buyer can no longer reverse it. Null on rows older than the clearing window. */
+  clearsAt: string | null;
+  /** When Dodo paid us for it. Null until then. */
+  settledAt: string | null;
+}
+
+/** Everything about one vault's buyers and reviewers, for its seller or the operator. */
+export interface VaultInsights {
+  vaultId: string;
+  /** Null when the listing has since been removed from the catalog. */
+  vault: Vault | null;
+  sales: VaultSales;
+  ratingAvg: number;
+  ratingCount: number;
+  /** How many reviews gave one star, two, and so on: index 0 is one star. */
+  ratingBreakdown: [number, number, number, number, number];
+  /** Newest first. */
+  purchases: PurchaseRecord[];
+  /** Newest first. */
+  reviews: Review[];
+}
+
+/** One line of the operator's dashboard. */
+export interface AdminVaultRow {
+  vaultId: string;
+  vault: Vault | null;
+  sales: VaultSales;
+}
+
+export interface AdminOverview {
+  totals: {
+    /** Every purchase row, paid or free. */
+    purchases: number;
+    /** Paid purchases. */
+    sales: number;
+    /** Distinct buyers. */
+    buyers: number;
+    /** Profiles that have turned on selling. */
+    sellers: number;
+    /** Listings in the catalog, whether or not anyone has bought them. */
+    vaults: number;
+    grossCents: number;
+    feeCents: number;
+    netCents: number;
+    currency: string;
+  };
+  /** Most bought first. */
+  vaults: AdminVaultRow[];
+  /** The latest purchases across the marketplace, newest first, each with its vault's title. */
+  recent: (PurchaseRecord & { vaultTitle: string | null })[];
+}

@@ -17,29 +17,10 @@
  * These endpoints record money that moved elsewhere. Nothing here sends a payment.
  */
 import type { FastifyInstance } from 'fastify';
-import { cfg } from '../config.ts';
+import { requireAdmin } from '../admin.ts';
 import { cancelPayoutRun, confirmPayoutRun, payoutHistory, pendingPayoutRuns, preparePayoutRuns, recordPayout, runsToCsv, sellerBalances } from '../payout-ledger.ts';
-import { userFromRequest } from '../supabase.ts';
 
 export default async function adminPayoutRoutes(app: FastifyInstance) {
-  /** Resolves the caller and refuses anyone not named in ADMIN_USER_IDS. */
-  const requireAdmin = async (req: Parameters<typeof userFromRequest>[0], reply: { code: (c: number) => { send: (b: unknown) => unknown } }) => {
-    if (!cfg.adminUserIds.length) {
-      reply.code(503).send({ error: 'Admin payouts are not enabled. Set ADMIN_USER_IDS on the server.' });
-      return null;
-    }
-    const user = await userFromRequest(req);
-    if (!user) {
-      reply.code(401).send({ error: 'Not signed in' });
-      return null;
-    }
-    if (!cfg.adminUserIds.includes(user.id)) {
-      reply.code(403).send({ error: 'Not an administrator' });
-      return null;
-    }
-    return user;
-  };
-
   app.get('/admin/payouts', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
     const rows = await sellerBalances();

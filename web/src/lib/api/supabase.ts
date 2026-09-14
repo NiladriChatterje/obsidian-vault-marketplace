@@ -1,4 +1,4 @@
-import type { PayoutDetails, Profile, Purchase, Review, SellerStats, SortMode, Vault, VaultInput, VaultStatus } from '../../types';
+import type { AdminOverview, PayoutDetails, Profile, Purchase, Review, SellerStats, SortMode, Vault, VaultInput, VaultInsights, VaultSales, VaultStatus } from '../../types';
 import { decodeCursor, encodeCursor, type Cursor } from '../cursor';
 import { API_URL, MIN_PASSWORD_LENGTH, REDIRECT_ORIGIN, STORAGE_BUCKETS } from '../config';
 import { requireSupabase } from '../supabase';
@@ -224,15 +224,18 @@ export const supabaseBackend: Backend = {
     const { error } = await requireSupabase().auth.signInWithPassword({ email, password });
     if (error) throw authError(error);
   },
-  async signUp(email, password, username) {
+  async signUp(email, password, username, role = 'buyer') {
     // Checked here as well as in the form: the profiles trigger silently renames a clashing
     // username (nova -> nova1), so a taken name would otherwise create an account under a
     // name the seller never chose. Racy by nature; the unique constraint is the real guard.
     if (!(await usernameAvailable(username))) throw new Error('That username is taken. Pick another.');
+    // The role rides in the metadata like the username does, so the profile trigger creates
+    // a seller as a seller. With email confirmation on there is no session to set it from
+    // until the link is clicked, which is exactly when the seller is sent on to payouts.
     const { data, error } = await requireSupabase().auth.signUp({
       email,
       password,
-      options: { data: { username, display_name: username }, emailRedirectTo: emailRedirect('/auth/callback') },
+      options: { data: { username, display_name: username, role }, emailRedirectTo: emailRedirect('/auth/callback') },
     });
     if (error) throw authError(error);
     return { needsEmailConfirm: !data.session };
@@ -283,6 +286,17 @@ export const supabaseBackend: Backend = {
   async savePayoutDetails(details: PayoutDetails) {
     const data = await apiFetch<{ details: PayoutDetails }>('/me/payout-details', { method: 'PUT', body: { details } });
     return data.details;
+  },
+  async isAdmin() {
+    // The list of administrators lives on the server. Anything that stops the question being
+    // asked (no server, signed out, network) is a plain no, never an error in the nav.
+    if (!API_URL) return false;
+    try {
+      const { admin } = await apiFetch<{ admin?: boolean }>('/admin/access');
+      return !!admin;
+    } catch {
+      return false;
+    }
   },
 
   /**
@@ -479,4 +493,11 @@ export const supabaseBackend: Backend = {
     if (error) throw new Error(error.message);
     return { path, sizeBytes: bytes.byteLength };
   },
+
+  // Purchases and reviews are joined to the catalog on the server, which holds the service
+  // role and the Sanity token; the browser could see neither side in full on its own.
+  getMyInsights: () => apiFetch<VaultSales[]>('/me/insights'),
+  getMyVaultInsights: (vaultId) => apiFetch<VaultInsights>(`/me/vaults/${encodeURIComponent(vaultId)}/insights`),
+  getAdminOverview: () => apiFetch<AdminOverview>('/admin/overview'),
+  getAdminVault: (vaultId) => apiFetch<VaultInsights>(`/admin/vaults/${encodeURIComponent(vaultId)}`),
 };

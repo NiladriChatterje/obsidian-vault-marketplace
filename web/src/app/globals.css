@@ -345,3 +345,46 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
 .payout-breakdown .row { padding: 3px 0; }
 .payout-breakdown .total { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 8px; }
 
+/* Sign-in: buyer or seller. One control, two states, the chosen one filled like a selected chip. */
+.segmented { display: flex; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; background: var(--raised); }
+.segmented button { flex: 1; background: transparent; border: 0; padding: 10px 12px; color: var(--muted); cursor: pointer; font: inherit; font-size: 13.5px; font-weight: 500; }
+.segmented button:hover { color: var(--text); }
+.segmented button.active { background: var(--text); color: var(--on-primary); }
+
+/* Tables: the admin dashboard and buyer lists. Numbers right-aligned and tabular so columns compare down the page. */
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); }
+.table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.table th, .table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
+.table tbody tr:last-child td { border-bottom: 0; }
+.table th { color: var(--muted); font-size: 12px; font-weight: 600; background: var(--raised); }
+.table .num, .num { text-align: right; font-variant-numeric: tabular-nums; }
+.table td:first-child { white-space: normal; min-width: 180px; max-width: 320px; }
+.table-title { font-weight: 600; color: var(--text); }
+.table.clickable tbody tr { cursor: pointer; }
+.table.clickable tbody tr:hover td { background: var(--raised); }
+
+/* A purchase feed: avatar, sentence, amount, time. */
+.feed-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.feed-row:last-child { border-bottom: 0; }
+.feed-row .num { min-width: 72px; }
+
+/* One vault's insights: cover beside the title, then ratings and buyers side by side. */
+.insight-head { display: flex; gap: 20px; align-items: flex-start; }
+.insight-cover { width: 200px; flex-shrink: 0; }
+.insight-cover .cover .monogram { font-size: 22px; }
+.insight-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 32px; align-items: start; }
+.bars { display: flex; flex-direction: column; gap: 8px; }
+.bar { display: grid; grid-template-columns: 36px 1fr 32px; gap: 10px; align-items: center; }
+.bar-track { display: block; height: 8px; border-radius: 4px; background: var(--raised); overflow: hidden; }
+.bar-fill { display: block; height: 100%; background: var(--text); border-radius: 4px; }
+
+@media (max-width: 900px) {
+  .insight-cols { grid-template-columns: 1fr; gap: 24px; }
+}
+@media (max-width: 640px) {
+  .insight-head { flex-direction: column; gap: 12px; }
+  .insight-cover { width: 100%; }
+  .feed-row { flex-wrap: wrap; }
+  .feed-row .grow { flex-basis: calc(100% - 38px); }
+  .feed-row .num { margin-left: 38px; min-width: 0; }
+}

@@ -18,6 +18,19 @@ export function formatPrice(cents: number, currency = DEFAULT_CURRENCY): string 
   }
 }
 
+/**
+ * A sum of money rather than a price: earnings, fees, totals. Zero is "₹0.00" here, where
+ * formatPrice would say "Free", which is true of a listing and nonsense of a total.
+ */
+export function formatMoney(cents: number, currency = DEFAULT_CURRENCY): string {
+  if (cents !== 0) return formatPrice(cents, currency);
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(0);
+  } catch {
+    return `${currency} 0.00`;
+  }
+}
+
 export function formatBytes(bytes: number): string {
   if (!bytes) return '—';
   if (bytes < 1024) return `${bytes} B`;
@@ -65,4 +78,13 @@ export function slugify(text: string): string {
 
 export function parseTags(text: string): string[] {
   return [...new Set(text.split(/[,\n]/).map((t) => t.trim().toLowerCase()).filter(Boolean))].slice(0, 10);
+}
+
+/** A calendar date for tables, where "3d ago" would need a second glance to compare. */
+export function formatDate(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso));
+  } catch {
+    return iso.slice(0, 10);
+  }
 }

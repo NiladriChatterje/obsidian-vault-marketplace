@@ -17,6 +17,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { Loading } from '@/components/ui';
 import { api } from '@/lib/api';
+import { landingFor } from '@/lib/onboarding';
 
 export default function AuthCallbackPage() {
   return (
@@ -42,8 +43,12 @@ function Callback() {
     let tries = 0;
     const tick = async () => {
       if (!active) return;
-      if (await api.getCurrentUser()) {
-        router.replace(next);
+      const user = await api.getCurrentUser();
+      if (user) {
+        // Someone who signed up to sell is sent to say where to pay them; the profile
+        // trigger already made them a seller from the role in their sign-up metadata.
+        const profile = await api.getProfile(user.id).catch(() => null);
+        router.replace(await landingFor(profile?.isSeller ? 'seller' : 'buyer', next));
         return;
       }
       // The exchange is a network round trip that starts when the client module loads.
