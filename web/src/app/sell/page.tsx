@@ -23,7 +23,7 @@ export default function SellPage() {
 function Sell() {
   const router = useRouter();
   const params = useSearchParams();
-  const { user, profile, refreshProfile, isDemo, loading } = useAuth();
+  const { user, profile, refreshProfile, setMode, isDemo, loading } = useAuth();
   const isSeller = !!profile?.isSeller;
 
   const vaults = useAsync(() => (user && isSeller ? api.getMyVaults() : Promise.resolve([])), [user?.id, isSeller]);
@@ -51,6 +51,7 @@ function Sell() {
     try {
       await api.updateProfile({ isSeller: true });
       await refreshProfile();
+      setMode('seller');
     } catch (e) {
       setError(errorMessage(e));
     } finally {

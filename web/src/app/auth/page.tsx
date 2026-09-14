@@ -32,7 +32,7 @@ function AuthForm() {
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get('next') ?? '/';
-  const { signIn, signUp, isUsernameAvailable, sendPasswordReset, resendConfirmation, refreshProfile, isDemo } = useAuth();
+  const { signIn, signUp, isUsernameAvailable, sendPasswordReset, resendConfirmation, refreshProfile, setMode: setSide, isDemo } = useAuth();
 
   const [mode, setMode] = useState<Mode>('in');
   // Someone sent here from the Sell tab has already said what they are here for.
@@ -59,10 +59,13 @@ function AuthForm() {
    * nothing, so a seller who signs in as a buyer stays a seller.
    */
   const arrive = async () => {
+    // An administrator's visit is the dashboard, whatever they picked above.
+    if (await api.isAdmin()) return router.replace('/admin');
     if (role === 'seller') {
       await api.updateProfile({ isSeller: true });
       await refreshProfile();
     }
+    setSide(role);
     router.replace(await landingFor(role, next));
   };
 

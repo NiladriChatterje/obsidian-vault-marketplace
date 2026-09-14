@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api, type AuthUser } from '../lib/api';
+import { readStoredRole, storeRole, type Mode } from '../lib/mode';
 import type { AccountRole, Profile } from '../types';
 
 interface AuthValue {
@@ -7,6 +8,13 @@ interface AuthValue {
   profile: Profile | null;
   /** Named in the server's ADMIN_USER_IDS. Decides whether the admin link is shown; the server decides the rest. */
   isAdmin: boolean;
+  /**
+   * Which side of the site this visit is on. Administrators are always on the dashboard;
+   * everyone else is buying unless they chose to sell and their profile allows it.
+   */
+  mode: Mode;
+  /** Switch between buying and selling. Selling needs the profile to have it turned on. */
+  setMode(role: AccountRole): void;
   loading: boolean;
   isDemo: boolean;
   signIn(email: string, password: string): Promise<void>;
@@ -26,6 +34,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Read after mount: the server render has no localStorage and must match the first client render.
+  const [role, setRole] = useState<AccountRole | null>(null);
 
   const loadProfile = useCallback(async (u: AuthUser | null) => {
     if (!u) {
@@ -39,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    setRole(readStoredRole());
     let active = true;
     api
       .getCurrentUser()
@@ -58,23 +69,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [loadProfile]);
 
+  const setMode = useCallback((r: AccountRole) => {
+    storeRole(r);
+    setRole(r);
+  }, []);
+
+  // A remembered "seller" from a profile that is not one (turned off since, or a different
+  // account on the same browser) falls back to buying rather than showing an empty store.
+  const mode: Mode = isAdmin ? 'admin' : role === 'seller' && profile?.isSeller ? 'seller' : 'buyer';
+
   const value = useMemo<AuthValue>(
     () => ({
       user,
       profile,
       isAdmin,
+      mode,
+      setMode,
       loading,
       isDemo: api.isDemo,
       signIn: (email, password) => api.signIn(email, password),
       signUp: (email, password, username, role) => api.signUp(email, password, username, role),
-      signOut: () => api.signOut(),
+      signOut: async () => {
+        await api.signOut();
+        // The choice belonged to this account's visit; the next person to sign in makes their own.
+        storeRole(null);
+        setRole(null);
+      },
       isUsernameAvailable: (username) => api.isUsernameAvailable(username),
       sendPasswordReset: (email) => api.sendPasswordReset(email),
       updatePassword: (password) => api.updatePassword(password),
       resendConfirmation: (email) => api.resendConfirmation(email),
+      // Re-reads the session rather than trusting the closed-over user, which is stale for a
+      // moment after sign-in: the auth page refreshes right after turning selling on.
       refreshProfile: async () => loadProfile(await api.getCurrentUser()),
     }),
-    [user, profile, isAdmin, loading, loadProfile]
+    [user, profile, isAdmin, mode, setMode, loading, loadProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -3,14 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { HOME, NAV, activeHref } from '@/lib/mode';
 import { useAuth } from '@/store/auth';
-
-const LINKS = [
-  { href: '/', label: 'Explore' },
-  { href: '/library', label: 'Library' },
-  { href: '/sell', label: 'Sell' },
-  { href: '/connect', label: 'MCP' },
-];
 
 /** How far a rifted row's line steps in from the outer line, in px. Labels stay put. */
 const RIFT = 14;
@@ -42,19 +36,23 @@ function RailSegment({ from, to }: { from: number | null; to: number }) {
 /** Matches the phone breakpoint in globals.css, where the inline links give way to the pane. */
 const PHONE = '(max-width: 640px)';
 
-function isActive(pathname: string, href: string): boolean {
-  return pathname === href || (href !== '/' && pathname.startsWith(href));
-}
+/** A word for the side the visitor is on, shown beside the brand so the trimmed nav explains itself. */
+const MODE_LABEL = { buyer: null, seller: 'Seller', admin: 'Admin' } as const;
 
 export function Nav() {
   const pathname = usePathname();
-  const { user, profile, isDemo, loading, isAdmin } = useAuth();
-  // Only the people the server names as administrators get the link; the pages refuse everyone else anyway.
-  const links = isAdmin ? [...LINKS, { href: '/admin', label: 'Admin' }] : LINKS;
+  const { user, profile, isDemo, loading, mode } = useAuth();
   const [open, setOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const paneRef = useRef<HTMLElement>(null);
   const wasOpen = useRef(false);
+
+  // Each side of the site has its own tabs and nothing from the others. Until the session is
+  // known the buyer's tabs stand in, which is also what a visitor who is signed out sees.
+  const links = loading ? NAV.buyer : NAV[mode];
+  const home = loading ? HOME.buyer : HOME[mode];
+  const active = activeHref(links, pathname);
+  const modeLabel = loading || !user ? null : MODE_LABEL[mode];
 
   // Navigating anywhere closes the pane; so does widening the window past the phone breakpoint,
   // which would otherwise leave the page's scroll locked behind a pane that CSS no longer shows.
@@ -89,12 +87,13 @@ export function Nav() {
   return (
     <header className="nav" data-open={open || undefined}>
       <div className="nav-inner">
-        <Link href="/" className="brand">
+        <Link href={home} className="brand">
           Vault Market
+          {modeLabel ? <span className="brand-mode">{modeLabel}</span> : null}
         </Link>
         <nav className="nav-links">
           {links.map((l) => (
-            <Link key={l.href} href={l.href} className={isActive(pathname, l.href) ? 'active' : ''}>
+            <Link key={l.href} href={l.href} className={active === l.href ? 'active' : ''}>
               {l.label}
             </Link>
           ))}
@@ -128,7 +127,7 @@ export function Nav() {
         <nav className="nav-pane-links">
           {links.map((l, i) => {
             const rift = i % 2;
-            const classes = [isActive(pathname, l.href) && 'active', i > 0 && 'jog'].filter(Boolean).join(' ');
+            const classes = [active === l.href && 'active', i > 0 && 'jog'].filter(Boolean).join(' ');
             return (
               <Link key={l.href} href={l.href} className={classes} style={{ '--i': i, '--x': rift } as CSSProperties}>
                 <RailSegment from={i > 0 ? (i - 1) % 2 : null} to={rift} />
@@ -143,7 +142,7 @@ export function Nav() {
               <span className="avatar">{initial}</span>
               <span className="grow">
                 <span className="nav-account-name truncate">{profile?.displayName ?? 'Your profile'}</span>
-                <span className="muted small truncate">{user.email}</span>
+                <span className="muted small truncate">{modeLabel ? `${modeLabel} · ` : ''}{user.email}</span>
               </span>
             </Link>
           ) : (
