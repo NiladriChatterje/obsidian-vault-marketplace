@@ -238,7 +238,7 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
   .nav[data-open] .nav-pane { transform: none; visibility: visible; transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1); }
 
   /* Each item settles a beat after the one above it, so the pane reads as arriving rather than appearing. */
-  .nav-pane-links { display: flex; flex-direction: column; gap: 2px; padding: 14px 8px 0; flex: 1; overflow-y: auto; }
+  .nav-pane-links { display: flex; flex-direction: column; padding: 14px 8px 0 16px; flex: 1; overflow-y: auto; }
   .nav-pane-links a, .nav-pane-foot {
     opacity: 0; transform: translateX(14px);
     transition: opacity 0.2s ease, transform 0.2s ease, color 0.15s, background 0.15s;
@@ -248,14 +248,26 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
     transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.32, 0.72, 0, 1), color 0.15s, background 0.15s;
     transition-delay: calc(0.1s + var(--i) * 0.045s);
   }
+  /* A hairline runs down the left of the list, table-of-contents style, rifting in and out on
+     alternate rows while the labels keep one left edge; the current row lays a short, heavier bar over
+     it. The rail is pinned over the row rather than laid out in it (an inline svg with no viewBox is
+     150px tall by default and would stretch the row), so the label alone sets the row height and each
+     segment still spans it in full. --x is 0 on the outer line, 1 when rifted in. */
   .nav-pane-links a {
-    display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: var(--r-md);
-    font-size: 16px; font-weight: 500; letter-spacing: -0.01em; color: var(--muted);
+    position: relative; display: block; padding: 0 12px 0 26px; border-radius: 0 var(--r-md) var(--r-md) 0;
+    font-size: 14px; font-weight: 500; letter-spacing: -0.01em; color: var(--muted);
   }
-  .nav-pane-links a:active { background: var(--raised); }
-  .nav-pane-links a.active { color: var(--text); background: var(--raised); }
-  .nav-pane-icon { width: 18px; height: 18px; flex: none; color: var(--faint); transition: color 0.15s; }
-  .nav-pane-links a.active .nav-pane-icon { color: var(--text); }
+  .nav-pane-rail { position: absolute; left: 0; top: 0; width: 20px; height: 100%; overflow: visible; }
+  .nav-pane-rail line, .nav-pane-rail path { fill: none; stroke: color-mix(in srgb, var(--faint) 55%, var(--bg)); stroke-width: 1; }
+  .nav-pane-label { display: block; padding: 5px 0; }
+  .nav-pane-links a.jog .nav-pane-label { padding-top: 9px; }
+  .nav-pane-links a::before {
+    content: ''; position: absolute; left: calc(2px + var(--x) * 14px); top: 4px; bottom: 4px; width: 3px; border-radius: 2px;
+    background: var(--text); transform: scaleY(0); transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .nav-pane-links a.jog::before { top: 9px; }
+  .nav-pane-links a:active, .nav-pane-links a.active { color: var(--text); }
+  .nav-pane-links a.active::before { transform: none; }
 
   .nav-pane-foot { display: flex; flex-direction: column; gap: 14px; padding: 16px 24px calc(20px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
   .nav-pane-foot .demo-pill { align-self: flex-start; }
