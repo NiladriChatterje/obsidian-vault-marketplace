@@ -38,7 +38,7 @@ export function vaultListQuery(opts: {
       : opts.sort === 'top'
         ? 'order(ratingAvg desc, ratingCount desc)'
         : 'order(downloads desc)';
-  return { query: `*[${where.join(' && ')}] | ${order} [0...$limit] ${VAULT_PROJECTION}`, params };
+  return { query: `*[${where.join(' && ')}] | ${order} [$offset...$end] ${VAULT_PROJECTION}`, params };
 }
 
 export const VAULT_BY_ID = `*[_type == "vault" && _id == $id][0] ${VAULT_PROJECTION}`;

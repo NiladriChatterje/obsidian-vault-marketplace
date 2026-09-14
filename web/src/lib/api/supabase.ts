@@ -271,7 +271,8 @@ export const supabaseBackend: Backend = {
       default:
         q = q.order('downloads', { ascending: false });
     }
-    const { data, error } = await q.limit(params.limit ?? 50);
+    const offset = params.offset ?? 0;
+    const { data, error } = await q.range(offset, offset + (params.limit ?? 50) - 1);
     if (error) throw new Error(error.message);
     return (data ?? []).map(toVault);
   },

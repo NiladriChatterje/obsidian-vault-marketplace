@@ -57,7 +57,8 @@ function toNote(d: Doc): VaultNote {
 
 export async function listVaults(params: ListVaultsParams = {}): Promise<Vault[]> {
   const { query, params: p } = Q.vaultListQuery(params);
-  const docs = await sanity().fetch<Doc[]>(query, { ...p, limit: params.limit ?? 50 });
+  const offset = params.offset ?? 0;
+  const docs = await sanity().fetch<Doc[]>(query, { ...p, offset, end: offset + (params.limit ?? 50) });
   return docs.map(toVault);
 }
 

@@ -149,4 +149,6 @@ export interface ListVaultsParams {
   featured?: boolean;
   freeOnly?: boolean;
   limit?: number;
+  /** How many matching vaults to skip, for paging through a long list. */
+  offset?: number;
 }
