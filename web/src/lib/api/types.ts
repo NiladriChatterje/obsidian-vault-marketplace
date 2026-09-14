@@ -9,6 +9,7 @@ import type {
   VaultInput,
   VaultNote,
   VaultNoteContent,
+  VaultPage,
   VaultStatus,
 } from '../../types';
 
@@ -50,7 +51,7 @@ export interface Backend {
   savePayoutDetails(details: PayoutDetails): Promise<PayoutDetails>;
 
   // Catalog
-  listVaults(params?: ListVaultsParams): Promise<Vault[]>;
+  listVaults(params?: ListVaultsParams): Promise<VaultPage>;
   getVault(id: string): Promise<Vault | null>;
   getSellerVaults(sellerId: string): Promise<Vault[]>;
   getReviews(vaultId: string): Promise<Review[]>;

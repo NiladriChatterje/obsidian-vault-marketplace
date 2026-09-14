@@ -37,7 +37,7 @@ async function resolveUser(token: string): Promise<string | null> {
 /* ---------- vault access ---------- */
 
 async function ownedVaults(userId: string): Promise<OwnedVault[]> {
-  if (IS_DEMO) return catalog.listVaults({ limit: 100 }); // demo purchases live in the browser
+  if (IS_DEMO) return (await catalog.listVaults({ limit: 100 })).items; // demo purchases live in the browser
   const { data, error } = await admin().from('purchases').select('vault_id').eq('buyer_id', userId);
   if (error) throw new Error(error.message);
   const [bought, mine] = await Promise.all([

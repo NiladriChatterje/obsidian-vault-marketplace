@@ -16,6 +16,7 @@ const AsyncStorage = {
   },
 };
 import type { PayoutDetails, Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
+import { decodeCursor, encodeCursor } from '../cursor';
 import { API_URL, REDIRECT_ORIGIN, platformFee } from '../config';
 import { DEMO_REVIEWS, DEMO_SELLERS, DEMO_VAULTS } from '../demo-data';
 import type { AuthUser, Backend } from './types';
@@ -225,8 +226,13 @@ export const demoBackend: Backend = {
       default:
         list.sort((a, b) => b.downloads - a.downloads);
     }
-    const offset = params.offset ?? 0;
-    return list.slice(offset, offset + (params.limit ?? 50));
+    // The demo list is small and sorted in memory, so the cursor is simply the id the last page ended on.
+    const cursor = decodeCursor(params.cursor, 0);
+    const start = cursor ? list.findIndex((v) => v.id === cursor.id) + 1 : 0;
+    const limit = params.limit ?? 50;
+    const page = list.slice(start, start + limit);
+    const last = page[page.length - 1];
+    return { items: page, nextCursor: start + limit < list.length && last ? encodeCursor({ values: [], id: last.id }) : null };
   },
   async getVault(id) {
     const s = await load();

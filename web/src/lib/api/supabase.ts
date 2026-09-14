@@ -1,4 +1,5 @@
-import type { PayoutDetails, Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
+import type { PayoutDetails, Profile, Purchase, Review, SellerStats, SortMode, Vault, VaultInput, VaultStatus } from '../../types';
+import { decodeCursor, encodeCursor, type Cursor } from '../cursor';
 import { API_URL, MIN_PASSWORD_LENGTH, REDIRECT_ORIGIN, STORAGE_BUCKETS } from '../config';
 import { requireSupabase } from '../supabase';
 import type { AuthUser, Backend } from './types';
@@ -85,6 +86,38 @@ function toReview(r: Row): Review {
 }
 
 const VAULT_SELECT = '*, seller:profiles!vaults_seller_id_fkey(id, username, display_name, avatar_url)';
+
+/** The columns each list sort orders by (all descending), most significant first; id breaks ties. */
+const LIST_SORT_COLUMNS: Record<SortMode, string[]> = {
+  popular: ['downloads'],
+  new: ['created_at'],
+  top: ['rating_avg', 'rating_count'],
+};
+
+const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:?\d{2}|Z)$/;
+const UUID = /^[0-9a-f-]{36}$/i;
+
+/** A cursor value as a PostgREST filter literal; anything that is not a number or a timestamp is refused. */
+function literal(v: number | string): string {
+  if (typeof v === 'number') return String(v);
+  if (ISO_TIMESTAMP.test(v)) return `"${v}"`;
+  throw new Error('Bad cursor');
+}
+
+/**
+ * PostgREST `or` filter for "rows after the cursor" under a descending sort on `columns` then id
+ * ascending: the first column is smaller, or ties and the next column decides, ending on id.
+ */
+function afterCursor(columns: string[], cursor: Cursor): string {
+  if (!UUID.test(cursor.id)) throw new Error('Bad cursor');
+  const eq = (upTo: number) => columns.slice(0, upTo).map((c, j) => `${c}.eq.${literal(cursor.values[j])}`);
+  const clauses = columns.map((c, i) => {
+    const lt = `${c}.lt.${literal(cursor.values[i])}`;
+    return i === 0 ? lt : `and(${[...eq(i), lt].join(',')})`;
+  });
+  clauses.push(`and(${[...eq(columns.length), `id.gt.${cursor.id}`].join(',')})`);
+  return clauses.join(',');
+}
 
 async function currentUserId(): Promise<string> {
   const { data } = await requireSupabase().auth.getUser();
@@ -252,7 +285,19 @@ export const supabaseBackend: Backend = {
     return data.details;
   },
 
+  /**
+   * One page, keyset-paged. Each sort orders by its columns then id; a cursor holds the last row's
+   * values, and the filter asks for rows strictly after them in that order. Fetches one row past
+   * the limit to learn whether a next page exists. Cursor values are validated before they are
+   * written into the PostgREST filter string.
+   */
   async listVaults(params = {}) {
+    const sort = params.sort ?? 'popular';
+    const limit = params.limit ?? 50;
+    const columns = LIST_SORT_COLUMNS[sort];
+    const cursor = decodeCursor(params.cursor, columns.length);
+    if (params.cursor && !cursor) throw new Error('Bad cursor');
+
     let q = requireSupabase().from('vaults').select(VAULT_SELECT).eq('status', 'published');
     if (params.category) q = q.eq('category', params.category);
     if (params.featured) q = q.eq('featured', true);
@@ -261,20 +306,17 @@ export const supabaseBackend: Backend = {
       const s = params.search.replace(/[%,()]/g, ' ').trim();
       if (s) q = q.or(`title.ilike.%${s}%,tagline.ilike.%${s}%,tags.cs.{${s.toLowerCase()}}`);
     }
-    switch (params.sort ?? 'popular') {
-      case 'new':
-        q = q.order('created_at', { ascending: false });
-        break;
-      case 'top':
-        q = q.order('rating_avg', { ascending: false }).order('rating_count', { ascending: false });
-        break;
-      default:
-        q = q.order('downloads', { ascending: false });
-    }
-    const offset = params.offset ?? 0;
-    const { data, error } = await q.range(offset, offset + (params.limit ?? 50) - 1);
+    if (cursor) q = q.or(afterCursor(columns, cursor));
+    for (const col of columns) q = q.order(col, { ascending: false });
+    q = q.order('id', { ascending: true });
+
+    const { data, error } = await q.limit(limit + 1);
     if (error) throw new Error(error.message);
-    return (data ?? []).map(toVault);
+    const rows = data ?? [];
+    const page = rows.slice(0, limit);
+    const last = page[page.length - 1];
+    const nextCursor = rows.length > limit && last ? encodeCursor({ values: columns.map((c) => last[c]), id: last.id }) : null;
+    return { items: page.map(toVault), nextCursor };
   },
   async getVault(id) {
     const { data, error } = await requireSupabase().from('vaults').select(VAULT_SELECT).eq('id', id).maybeSingle();
