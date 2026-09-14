@@ -2,17 +2,23 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Empty, ErrorBox, Loading, Section, VaultTile } from '@/components/ui';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/lib/api';
+import { HOME } from '@/lib/mode';
 import { useAuth } from '@/store/auth';
 import { CATEGORIES, type VaultPage } from '@/types';
 
 export default function ExplorePage() {
   const router = useRouter();
-  const { isDemo } = useAuth();
+  const { isDemo, mode, loading } = useAuth();
   const [query, setQuery] = useState('');
+
+  // Explore is the buyer's home. A seller or administrator landing here is sent to theirs.
+  useEffect(() => {
+    if (!loading && mode !== 'buyer') router.replace(HOME[mode]);
+  }, [loading, mode, router]);
 
   const featured = useAsync(() => api.listVaults({ featured: true, limit: 8 }), []);
   const trending = useAsync(() => api.listVaults({ sort: 'popular', limit: 8 }), []);

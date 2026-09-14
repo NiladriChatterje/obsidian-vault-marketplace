@@ -18,6 +18,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { Loading } from '@/components/ui';
 import { api } from '@/lib/api';
 import { landingFor } from '@/lib/onboarding';
+import { useAuth } from '@/store/auth';
 
 export default function AuthCallbackPage() {
   return (
@@ -30,6 +31,7 @@ export default function AuthCallbackPage() {
 function Callback() {
   const router = useRouter();
   const params = useSearchParams();
+  const { setMode } = useAuth();
   const next = params.get('next') ?? '/';
   const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +50,9 @@ function Callback() {
         // Someone who signed up to sell is sent to say where to pay them; the profile
         // trigger already made them a seller from the role in their sign-up metadata.
         const profile = await api.getProfile(user.id).catch(() => null);
-        router.replace(await landingFor(profile?.isSeller ? 'seller' : 'buyer', next));
+        const role = profile?.isSeller ? 'seller' : 'buyer';
+        setMode(role);
+        router.replace(await landingFor(role, next));
         return;
       }
       // The exchange is a network round trip that starts when the client module loads.
@@ -63,7 +67,7 @@ function Callback() {
       active = false;
       clearTimeout(timer);
     };
-  }, [params, next, router]);
+  }, [params, next, router, setMode]);
 
   if (error) {
     return (

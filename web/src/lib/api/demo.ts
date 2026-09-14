@@ -245,8 +245,10 @@ export const demoBackend: Backend = {
     return details;
   },
   async isAdmin() {
-    // The demo is a sandbox with no operator, so whoever is signed in may look around the dashboard.
-    return !!(await load()).user;
+    // The demo has no operator list. An address starting with "admin" plays the part, so the
+    // dashboard can be seen without hiding the buyer's and seller's sides from everyone else.
+    const u = (await load()).user;
+    return !!u && /^admin(@|\+|\.|$)/i.test(u.email);
   },
 
   async listVaults(params = {}) {

@@ -6,15 +6,18 @@ import { useEffect, useState } from 'react';
 import { Empty, Field, Loading } from '@/components/ui';
 import { errorMessage } from '@/lib/web';
 import { api } from '@/lib/api';
+import { landingFor } from '@/lib/onboarding';
 import { useAuth } from '@/store/auth';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, profile, loading, signOut, refreshProfile } = useAuth();
+  const { user, profile, loading, signOut, refreshProfile, mode, setMode } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [busy, setBusy] = useState(false);
+  const [switching, setSwitching] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
 
   useEffect(() => {
     setDisplayName(profile?.displayName ?? '');
@@ -50,6 +53,27 @@ export default function ProfilePage() {
     }
   };
 
+  /**
+   * Cross to the other side of the site. Selling is turned on for the profile the first time,
+   * and a seller with nowhere to be paid yet is taken to say where, as at sign-in.
+   */
+  const switchTo = async (role: 'buyer' | 'seller') => {
+    setSwitching(true);
+    setSwitchError(null);
+    try {
+      if (role === 'seller' && !profile?.isSeller) {
+        await api.updateProfile({ isSeller: true });
+        await refreshProfile();
+      }
+      setMode(role);
+      router.push(await landingFor(role, role === 'seller' ? '/sell' : '/'));
+    } catch (err) {
+      setSwitchError(errorMessage(err));
+    } finally {
+      setSwitching(false);
+    }
+  };
+
   return (
     <div className="narrow stack" style={{ margin: '0 auto', gap: 16 }}>
       <h1>Account</h1>
@@ -66,11 +90,41 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-        {profile?.id ? (
+        {profile?.id && mode !== 'admin' ? (
           <Link href={`/seller/${profile.id}`} className="muted small">
             View public profile →
           </Link>
         ) : null}
+      </div>
+
+      {/* One account can buy and sell; the site shows one side at a time. This is where to cross over. */}
+      <div className="card stack">
+        <div>
+          <strong>{mode === 'admin' ? 'Administrator' : mode === 'seller' ? 'You are selling' : 'You are buying'}</strong>
+          <p className="muted small" style={{ marginTop: 4 }}>
+            {mode === 'admin'
+              ? 'This account runs the marketplace, so it sees the dashboard and nothing else.'
+              : mode === 'seller'
+                ? 'Your tabs are your store, new listings and payouts. Switch to buying to browse and use your library.'
+                : profile?.isSeller
+                  ? 'Your tabs are Explore, Library and MCP. Switch to selling to see your store, listings and payouts.'
+                  : 'Your tabs are Explore, Library and MCP. Start selling to list your own vaults; you will be asked where to send your earnings.'}
+          </p>
+        </div>
+        {switchError ? <div className="error">{switchError}</div> : null}
+        {mode === 'admin' ? null : mode === 'seller' ? (
+          <div>
+            <button className="btn secondary" onClick={() => switchTo('buyer')} disabled={switching}>
+              {switching ? 'Switching…' : 'Switch to buying'}
+            </button>
+          </div>
+        ) : (
+          <div>
+            <button className="btn secondary" onClick={() => switchTo('seller')} disabled={switching}>
+              {switching ? 'Switching…' : profile?.isSeller ? 'Switch to selling' : 'Start selling'}
+            </button>
+          </div>
+        )}
       </div>
 
       <form className="card stack" onSubmit={save}>
