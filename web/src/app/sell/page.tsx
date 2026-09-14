@@ -8,9 +8,9 @@ import { errorMessage } from '@/lib/web';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/lib/api';
 import { PLATFORM_FEE_FIXED_CENTS, PLATFORM_FEE_PERCENT_DOMESTIC, PLATFORM_FEE_PERCENT_INTERNATIONAL } from '@/lib/config';
-import { formatCount, formatPrice } from '@/lib/format';
+import { formatCount, formatMoney, formatPrice } from '@/lib/format';
 import { useAuth } from '@/store/auth';
-import type { Vault, VaultStatus } from '@/types';
+import type { Vault, VaultSales, VaultStatus } from '@/types';
 
 export default function SellPage() {
   return (
@@ -35,6 +35,9 @@ function Sell() {
   );
   const payoutMissing = !isDemo && isSeller && !payout.loading && !payout.data?.details;
   const stats = useAsync(() => (user && isSeller ? api.getSellerStats() : Promise.resolve(null)), [user?.id, isSeller]);
+  // How each listing has sold, so the store shows buyers and earnings per vault, not just in total.
+  const insights = useAsync(() => (user && isSeller ? api.getMyInsights() : Promise.resolve([])), [user?.id, isSeller]);
+  const salesById = new Map((insights.data ?? []).map((s) => [s.vaultId, s]));
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -109,11 +112,21 @@ function Sell() {
 
   return (
     <div className="stack" style={{ gap: 20 }}>
-      <div className="row between">
-        <h1>Seller dashboard</h1>
-        <Link href="/sell/new" className="btn">
-          New listing
-        </Link>
+      <div className="row between wrap">
+        <div>
+          <h1>Your store</h1>
+          <p className="muted small">Your listings, who bought them and what you have earned.</p>
+        </div>
+        <div className="row wrap">
+          {user ? (
+            <Link href={`/seller/${user.id}`} className="btn secondary">
+              Public storefront
+            </Link>
+          ) : null}
+          <Link href="/sell/new" className="btn">
+            New listing
+          </Link>
+        </div>
       </div>
 
       {!isSeller && !isDemo ? (
@@ -139,14 +152,14 @@ function Sell() {
         <div className="stats">
           <div className="stat accent">
             <div className="label">Net earnings</div>
-            <div className="value">{formatPrice(stats.data.netCents)}</div>
+            <div className="value">{formatMoney(stats.data.netCents)}</div>
           </div>
           {/* Earned and paid are separate events: the platform transfers a balance once it is
               worth the transfer fee, so a seller should see where they stand. */}
           {stats.data.availableCents !== undefined ? (
             <div className="stat">
               <div className="label">Awaiting payout</div>
-              <div className="value">{formatPrice(stats.data.availableCents)}</div>
+              <div className="value">{formatMoney(stats.data.availableCents)}</div>
               {stats.data.payoutThresholdCents ? (
                 <div className="label" style={{ marginTop: 4 }}>
                   {stats.data.availableCents >= stats.data.payoutThresholdCents
@@ -161,14 +174,14 @@ function Sell() {
           {stats.data.holdingCents ? (
             <div className="stat">
               <div className="label">Clearing</div>
-              <div className="value">{formatPrice(stats.data.holdingCents)}</div>
+              <div className="value">{formatMoney(stats.data.holdingCents)}</div>
               <div className="label" style={{ marginTop: 4 }}>Recent sales, payable once they clear</div>
             </div>
           ) : null}
           {stats.data.paidOutCents ? (
             <div className="stat">
               <div className="label">Paid out</div>
-              <div className="value">{formatPrice(stats.data.paidOutCents)}</div>
+              <div className="value">{formatMoney(stats.data.paidOutCents)}</div>
             </div>
           ) : null}
           <div className="stat">
@@ -207,7 +220,8 @@ function Sell() {
           <div key={v.id} className="stack" style={{ gap: 8 }}>
             <VaultRow
               vault={v}
-              href={`/sell/${v.id}`}
+              href={`/sell/${v.id}/insights`}
+              subtitle={salesLine(v, salesById.get(v.id))}
               right={
                 <div className="row">
                   <StatusPill status={v.status} />
@@ -222,6 +236,9 @@ function Sell() {
               <Link href={`/sell/${v.id}`} className="btn small secondary">
                 Edit
               </Link>
+              <Link href={`/sell/${v.id}/insights`} className="btn small secondary">
+                Buyers &amp; reviews
+              </Link>
               <button className="btn small danger" onClick={() => onDelete(v)}>
                 Delete
               </button>
@@ -233,6 +250,21 @@ function Sell() {
         ))}
       </section>
     </div>
+  );
+}
+
+/**
+ * What a listing has done so far, in one line under its title. Falls back to the tagline
+ * while the numbers load, so the row never jumps from empty to full.
+ */
+function salesLine(v: Vault, s: VaultSales | undefined) {
+  if (!s) return undefined;
+  if (!s.buyers) return <span className="muted">No buyers yet</span>;
+  return (
+    <>
+      {s.buyers} {s.buyers === 1 ? 'buyer' : 'buyers'} · {s.sales} paid · earned {formatMoney(s.netCents, v.currency)}
+      {v.ratingCount ? <> · {v.ratingAvg.toFixed(1)} ★ ({v.ratingCount})</> : null}
+    </>
   );
 }
 

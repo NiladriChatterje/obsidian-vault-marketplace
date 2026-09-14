@@ -15,9 +15,9 @@ const AsyncStorage = {
     }
   },
 };
-import type { PayoutDetails, Profile, Purchase, Review, SellerStats, Vault, VaultInput, VaultStatus } from '../../types';
+import type { AdminOverview, PayoutDetails, Profile, Purchase, PurchaseRecord, Review, SellerStats, Vault, VaultInput, VaultInsights, VaultSales, VaultStatus } from '../../types';
 import { decodeCursor, encodeCursor } from '../cursor';
-import { API_URL, REDIRECT_ORIGIN, platformFee } from '../config';
+import { API_URL, DEFAULT_CURRENCY, REDIRECT_ORIGIN, platformFee } from '../config';
 import { DEMO_REVIEWS, DEMO_SELLERS, DEMO_VAULTS } from '../demo-data';
 import type { AuthUser, Backend } from './types';
 
@@ -78,6 +78,51 @@ function summary(p: Profile) {
   return { id: p.id, username: p.username, displayName: p.displayName, avatarUrl: p.avatarUrl };
 }
 
+const newestFirst = (a: { createdAt: string }, b: { createdAt: string }) => b.createdAt.localeCompare(a.createdAt);
+
+/** How one vault has sold, from the browser's own purchase log. */
+function salesFor(s: DemoState, vaultId: string): VaultSales {
+  const rows = s.purchases.filter((p) => p.vaultId === vaultId);
+  const paid = rows.filter((p) => p.amountCents > 0);
+  const gross = paid.reduce((n, p) => n + p.amountCents, 0);
+  const fee = paid.reduce((n, p) => n + p.feeCents, 0);
+  return {
+    vaultId,
+    sales: paid.length,
+    freeClaims: rows.length - paid.length,
+    buyers: new Set(rows.map((p) => p.buyerId)).size,
+    grossCents: gross,
+    feeCents: fee,
+    netCents: gross - fee,
+    lastPurchaseAt: rows.reduce<string | null>((m, p) => (!m || p.createdAt > m ? p.createdAt : m), null),
+  };
+}
+
+function toRecord(s: DemoState, p: Purchase): PurchaseRecord {
+  const buyer = s.profiles.find((x) => x.id === p.buyerId);
+  return { id: p.id, vaultId: p.vaultId, buyer: buyer ? summary(buyer) : null, amountCents: p.amountCents, feeCents: p.feeCents, buyerCountry: null, createdAt: p.createdAt, clearsAt: null, settledAt: null };
+}
+
+/** Everything about one vault's buyers and reviewers. */
+function insightsFor(s: DemoState, vaultId: string): VaultInsights {
+  const reviews = s.reviews.filter((r) => r.vaultId === vaultId).sort(newestFirst);
+  const breakdown: VaultInsights['ratingBreakdown'] = [0, 0, 0, 0, 0];
+  for (const r of reviews) breakdown[Math.min(5, Math.max(1, r.rating)) - 1]++;
+  return {
+    vaultId,
+    vault: s.vaults.find((v) => v.id === vaultId) ?? null,
+    sales: salesFor(s, vaultId),
+    ratingAvg: reviews.length ? Math.round((reviews.reduce((n, r) => n + r.rating, 0) / reviews.length) * 100) / 100 : 0,
+    ratingCount: reviews.length,
+    ratingBreakdown: breakdown,
+    purchases: s.purchases.filter((p) => p.vaultId === vaultId).sort(newestFirst).map((p) => toRecord(s, p)),
+    reviews: reviews.map((r) => {
+      const author = s.profiles.find((x) => x.id === r.userId);
+      return { ...r, author: r.author ?? (author ? summary(author) : undefined) };
+    }),
+  };
+}
+
 /**
  * Purchase bookkeeping exposed for the Sanity-backed catalog wrapper: vaults may
  * not exist in local seed data, so ownership is tracked by id alone.
@@ -135,7 +180,7 @@ export const demoBackend: Backend = {
     await persist();
     listeners.forEach((l) => l(s.user));
   },
-  async signUp(email, _password, username) {
+  async signUp(email, _password, username, role = 'buyer') {
     const s = await load();
     await wait(400);
     const id = `demo-${email.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
@@ -143,12 +188,13 @@ export const demoBackend: Backend = {
     if (existing) {
       existing.username = username;
       existing.displayName = username;
+      existing.isSeller = existing.isSeller || role === 'seller';
     } else {
       s.profiles.push({
         id,
         username,
         displayName: username,
-        isSeller: false,
+        isSeller: role === 'seller',
         createdAt: new Date().toISOString(),
       });
     }
@@ -197,6 +243,10 @@ export const demoBackend: Backend = {
   },
   async savePayoutDetails(details: PayoutDetails) {
     return details;
+  },
+  async isAdmin() {
+    // The demo is a sandbox with no operator, so whoever is signed in may look around the dashboard.
+    return !!(await load()).user;
   },
 
   async listVaults(params = {}) {
@@ -435,5 +485,46 @@ export const demoBackend: Backend = {
   async uploadVaultFile(localUri, _fileName) {
     await wait(600);
     return { path: localUri, sizeBytes: 0 };
+  },
+
+  async getMyInsights() {
+    const s = await load();
+    const u = s.user;
+    if (!u) return [];
+    return s.vaults.filter((v) => v.sellerId === u.id).map((v) => salesFor(s, v.id));
+  },
+  async getMyVaultInsights(vaultId) {
+    const s = await load();
+    const u = requireUser(s);
+    if (!s.vaults.some((v) => v.id === vaultId && v.sellerId === u.id)) throw new Error('Listing not found');
+    return insightsFor(s, vaultId);
+  },
+  async getAdminOverview(): Promise<AdminOverview> {
+    const s = await load();
+    const ids = [...new Set([...s.vaults.map((v) => v.id), ...s.purchases.map((p) => p.vaultId)])];
+    const vaults = ids
+      .map((id) => ({ vaultId: id, vault: s.vaults.find((v) => v.id === id) ?? null, sales: salesFor(s, id) }))
+      .sort((a, b) => b.sales.buyers - a.sales.buyers || b.sales.grossCents - a.sales.grossCents);
+    const paid = s.purchases.filter((p) => p.amountCents > 0);
+    const gross = paid.reduce((n, p) => n + p.amountCents, 0);
+    const fee = paid.reduce((n, p) => n + p.feeCents, 0);
+    return {
+      totals: {
+        purchases: s.purchases.length,
+        sales: paid.length,
+        buyers: new Set(s.purchases.map((p) => p.buyerId)).size,
+        sellers: s.profiles.filter((p) => p.isSeller).length,
+        vaults: s.vaults.length,
+        grossCents: gross,
+        feeCents: fee,
+        netCents: gross - fee,
+        currency: DEFAULT_CURRENCY,
+      },
+      vaults,
+      recent: [...s.purchases].sort(newestFirst).slice(0, 50).map((p) => ({ ...toRecord(s, p), vaultTitle: s.vaults.find((v) => v.id === p.vaultId)?.title ?? null })),
+    };
+  },
+  async getAdminVault(vaultId) {
+    return insightsFor(await load(), vaultId);
   },
 };

@@ -1,8 +1,8 @@
 /**
  * Vault Market payment server (Fastify).
  * Owns everything with a secret:
- * the Dodo Payments checkout and its webhook, the Sanity-backed vault catalog, and the
- * MCP endpoint over purchased vaults.
+ * the Dodo Payments checkout and its webhook, the Sanity-backed vault catalog, the seller
+ * ledger and admin dashboard, and the MCP endpoint over purchased vaults.
  *
  *   npm run dev      # reads ../.env, restarts on change
  */
@@ -19,6 +19,7 @@ import { startPayoutWatch } from './payout-watch.ts';
 import catalogRoutes from './routes/catalog.ts';
 import adminPayoutRoutes from './routes/admin-payouts.ts';
 import dodoWebhookRoutes from './routes/dodo.ts';
+import insightsRoutes from './routes/insights.ts';
 import payoutRoutes from './routes/payouts.ts';
 import checkoutRoutes from './routes/checkout.ts';
 import mcpRoutes from './routes/mcp.ts';
@@ -43,6 +44,7 @@ await app.register(catalogRoutes); // own scope: multipart parser for zip upload
 await app.register(checkoutRoutes);
 await app.register(payoutRoutes);
 await app.register(adminPayoutRoutes);
+await app.register(insightsRoutes); // who bought what: seller insights and the admin dashboard
 await app.register(dodoWebhookRoutes); // same, for Dodo's Standard Webhooks signature
 await app.register(mcpRoutes); // own plugin scope: raw JSON for the MCP SDK
 

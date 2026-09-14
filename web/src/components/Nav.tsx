@@ -48,7 +48,9 @@ function isActive(pathname: string, href: string): boolean {
 
 export function Nav() {
   const pathname = usePathname();
-  const { user, profile, isDemo, loading } = useAuth();
+  const { user, profile, isDemo, loading, isAdmin } = useAuth();
+  // Only the people the server names as administrators get the link; the pages refuse everyone else anyway.
+  const links = isAdmin ? [...LINKS, { href: '/admin', label: 'Admin' }] : LINKS;
   const [open, setOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const paneRef = useRef<HTMLElement>(null);
@@ -91,7 +93,7 @@ export function Nav() {
           Vault Market
         </Link>
         <nav className="nav-links">
-          {LINKS.map((l) => (
+          {links.map((l) => (
             <Link key={l.href} href={l.href} className={isActive(pathname, l.href) ? 'active' : ''}>
               {l.label}
             </Link>
@@ -124,7 +126,7 @@ export function Nav() {
       <div className="nav-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />
       <aside id="mobile-menu" ref={paneRef} className="nav-pane" role="dialog" aria-modal="true" aria-label="Menu" inert={!open}>
         <nav className="nav-pane-links">
-          {LINKS.map((l, i) => {
+          {links.map((l, i) => {
             const rift = i % 2;
             const classes = [isActive(pathname, l.href) && 'active', i > 0 && 'jog'].filter(Boolean).join(' ');
             return (
@@ -135,7 +137,7 @@ export function Nav() {
             );
           })}
         </nav>
-        <div className="nav-pane-foot" style={{ '--i': LINKS.length } as CSSProperties}>
+        <div className="nav-pane-foot" style={{ '--i': links.length } as CSSProperties}>
           {loading ? null : user ? (
             <Link href="/profile" className="nav-account">
               <span className="avatar">{initial}</span>

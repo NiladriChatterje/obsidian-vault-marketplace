@@ -1,4 +1,6 @@
 import type {
+  AccountRole,
+  AdminOverview,
   ListVaultsParams,
   PayoutDetails,
   Profile,
@@ -7,9 +9,11 @@ import type {
   SellerStats,
   Vault,
   VaultInput,
+  VaultInsights,
   VaultNote,
   VaultNoteContent,
   VaultPage,
+  VaultSales,
   VaultStatus,
 } from '../../types';
 
@@ -34,7 +38,8 @@ export interface Backend {
   getCurrentUser(): Promise<AuthUser | null>;
   onAuthChange(cb: (user: AuthUser | null) => void): () => void;
   signIn(email: string, password: string): Promise<void>;
-  signUp(email: string, password: string, username: string): Promise<{ needsEmailConfirm: boolean }>;
+  /** `role` travels with the account so a seller's profile is created as one, even before the email is confirmed. */
+  signUp(email: string, password: string, username: string, role?: AccountRole): Promise<{ needsEmailConfirm: boolean }>;
   signOut(): Promise<void>;
   /** False when the username is already taken, so sign-up can fail before the account exists. */
   isUsernameAvailable(username: string): Promise<boolean>;
@@ -49,6 +54,8 @@ export interface Backend {
   /** Null until the seller says where their share should go. Paid listings are gated on it. */
   getPayoutDetails(): Promise<{ details: PayoutDetails | null; currencies: string[] }>;
   savePayoutDetails(details: PayoutDetails): Promise<PayoutDetails>;
+  /** Whether the signed-in user may open the admin dashboard. False whenever in doubt, including with no server. */
+  isAdmin(): Promise<boolean>;
 
   // Catalog
   listVaults(params?: ListVaultsParams): Promise<VaultPage>;
@@ -78,4 +85,14 @@ export interface Backend {
   deleteVault(id: string): Promise<void>;
   uploadCover(localUri: string): Promise<string>;
   uploadVaultFile(localUri: string, fileName: string): Promise<UploadedFile>;
+
+  // Who bought what, and what they said
+  /** How each of my listings has sold. */
+  getMyInsights(): Promise<VaultSales[]>;
+  /** One of my listings: every buyer and every review. */
+  getMyVaultInsights(vaultId: string): Promise<VaultInsights>;
+  /** Operator only: the whole marketplace at a glance. */
+  getAdminOverview(): Promise<AdminOverview>;
+  /** Operator only: any vault's buyers and reviews. */
+  getAdminVault(vaultId: string): Promise<VaultInsights>;
 }

@@ -138,6 +138,27 @@ The site reads the repo-root `.env` (and its own `web/.env*` files). Keys that m
 | `NEXT_PUBLIC_API_URL` | The same URL for the Expo app. Metro inlines only `NEXT_PUBLIC_*` names, so the app cannot read `SERVER_API_URL`. |
 | `NEXT_PUBLIC_REDIRECT_ORIGIN` | Optional. Where the payment server sends buyers back (defaults to the browser origin). Also list it in `ALLOWED_REDIRECT_ORIGINS`. |
 
+### Buyers, sellers and the admin dashboard
+
+Signing in asks what you are here for. **Buy vaults** is the default. **Sell vaults** turns
+selling on for the profile and, once there is a session, sends the seller to `/sell/payouts`
+to say where their share should go, since no paid vault can be listed until that is filled
+in. At sign-up the choice travels in the auth metadata as `role`, so with email confirmation
+on the profile is created as a seller before there is any session to set it from
+(migration `0017`), and the confirmation link lands them on the payout form.
+
+`/sell` is the seller's store: every listing with its buyers, paid sales, earnings and rating,
+and a **Buyers & reviews** page per vault (`/sell/<id>/insights`) listing who bought it, when,
+for how much, and every rating and review.
+
+`/admin` is the operator's dashboard, shown in the nav only to users named in
+`ADMIN_USER_IDS` on the server: totals across the marketplace, every vault with its buyer
+count, sales, fees and rating, and the latest purchases. Each vault opens
+`/admin/vaults/<id>` with the full buyer list (including where each sale's money stands:
+clearing, awaiting Dodo, or settled) and every review. The routes behind it are
+`GET /admin/overview`, `GET /admin/vaults/:id`, `GET /me/insights` and
+`GET /me/vaults/:id/insights`; the payout ledger stays at `/admin/payouts`.
+
 ### MCP access
 
 Every buyer gets a personal token at `/connect` (only its SHA-256 hash is stored, table `mcp_tokens`, migration `0002`). The endpoint is served by the payment server. Point any Model Context Protocol client at `https://<api>/mcp` with `Authorization: Bearer <token>`:
@@ -202,7 +223,7 @@ mobile/                    Expo app (own package.json)
   src/lib/payouts.ts       Payout form fields + validation
   src/store, hooks, components, theme
 web/                       Next.js site (own package.json), no server-side secrets
-  src/app/                 Pages: explore, browse, vault, library, sell, connect (MCP), auth
+  src/app/                 Pages: explore, browse, vault, library, sell (store + per-vault insights), admin, connect (MCP), auth
   src/components/          UI kit, VaultContents
   src/lib/                 Browser copy of the data layer + mcp-token.ts, web.ts
 server/                    Fastify (own package.json)
@@ -210,6 +231,9 @@ server/                    Fastify (own package.json)
   src/routes/payouts.ts    Seller payout details; gates publishing a paid vault
   src/seller-payouts.ts    Reads/validates them; hasPayoutDetails is the gate
   src/routes/admin-payouts.ts  Who is owed what, CSV for a batch transfer, record a payment
+  src/routes/insights.ts   Who bought each vault and what they said: seller insights, admin dashboard
+  src/insights.ts          Groups purchases and reviews by vault, hydrated from the catalog
+  src/admin.ts             The ADMIN_USER_IDS gate shared by every /admin route
   src/payout-ledger.ts     Earned minus paid, per seller
   src/routes/catalog.ts    Sanity catalog, notes, uploads, downloads, seller CRUD
   src/routes/mcp.ts        MCP endpoint over purchased vaults
@@ -219,7 +243,7 @@ server/                    Fastify (own package.json)
   src/routes/dodo.ts       POST /webhooks/dodo - the only way a Dodo purchase is granted
   scripts/seed-sanity.ts   Seeds sample vaults + notes into Sanity
 sanity-studio/             Studio: schemaTypes/ (vault, note, attachment, seller), structure.ts
-supabase/                  migrations/0001_init.sql … 0005_sanity_catalog.sql
+supabase/                  migrations/0001_init.sql … 0017_signup_role.sql
 ```
 
 ## Launch checklist
