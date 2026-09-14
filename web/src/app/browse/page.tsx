@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
-import { Empty, ErrorBox, Loading, VaultTile } from '@/components/ui';
-import { useAsync } from '@/hooks/useAsync';
-import { api } from '@/lib/api';
+import { Empty, ErrorBox, Loading } from '@/components/ui';
+import { VaultGrid } from '@/components/VaultGrid';
+import { usePagedVaults } from '@/hooks/usePagedVaults';
 import { CATEGORIES, categoryLabel, type CategorySlug, type SortMode } from '@/types';
 
 export default function BrowsePage() {
@@ -25,7 +25,7 @@ function Browse() {
   const freeOnly = params.get('free') === '1';
   const [query, setQuery] = useState(q);
 
-  const results = useAsync(() => api.listVaults({ search: q || undefined, category, sort, freeOnly }), [q, category, sort, freeOnly]);
+  const results = usePagedVaults({ search: q || undefined, category, sort, freeOnly });
 
   const setParam = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params.toString());
@@ -39,63 +39,62 @@ function Browse() {
   const title = q ? `Results for “${q}”` : category ? categoryLabel(category) : freeOnly ? 'Free vaults' : 'Browse';
 
   return (
-    <div className="stack" style={{ gap: 16 }}>
+    <>
       <h1>{title}</h1>
-      <form
-        className="search"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setParam({ q: query.trim() });
-        }}
-      >
-        <span className="muted">⌕</span>
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search vaults, plugins, tags" />
-      </form>
-
-      <div className="chips">
-        <button className={`chip${!category ? ' selected' : ''}`} onClick={() => setParam({ category: null })}>
-          All
-        </button>
-        {CATEGORIES.map((c) => (
-          <button key={c.slug} className={`chip${category === c.slug ? ' selected' : ''}`} onClick={() => setParam({ category: c.slug })}>
-            {c.label}
-          </button>
-        ))}
+      <div className="search-sticky">
+        <form
+          className="search"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setParam({ q: query.trim() });
+          }}
+        >
+          <span className="muted">⌕</span>
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search vaults, plugins, tags" />
+        </form>
       </div>
-
-      <div className="row between wrap">
-        <div className="tabs">
-          {(['popular', 'new', 'top'] as SortMode[]).map((s) => (
-            <button key={s} className={sort === s ? 'active' : ''} onClick={() => setParam({ sort: s })}>
-              {{ popular: 'Popular', new: 'Newest', top: 'Top rated' }[s]}
+      <div className="stack" style={{ gap: 16 }}>
+        <div className="chips">
+          <button className={`chip${!category ? ' selected' : ''}`} onClick={() => setParam({ category: null })}>
+            All
+          </button>
+          {CATEGORIES.map((c) => (
+            <button key={c.slug} className={`chip${category === c.slug ? ' selected' : ''}`} onClick={() => setParam({ category: c.slug })}>
+              {c.label}
             </button>
           ))}
         </div>
-        <label className="switch small muted">
-          <input type="checkbox" checked={freeOnly} onChange={(e) => setParam({ free: e.target.checked ? '1' : null })} /> Free only
-        </label>
-      </div>
 
-      {results.error ? <ErrorBox message={results.error} onRetry={results.refresh} /> : null}
-      {results.loading && !results.data ? <Loading /> : null}
-      {results.data && results.data.length === 0 ? (
-        <Empty
-          title="No vaults match"
-          message="Try another search or category."
-          action={
-            <Link href="/browse" className="btn secondary">
-              Clear filters
-            </Link>
-          }
-        />
-      ) : null}
-      {results.data && results.data.length > 0 ? (
-        <div className="grid">
-          {results.data.map((v) => (
-            <VaultTile key={v.id} vault={v} />
-          ))}
+        <div className="row between wrap">
+          <div className="tabs">
+            {(['popular', 'new', 'top'] as SortMode[]).map((s) => (
+              <button key={s} className={sort === s ? 'active' : ''} onClick={() => setParam({ sort: s })}>
+                {{ popular: 'Popular', new: 'Newest', top: 'Top rated' }[s]}
+              </button>
+            ))}
+          </div>
+          <label className="switch small muted">
+            <input type="checkbox" checked={freeOnly} onChange={(e) => setParam({ free: e.target.checked ? '1' : null })} /> Free only
+          </label>
         </div>
-      ) : null}
-    </div>
+
+        {results.error && results.items.length === 0 ? <ErrorBox message={results.error} onRetry={results.refresh} /> : null}
+        {results.loading && results.items.length === 0 ? <Loading /> : null}
+        {!results.loading && !results.error && results.items.length === 0 ? (
+          <Empty
+            title="No vaults match"
+            message="Try another search or category."
+            action={
+              <Link href="/browse" className="btn secondary">
+                Clear filters
+              </Link>
+            }
+          />
+        ) : null}
+        {results.items.length > 0 ? (
+          <VaultGrid vaults={results.items} hasMore={!results.done} loading={results.loading} error={results.error} onLoadMore={results.loadMore} />
+        ) : null}
+      </div>
+    </>
   );
 }

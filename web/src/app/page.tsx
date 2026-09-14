@@ -27,15 +27,17 @@ export default function ExplorePage() {
 
   return (
     <>
-      <div className="stack" style={{ gap: 16 }}>
-        <div>
-          <h1>Ready-made Obsidian vaults</h1>
-          <p className="muted">From people who live in them. Buy once, download the zip or connect it to your AI assistant over MCP.</p>
-        </div>
+      <div>
+        <h1>Ready-made Obsidian vaults</h1>
+        <p className="muted">From people who live in them. Buy once, download the zip or connect it to your AI assistant over MCP.</p>
+      </div>
+      <div className="search-sticky">
         <form className="search" onSubmit={submit}>
           <span className="muted">⌕</span>
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search vaults, plugins, tags" />
         </form>
+      </div>
+      <div className="stack" style={{ gap: 16 }}>
         {isDemo ? (
           <div className="notice">
             Demo mode: sample vaults, any email signs in, purchases complete instantly. Set the Supabase keys in the repo <code>.env</code> to go live.

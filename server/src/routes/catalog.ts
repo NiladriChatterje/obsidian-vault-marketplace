@@ -53,6 +53,7 @@ export default async function catalogRoutes(app: FastifyInstance) {
       featured: q.featured === '1' || q.featured === 'true',
       freeOnly: q.free === '1' || q.free === 'true',
       limit: Math.min(Number(q.limit) || 50, 100),
+      offset: Math.max(0, Math.floor(Number(q.offset) || 0)),
     });
   });
 

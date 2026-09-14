@@ -71,7 +71,7 @@ export function withServerCatalog(base: Backend): Backend {
 
     // ---- catalog
     listVaults: (params = {}) =>
-      get<Vault[]>(`/vaults${qs({ category: params.category, q: params.search, sort: params.sort, featured: params.featured ? 1 : undefined, free: params.freeOnly ? 1 : undefined, limit: params.limit })}`),
+      get<Vault[]>(`/vaults${qs({ category: params.category, q: params.search, sort: params.sort, featured: params.featured ? 1 : undefined, free: params.freeOnly ? 1 : undefined, limit: params.limit, offset: params.offset || undefined })}`),
     getVault,
     getSellerVaults: (sellerId) => get<Vault[]>(`/sellers/${encodeURIComponent(sellerId)}/vaults`),
     getVaultNotes: (vaultId) => get<VaultNote[]>(`/vaults/${encodeURIComponent(vaultId)}/notes`),

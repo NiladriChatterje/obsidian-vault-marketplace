@@ -225,7 +225,8 @@ export const demoBackend: Backend = {
       default:
         list.sort((a, b) => b.downloads - a.downloads);
     }
-    return list.slice(0, params.limit ?? 50);
+    const offset = params.offset ?? 0;
+    return list.slice(offset, offset + (params.limit ?? 50));
   },
   async getVault(id) {
     const s = await load();
