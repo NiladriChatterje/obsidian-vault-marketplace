@@ -2,14 +2,44 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useAuth } from '@/store/auth';
 
+/** 16px stroke glyphs for the phone pane; the inline desktop links stay text-only. */
+const ICONS: Record<string, ReactNode> = {
+  explore: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m15.5 8.5-2 5-5 2 2-5z" />
+    </>
+  ),
+  library: (
+    <>
+      <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H9v16H5.5A1.5 1.5 0 0 1 4 18.5z" />
+      <path d="M9 4h4.5A1.5 1.5 0 0 1 15 5.5V20H9" />
+      <path d="m15 7 3.6-1.1a1.5 1.5 0 0 1 1.9 1l3.2 11.7-4.4 1.3" />
+    </>
+  ),
+  sell: (
+    <>
+      <path d="M3 12.6V4.5A1.5 1.5 0 0 1 4.5 3h8.1a2 2 0 0 1 1.4.6l6.9 6.9a2 2 0 0 1 0 2.8l-6.6 6.6a2 2 0 0 1-2.8 0l-7-6.9A2 2 0 0 1 3 12.6z" />
+      <circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none" />
+    </>
+  ),
+  mcp: (
+    <>
+      <path d="M9 3v4M15 3v4" />
+      <path d="M6 7h12v3a6 6 0 0 1-12 0z" />
+      <path d="M12 16v5" />
+    </>
+  ),
+};
+
 const LINKS = [
-  { href: '/', label: 'Explore' },
-  { href: '/library', label: 'Library' },
-  { href: '/sell', label: 'Sell' },
-  { href: '/connect', label: 'MCP' },
+  { href: '/', label: 'Explore', icon: 'explore' },
+  { href: '/library', label: 'Library', icon: 'library' },
+  { href: '/sell', label: 'Sell', icon: 'sell' },
+  { href: '/connect', label: 'MCP', icon: 'mcp' },
 ];
 
 /** Matches the phone breakpoint in globals.css, where the inline links give way to the pane. */
@@ -104,7 +134,18 @@ export function Nav() {
               className={isActive(pathname, l.href) ? 'active' : ''}
               style={{ '--i': i } as CSSProperties}
             >
-              <span className="nav-pane-index mono">{String(i + 1).padStart(2, '0')}</span>
+              <svg
+                className="nav-pane-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                {ICONS[l.icon]}
+              </svg>
               {l.label}
             </Link>
           ))}
