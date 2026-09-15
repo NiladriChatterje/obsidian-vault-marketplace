@@ -140,8 +140,7 @@ The site reads the repo-root `.env` (and its own `web/.env*` files). Keys that m
 
 ### Buyers, sellers and the admin dashboard
 
-The site shows one side at a time. Signing in asks what you are here for, and that choice
-sets the tabs for the visit:
+The site shows one side at a time, and the side sets the tabs for the visit:
 
 | Side | Tabs | Home |
 | --- | --- | --- |
@@ -149,17 +148,16 @@ sets the tabs for the visit:
 | Seller | Store, New listing, Payouts | `/sell` |
 | Administrator | Dashboard | `/admin` |
 
-One account can buy and sell; the account page (`/profile`) switches sides, and the choice
-is remembered per browser. Choosing **Sell vaults** turns selling on for the profile and,
-once there is a session, sends the seller to `/sell/payouts` to say where their share should
-go, since no paid vault can be listed until that is filled in. At sign-up the choice travels
-in the auth metadata as `role`, so with email confirmation on the profile is created as a
-seller before there is any session to set it from (migration `0017`), and the confirmation
-link lands them on the payout form. The account named in `ADMIN_USER_IDS` is asked a second
-time after signing in, with **Run the dashboard** as a third choice next to buying and
-selling, since before the sign-in nobody knows who is typing; it can switch among all three
-on the account page. Everyone else sees buying and selling only. In demo mode an email
-starting with `admin` plays that part.
+One account can buy and sell. Nobody is asked which at sign-in: everyone arrives buying, and
+the account page (`/profile`) switches sides with the choice remembered per browser. The one
+exception is the door someone came through: signing in or up from the Sell tab turns selling
+on for the profile and, once there is a session, sends them to `/sell/payouts` to say where
+their share should go, since no paid vault can be listed until that is filled in. At sign-up
+that hint travels in the auth metadata as `role`, so with email confirmation on the profile is
+created as a seller before there is any session to set it from (migration `0017`), and the
+confirmation link lands them on the payout form. The account named in `ADMIN_USER_IDS` gets a
+third side on the account page, **Dashboard**; everyone else sees buying and selling only. In
+demo mode an email starting with `admin` plays that part.
 
 `/sell` is the seller's store: every listing with its buyers, paid sales, earnings and rating,
 and a **Buyers & reviews** page per vault (`/sell/<id>/insights`) listing who bought it, when,

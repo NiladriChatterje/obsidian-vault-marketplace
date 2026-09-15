@@ -5,7 +5,7 @@ import type { AccountRole } from '../types';
  * named in the server's ADMIN_USER_IDS can also run the place; the mode says which of those
  * they are here for right now, and the site shows only that side.
  *
- * The side is chosen at sign-in and can be switched on the account page. It is remembered
+ * Everyone starts out buying and switches sides on the account page. The side is remembered
  * per browser, not on the profile, because it is about this visit and not about the
  * account: the same person can be selling on a laptop and buying on a phone. A remembered
  * "admin" only counts while the server still says so; anyone else who has it stored is a buyer.
