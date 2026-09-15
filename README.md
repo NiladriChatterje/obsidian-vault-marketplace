@@ -155,14 +155,17 @@ once there is a session, sends the seller to `/sell/payouts` to say where their 
 go, since no paid vault can be listed until that is filled in. At sign-up the choice travels
 in the auth metadata as `role`, so with email confirmation on the profile is created as a
 seller before there is any session to set it from (migration `0017`), and the confirmation
-link lands them on the payout form. An account named in `ADMIN_USER_IDS` always lands on the
-dashboard and sees nothing else. In demo mode an email starting with `admin` plays that part.
+link lands them on the payout form. The account named in `ADMIN_USER_IDS` is asked a second
+time after signing in, with **Run the dashboard** as a third choice next to buying and
+selling, since before the sign-in nobody knows who is typing; it can switch among all three
+on the account page. Everyone else sees buying and selling only. In demo mode an email
+starting with `admin` plays that part.
 
 `/sell` is the seller's store: every listing with its buyers, paid sales, earnings and rating,
 and a **Buyers & reviews** page per vault (`/sell/<id>/insights`) listing who bought it, when,
 for how much, and every rating and review.
 
-`/admin` is the operator's dashboard, shown in the nav only to users named in
+`/admin` is the operator's dashboard, offered as a side only to the account named in
 `ADMIN_USER_IDS` on the server: totals across the marketplace, every vault with its buyer
 count, sales, fees and rating, and the latest purchases. Each vault opens
 `/admin/vaults/<id>` with the full buyer list (including where each sale's money stands:
