@@ -350,6 +350,8 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
 .segmented button { flex: 1; background: transparent; border: 0; padding: 10px 12px; color: var(--muted); cursor: pointer; font: inherit; font-size: 13.5px; font-weight: 500; }
 .segmented button:hover { color: var(--text); }
 .segmented button.active { background: var(--text); color: var(--on-primary); }
+.segmented button:disabled { cursor: default; }
+.segmented button:disabled:not(.active) { opacity: 0.6; }
 
 /* Tables: the admin dashboard and buyer lists. Numbers right-aligned and tabular so columns compare down the page. */
 .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); }

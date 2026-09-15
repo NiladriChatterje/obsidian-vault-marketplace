@@ -119,23 +119,21 @@ export default function ProfilePage() {
           </p>
         </div>
         {switchError ? <div className="error">{switchError}</div> : null}
-        <div className="row wrap">
-          {mode === 'buyer' ? null : (
-            <button className="btn secondary" onClick={() => switchTo('buyer')} disabled={switching}>
-              {switching ? 'Switching…' : 'Switch to buying'}
-            </button>
-          )}
-          {mode === 'seller' ? null : (
-            <button className="btn secondary" onClick={() => switchTo('seller')} disabled={switching}>
-              {switching ? 'Switching…' : profile?.isSeller ? 'Switch to selling' : 'Start selling'}
-            </button>
-          )}
-          {isAdmin && mode !== 'admin' ? (
-            <button className="btn secondary" onClick={() => switchTo('admin')} disabled={switching}>
-              {switching ? 'Switching…' : 'Open the dashboard'}
+        {/* Every side this account can be on, the current one lit. Picking another crosses over. */}
+        <div className="segmented" role="radiogroup" aria-label="Which side of the site you are on">
+          <button type="button" role="radio" aria-checked={mode === 'buyer'} className={mode === 'buyer' ? 'active' : ''} onClick={() => switchTo('buyer')} disabled={switching || mode === 'buyer'}>
+            Buying
+          </button>
+          <button type="button" role="radio" aria-checked={mode === 'seller'} className={mode === 'seller' ? 'active' : ''} onClick={() => switchTo('seller')} disabled={switching || mode === 'seller'}>
+            {profile?.isSeller || mode === 'seller' ? 'Selling' : 'Start selling'}
+          </button>
+          {isAdmin ? (
+            <button type="button" role="radio" aria-checked={mode === 'admin'} className={mode === 'admin' ? 'active' : ''} onClick={() => switchTo('admin')} disabled={switching || mode === 'admin'}>
+              Dashboard
             </button>
           ) : null}
         </div>
+        {switching ? <span className="help">Switching…</span> : null}
       </div>
 
       <form className="card stack" onSubmit={save}>

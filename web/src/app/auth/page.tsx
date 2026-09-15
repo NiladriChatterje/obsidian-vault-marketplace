@@ -6,7 +6,6 @@ import { Suspense, useState } from 'react';
 import { Field, Loading } from '@/components/ui';
 import { api } from '@/lib/api';
 import { MIN_PASSWORD_LENGTH } from '@/lib/config';
-import type { Mode as Side } from '@/lib/mode';
 import { landingFor } from '@/lib/onboarding';
 import { errorMessage } from '@/lib/web';
 import { useAuth } from '@/store/auth';
@@ -24,12 +23,6 @@ export default function AuthPage() {
 
 type Mode = 'in' | 'up' | 'forgot';
 
-const ROLE_HELP: Record<Side, string> = {
-  buyer: 'Browse, buy and download vaults. You can start selling later from the Sell tab.',
-  seller: 'You will be asked where to send your earnings next. Free vaults can be listed before that; paid ones cannot.',
-  admin: 'Every purchase across the marketplace, how each vault is doing, and the payout ledger.',
-};
-
 function AuthForm() {
   const router = useRouter();
   const params = useSearchParams();
@@ -37,12 +30,10 @@ function AuthForm() {
   const { signIn, signUp, isUsernameAvailable, sendPasswordReset, resendConfirmation, refreshProfile, setMode: rememberSide, isDemo } = useAuth();
 
   const [mode, setMode] = useState<Mode>('in');
-  // Someone sent here from the Sell tab has already said what they are here for.
-  const [role, setRole] = useState<AccountRole>(next.startsWith('/sell') ? 'seller' : 'buyer');
-  // Set once the server has confirmed the signed-in account is an administrator: the form
-  // above offered buying and selling only, because before the sign-in nobody knows who is
-  // typing, and an administrator gets the dashboard as a third choice on top of those.
-  const [side, setSide] = useState<Side | null>(null);
+  // Nobody is asked which side they are here for: everyone arrives buying and crosses over on
+  // the account page. The one hint taken is the door they came through, so someone sent here
+  // from the Sell tab is set up to sell straight away.
+  const role: AccountRole = next.startsWith('/sell') ? 'seller' : 'buyer';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
@@ -60,44 +51,24 @@ function AuthForm() {
   };
 
   /**
-   * Signed in, with a session in hand, and a side chosen. Choosing to sell turns selling on
-   * for the profile, which the Sell tab would otherwise ask for with a second click; choosing
-   * to buy changes nothing, so a seller who signs in as a buyer stays a seller. The dashboard
-   * is only ever offered to an account the server has just named an administrator.
+   * Signed in, with a session in hand. Coming through the Sell tab turns selling on for the
+   * profile, which that tab would otherwise ask for with a second click; any other door
+   * changes nothing, so a seller who signs in from the front page stays a seller and simply
+   * starts out buying. An administrator sent here by the dashboard goes back to it; the
+   * server, not this page, decides whether they may.
    */
-  const enter = async (s: Side) => {
-    if (s === 'admin') {
+  const arrive = async () => {
+    if (next.startsWith('/admin') && (await api.isAdmin())) {
       rememberSide('admin');
-      router.replace(next.startsWith('/admin') ? next : '/admin');
+      router.replace(next);
       return;
     }
-    if (s === 'seller') {
+    if (role === 'seller') {
       await api.updateProfile({ isSeller: true });
       await refreshProfile();
     }
-    rememberSide(s);
-    router.replace(await landingFor(s, next));
-  };
-
-  /** Signed in. Administrators are asked which side they want; everyone else goes where they said. */
-  const arrive = async () => {
-    if (await api.isAdmin()) {
-      setSide(next.startsWith('/admin') ? 'admin' : role);
-      return;
-    }
-    await enter(role);
-  };
-
-  const proceed = async () => {
-    if (!side) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await enter(side);
-    } catch (err) {
-      setError(errorMessage(err));
-      setBusy(false);
-    }
+    rememberSide(role);
+    router.replace(await landingFor(role, next));
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -156,40 +127,6 @@ function AuthForm() {
 
   const title = mode === 'forgot' ? 'Reset your password' : mode === 'in' ? 'Sign in' : 'Create account';
 
-  if (side) {
-    return (
-      <div className="narrow" style={{ margin: '0 auto' }}>
-        <div className="card stack" style={{ gap: 16 }}>
-          <div>
-            <h2 style={{ margin: 0 }}>Which side today?</h2>
-            <p className="muted small" style={{ marginTop: 4 }}>
-              This account runs the marketplace, so it can also open the dashboard. The account page switches sides later.
-            </p>
-          </div>
-          <div className="field">
-            <span className="label">I am here to</span>
-            <div className="segmented" role="radiogroup" aria-label="What you want to do">
-              <button type="button" role="radio" aria-checked={side === 'buyer'} className={side === 'buyer' ? 'active' : ''} onClick={() => setSide('buyer')}>
-                Buy vaults
-              </button>
-              <button type="button" role="radio" aria-checked={side === 'seller'} className={side === 'seller' ? 'active' : ''} onClick={() => setSide('seller')}>
-                Sell vaults
-              </button>
-              <button type="button" role="radio" aria-checked={side === 'admin'} className={side === 'admin' ? 'active' : ''} onClick={() => setSide('admin')}>
-                Run the dashboard
-              </button>
-            </div>
-            <span className="help">{ROLE_HELP[side]}</span>
-          </div>
-          {error ? <div className="error">{error}</div> : null}
-          <button className="btn block" type="button" onClick={proceed} disabled={busy}>
-            {busy ? 'Please wait…' : 'Continue'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="narrow" style={{ margin: '0 auto' }}>
       <div className="card stack" style={{ gap: 16 }}>
@@ -205,20 +142,9 @@ function AuthForm() {
         <form className="stack" onSubmit={submit}>
           {mode === 'forgot' ? (
             <p className="help">Enter the email you signed up with and we will send a link to set a new password.</p>
-          ) : (
-            <div className="field">
-              <span className="label">I am here to</span>
-              <div className="segmented" role="radiogroup" aria-label="What you want to do">
-                <button type="button" role="radio" aria-checked={role === 'buyer'} className={role === 'buyer' ? 'active' : ''} onClick={() => setRole('buyer')}>
-                  Buy vaults
-                </button>
-                <button type="button" role="radio" aria-checked={role === 'seller'} className={role === 'seller' ? 'active' : ''} onClick={() => setRole('seller')}>
-                  Sell vaults
-                </button>
-              </div>
-              <span className="help">{ROLE_HELP[role]}</span>
-            </div>
-          )}
+          ) : role === 'seller' ? (
+            <p className="help">You will be asked where to send your earnings next. Free vaults can be listed before that; paid ones cannot.</p>
+          ) : null}
           {mode === 'up' ? (
             <Field label="Username" hint="3–24 characters: lowercase letters, digits, dots or underscores. This is your public seller name.">
               <input
