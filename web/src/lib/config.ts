@@ -25,6 +25,15 @@ export const PLATFORM_COUNTRY = (process.env.NEXT_PUBLIC_PLATFORM_COUNTRY ?? 'IN
 export const PLATFORM_FEE_PERCENT_DOMESTIC = Number(process.env.NEXT_PUBLIC_PLATFORM_FEE_PERCENT_DOMESTIC ?? 8);
 export const PLATFORM_FEE_PERCENT_INTERNATIONAL = Number(process.env.NEXT_PUBLIC_PLATFORM_FEE_PERCENT_INTERNATIONAL ?? 12);
 
+/**
+ * The region a payout in this currency goes to, and so which rate applies: INR is IN and
+ * domestic, anything else is abroad. Mirrors regionForCurrency() in server/src/payout-currencies.ts,
+ * which is what the server stores; this copy only previews the rate while the form is filled in.
+ */
+export function regionForCurrency(currency: string): string {
+  return currency.trim().toUpperCase().slice(0, 2);
+}
+
 export function feePercentFor(sellerCountry?: string | null): number {
   const domestic = (sellerCountry ?? PLATFORM_COUNTRY).trim().toUpperCase() === PLATFORM_COUNTRY;
   return domestic ? PLATFORM_FEE_PERCENT_DOMESTIC : PLATFORM_FEE_PERCENT_INTERNATIONAL;

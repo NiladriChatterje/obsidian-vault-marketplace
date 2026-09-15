@@ -51,7 +51,7 @@ export interface Backend {
   resendConfirmation(email: string): Promise<void>;
   getProfile(userId: string): Promise<Profile | null>;
   updateProfile(patch: Partial<Pick<Profile, 'displayName' | 'bio' | 'username' | 'isSeller'>>): Promise<Profile>;
-  /** Null until the seller says where their share should go. Paid listings are gated on it. */
+  /** Null until the seller says where their share should go. Paid listings are gated on it. The currencies are the ones the server can pay out in. */
   getPayoutDetails(): Promise<{ details: PayoutDetails | null; currencies: string[] }>;
   savePayoutDetails(details: PayoutDetails): Promise<PayoutDetails>;
   /** Whether the signed-in user may open the admin dashboard. False whenever in doubt, including with no server. */

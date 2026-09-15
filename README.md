@@ -219,7 +219,7 @@ Free vaults skip the provider entirely: `claim_free_vault` inserts the purchase 
 ### Seller onboarding
 
 A creator switches on selling from `/sell`, then records where their share should go at
-`/sell/payouts`: country, currency, method and account. There is no linked account and no KYC,
+`/sell/payouts`: currency, method and account. There is no linked account and no KYC,
 because Vault Market is the seller of record; these are simply the platform's own records of
 who to pay. Dodo settles one amount to the platform and never pays a seller, so a paid vault
 cannot be published or bought until the seller can be paid. Free vaults are unaffected.

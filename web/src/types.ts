@@ -38,8 +38,11 @@ export interface Profile {
 export type PayoutMethod = 'bank' | 'wise' | 'payoneer' | 'paypal';
 
 export interface PayoutDetails {
-  /** ISO 3166-1 alpha-2. */
-  country: string;
+  /**
+   * The region the payout goes to, set by the server from the currency (IN for INR, EU for
+   * EUR). Not asked on the form; only read back, to show which fee rate applies.
+   */
+  country?: string;
   /** ISO 4217. */
   currency: string;
   method: PayoutMethod;
