@@ -1,20 +1,20 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api, type AuthUser } from '../lib/api';
-import { readStoredRole, storeRole, type Mode } from '../lib/mode';
+import { readStoredMode, storeMode, type Mode } from '../lib/mode';
 import type { AccountRole, Profile } from '../types';
 
 interface AuthValue {
   user: AuthUser | null;
   profile: Profile | null;
-  /** Named in the server's ADMIN_USER_IDS. Decides whether the admin link is shown; the server decides the rest. */
+  /** Named in the server's ADMIN_USER_IDS. Decides whether the dashboard is offered as a side; the server decides the rest. */
   isAdmin: boolean;
   /**
-   * Which side of the site this visit is on. Administrators are always on the dashboard;
-   * everyone else is buying unless they chose to sell and their profile allows it.
+   * Which side of the site this visit is on: buying unless they chose to sell and their
+   * profile allows it, or chose the dashboard and the server agrees they may.
    */
   mode: Mode;
-  /** Switch between buying and selling. Selling needs the profile to have it turned on. */
-  setMode(role: AccountRole): void;
+  /** Switch sides. Selling needs the profile to have it turned on; the dashboard needs the server's list. */
+  setMode(mode: Mode): void;
   loading: boolean;
   isDemo: boolean;
   signIn(email: string, password: string): Promise<void>;
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   // Read after mount: the server render has no localStorage and must match the first client render.
-  const [role, setRole] = useState<AccountRole | null>(null);
+  const [chosen, setChosen] = useState<Mode | null>(null);
 
   const loadProfile = useCallback(async (u: AuthUser | null) => {
     if (!u) {
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    setRole(readStoredRole());
+    setChosen(readStoredMode());
     let active = true;
     api
       .getCurrentUser()
@@ -69,14 +69,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [loadProfile]);
 
-  const setMode = useCallback((r: AccountRole) => {
-    storeRole(r);
-    setRole(r);
+  const setMode = useCallback((m: Mode) => {
+    storeMode(m);
+    setChosen(m);
   }, []);
 
-  // A remembered "seller" from a profile that is not one (turned off since, or a different
-  // account on the same browser) falls back to buying rather than showing an empty store.
-  const mode: Mode = isAdmin ? 'admin' : role === 'seller' && profile?.isSeller ? 'seller' : 'buyer';
+  // A remembered side the account cannot have (selling turned off since, an admin id removed
+  // from the server, or a different account on the same browser) falls back to buying rather
+  // than showing an empty store or a refused dashboard.
+  const mode: Mode = chosen === 'admin' && isAdmin ? 'admin' : chosen === 'seller' && profile?.isSeller ? 'seller' : 'buyer';
 
   const value = useMemo<AuthValue>(
     () => ({
@@ -92,8 +93,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut: async () => {
         await api.signOut();
         // The choice belonged to this account's visit; the next person to sign in makes their own.
-        storeRole(null);
-        setRole(null);
+        storeMode(null);
+        setChosen(null);
       },
       isUsernameAvailable: (username) => api.isUsernameAvailable(username),
       sendPasswordReset: (email) => api.sendPasswordReset(email),

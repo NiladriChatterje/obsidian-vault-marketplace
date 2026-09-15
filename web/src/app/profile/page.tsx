@@ -6,12 +6,13 @@ import { useEffect, useState } from 'react';
 import { Empty, Field, Loading } from '@/components/ui';
 import { errorMessage } from '@/lib/web';
 import { api } from '@/lib/api';
+import type { Mode } from '@/lib/mode';
 import { landingFor } from '@/lib/onboarding';
 import { useAuth } from '@/store/auth';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, profile, loading, signOut, refreshProfile, mode, setMode } = useAuth();
+  const { user, profile, loading, signOut, refreshProfile, mode, setMode, isAdmin } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [busy, setBusy] = useState(false);
@@ -54,19 +55,25 @@ export default function ProfilePage() {
   };
 
   /**
-   * Cross to the other side of the site. Selling is turned on for the profile the first time,
-   * and a seller with nowhere to be paid yet is taken to say where, as at sign-in.
+   * Cross to another side of the site. Selling is turned on for the profile the first time,
+   * and a seller with nowhere to be paid yet is taken to say where, as at sign-in. The
+   * dashboard is offered only while the server names this account in ADMIN_USER_IDS.
    */
-  const switchTo = async (role: 'buyer' | 'seller') => {
+  const switchTo = async (side: Mode) => {
     setSwitching(true);
     setSwitchError(null);
     try {
-      if (role === 'seller' && !profile?.isSeller) {
+      if (side === 'admin') {
+        setMode('admin');
+        router.push('/admin');
+        return;
+      }
+      if (side === 'seller' && !profile?.isSeller) {
         await api.updateProfile({ isSeller: true });
         await refreshProfile();
       }
-      setMode(role);
-      router.push(await landingFor(role, role === 'seller' ? '/sell' : '/'));
+      setMode(side);
+      router.push(await landingFor(side, side === 'seller' ? '/sell' : '/'));
     } catch (err) {
       setSwitchError(errorMessage(err));
     } finally {
@@ -97,13 +104,13 @@ export default function ProfilePage() {
         ) : null}
       </div>
 
-      {/* One account can buy and sell; the site shows one side at a time. This is where to cross over. */}
+      {/* One account can buy and sell, and the administrator's can also run the place; the site shows one side at a time. This is where to cross over. */}
       <div className="card stack">
         <div>
-          <strong>{mode === 'admin' ? 'Administrator' : mode === 'seller' ? 'You are selling' : 'You are buying'}</strong>
+          <strong>{mode === 'admin' ? 'You are running the dashboard' : mode === 'seller' ? 'You are selling' : 'You are buying'}</strong>
           <p className="muted small" style={{ marginTop: 4 }}>
             {mode === 'admin'
-              ? 'This account runs the marketplace, so it sees the dashboard and nothing else.'
+              ? 'Your one tab is the dashboard: every purchase across the marketplace and how each vault is doing. Switch sides to buy or sell as anyone else does.'
               : mode === 'seller'
                 ? 'Your tabs are your store, new listings and payouts. Switch to buying to browse and use your library.'
                 : profile?.isSeller
@@ -112,19 +119,23 @@ export default function ProfilePage() {
           </p>
         </div>
         {switchError ? <div className="error">{switchError}</div> : null}
-        {mode === 'admin' ? null : mode === 'seller' ? (
-          <div>
+        <div className="row wrap">
+          {mode === 'buyer' ? null : (
             <button className="btn secondary" onClick={() => switchTo('buyer')} disabled={switching}>
               {switching ? 'Switching…' : 'Switch to buying'}
             </button>
-          </div>
-        ) : (
-          <div>
+          )}
+          {mode === 'seller' ? null : (
             <button className="btn secondary" onClick={() => switchTo('seller')} disabled={switching}>
               {switching ? 'Switching…' : profile?.isSeller ? 'Switch to selling' : 'Start selling'}
             </button>
-          </div>
-        )}
+          )}
+          {isAdmin && mode !== 'admin' ? (
+            <button className="btn secondary" onClick={() => switchTo('admin')} disabled={switching}>
+              {switching ? 'Switching…' : 'Open the dashboard'}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <form className="card stack" onSubmit={save}>

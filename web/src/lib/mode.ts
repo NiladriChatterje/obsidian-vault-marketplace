@@ -1,31 +1,32 @@
 import type { AccountRole } from '../types';
 
 /**
- * What the person is doing on this visit. One account can buy and sell; the mode says which
- * of those they are here for right now, and the site shows only that side. Administrators
- * see only the dashboard.
+ * What the person is doing on this visit. One account can buy and sell, and the account
+ * named in the server's ADMIN_USER_IDS can also run the place; the mode says which of those
+ * they are here for right now, and the site shows only that side.
  *
- * The buyer/seller half is chosen at sign-in and can be switched on the account page. It is
- * remembered per browser, not on the profile, because it is about this visit and not about
- * the account: the same person can be selling on a laptop and buying on a phone.
+ * The side is chosen at sign-in and can be switched on the account page. It is remembered
+ * per browser, not on the profile, because it is about this visit and not about the
+ * account: the same person can be selling on a laptop and buying on a phone. A remembered
+ * "admin" only counts while the server still says so; anyone else who has it stored is a buyer.
  */
 export type Mode = AccountRole | 'admin';
 
 const KEY = 'vaultmarket:mode';
 
-export function readStoredRole(): AccountRole | null {
+export function readStoredMode(): Mode | null {
   try {
     const v = typeof window !== 'undefined' ? window.localStorage.getItem(KEY) : null;
-    return v === 'seller' || v === 'buyer' ? v : null;
+    return v === 'seller' || v === 'buyer' || v === 'admin' ? v : null;
   } catch {
     return null;
   }
 }
 
-export function storeRole(role: AccountRole | null): void {
+export function storeMode(mode: Mode | null): void {
   try {
     if (typeof window === 'undefined') return;
-    if (role) window.localStorage.setItem(KEY, role);
+    if (mode) window.localStorage.setItem(KEY, mode);
     else window.localStorage.removeItem(KEY);
   } catch {
     // Private mode or blocked storage: the choice simply lasts for this page load.
