@@ -6,13 +6,14 @@
  * `hasPayoutDetails` is the gate: a paid listing cannot be published, and cannot be bought,
  * unless the seller can actually be paid.
  */
-import { IS_DEMO } from './config.ts';
-import { isPayoutCurrency } from './payout-currencies.ts';
+import { IS_DEMO, cfg } from './config.ts';
+import { isPayoutCurrency, regionForCurrency } from './payout-currencies.ts';
 import { admin } from './supabase.ts';
 
 export type PayoutMethod = 'bank' | 'wise' | 'payoneer' | 'paypal';
 
 export interface PayoutDetails {
+  /** Derived from the currency on save, never taken from the seller; see regionForCurrency(). */
   country: string;
   currency: string;
   method: PayoutMethod;
@@ -67,9 +68,6 @@ export async function payoutRegion(userId: string): Promise<{ has: boolean; coun
 
 /** Returns the problem as a sentence for the seller, or null when the details are usable. */
 export function validatePayoutDetails(d: Partial<PayoutDetails>): string | null {
-  const country = (d.country ?? '').trim().toUpperCase();
-  if (!/^[A-Z]{2}$/.test(country)) return 'Choose the country your account is held in.';
-
   const currency = (d.currency ?? '').trim().toUpperCase();
   if (!currency) return 'Choose the currency you want to be paid in.';
   if (!isPayoutCurrency(currency)) {
@@ -87,14 +85,14 @@ export function validatePayoutDetails(d: Partial<PayoutDetails>): string | null 
   if (d.method !== 'bank' && !looksLikeEmail) return 'That does not look like an email address. Transfer services are addressed by the account email.';
   if (d.method === 'bank' && looksLikeEmail) return 'Enter the account number or IBAN here, not an email address.';
 
-  // An IBAN names its country in its first two letters, so it can be held to the country
-  // given. The country sets the commission and the payout threshold: one that says the
-  // account is domestic while the IBAN says otherwise would be charged the domestic rate
-  // and paid at the domestic threshold, then cost an international wire to actually reach.
-  if (d.method === 'bank') {
+  // An IBAN names its country in its first two letters. The platform's own currency is paid
+  // by domestic transfer at the domestic rate and threshold, and domestic accounts here have
+  // no IBAN, so one given with that currency means the account is abroad: it would be
+  // charged and thresholded as domestic, then cost an international wire to actually reach.
+  if (d.method === 'bank' && currency === cfg.platformCurrency) {
     const iban = ref.replace(/\s+/g, '').toUpperCase();
-    if (/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban) && iban.slice(0, 2) !== country) {
-      return `That IBAN is for an account in ${iban.slice(0, 2)}, but the country is set to ${country}. Set the country to where the account is held.`;
+    if (/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban) && iban.slice(0, 2) !== cfg.platformCountry) {
+      return `That IBAN is for an account in ${iban.slice(0, 2)}, which cannot receive ${currency} by domestic transfer. Choose the currency of that account instead.`;
     }
   }
 
@@ -104,7 +102,7 @@ export function validatePayoutDetails(d: Partial<PayoutDetails>): string | null 
 export async function savePayoutDetails(userId: string, d: PayoutDetails): Promise<PayoutDetails> {
   const row = {
     user_id: userId,
-    country: d.country.trim().toUpperCase(),
+    country: regionForCurrency(d.currency),
     currency: d.currency.trim().toUpperCase(),
     method: d.method,
     account_name: d.accountName.trim(),

@@ -18,6 +18,7 @@ export default async function payoutRoutes(app: FastifyInstance) {
   app.get('/me/payout-details', async (req, reply) => {
     const r = await requireRequester(req, reply);
     if (!r) return;
+    // The currencies ride along so the form offers only what can actually be paid out.
     if (IS_DEMO) return { details: null, currencies: PAYOUT_CURRENCIES, demo: true };
     return { details: await getPayoutDetails(r.id), currencies: PAYOUT_CURRENCIES };
   });

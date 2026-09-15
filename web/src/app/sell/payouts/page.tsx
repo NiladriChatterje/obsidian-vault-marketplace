@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { Empty, Field, Loading, Toast } from '@/components/ui';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/lib/api';
-import { PLATFORM_COUNTRY, PLATFORM_FEE_FIXED_CENTS, feePercentFor } from '@/lib/config';
+import { DEFAULT_CURRENCY, PLATFORM_FEE_FIXED_CENTS, PLATFORM_FEE_PERCENT_DOMESTIC, PLATFORM_FEE_PERCENT_INTERNATIONAL, feePercentFor, regionForCurrency } from '@/lib/config';
 import { formatPrice } from '@/lib/format';
 import { errorMessage } from '@/lib/web';
 import { useAuth } from '@/store/auth';
@@ -31,7 +31,7 @@ const PAYOUT_SPEED: Record<PayoutMethod, string> = {
   paypal: 'Cheap internationally. Note PayPal takes its own cut from what arrives.',
 };
 
-const EMPTY: PayoutDetails = { country: '', currency: '', method: 'bank', accountName: '', accountRef: '', bankCode: '', notes: '' };
+const EMPTY: PayoutDetails = { currency: '', method: 'bank', accountName: '', accountRef: '', bankCode: '', notes: '' };
 
 /**
  * Where the seller's share is sent. This is not an onboarding to the payment provider:
@@ -46,7 +46,7 @@ export default function PayoutDetailsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const existing = useAsync(() => (user ? api.getPayoutDetails() : Promise.resolve({ details: null, currencies: [] })), [user?.id]);
+  const existing = useAsync(() => (user ? api.getPayoutDetails() : Promise.resolve({ details: null, countries: [], currencies: [] })), [user?.id]);
 
   useEffect(() => {
     if (existing.data?.details) setForm({ ...EMPTY, ...existing.data.details });
@@ -69,6 +69,12 @@ export default function PayoutDetailsPage() {
   const currencies = existing.data?.currencies ?? [];
   const method = METHODS.find((m) => m.value === form.method)!;
   const isBank = form.method === 'bank';
+  const fixed = formatPrice(PLATFORM_FEE_FIXED_CENTS);
+  // The currency decides the rate: INR goes by domestic transfer, anything else abroad. Until
+  // one is chosen there is no single number to show, and quoting the international rate as
+  // if it were theirs would misprice most sellers, so both are shown instead.
+  const rate = form.currency ? `${feePercentFor(regionForCurrency(form.currency))}% + ${fixed}` : null;
+  const bothRates = `${PLATFORM_FEE_PERCENT_DOMESTIC}% + ${fixed} if paid in ${DEFAULT_CURRENCY}, ${PLATFORM_FEE_PERCENT_INTERNATIONAL}% + ${fixed} in any other currency`;
 
   const set = (patch: Partial<PayoutDetails>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -93,32 +99,21 @@ export default function PayoutDetailsPage() {
       <div>
         <h1>Payout details</h1>
         <p className="muted">
-          Buyers pay Vault Market, which is the seller of record for every sale and handles the tax. Your share, the price less our{' '}
-          {feePercentFor(form.country)}% + {formatPrice(PLATFORM_FEE_FIXED_CENTS)} fee, is sent to you separately, so we need to know where. A paid
-          vault cannot go live until this is filled in; free vaults can be published without it.
+          Buyers pay Vault Market, which is the seller of record for every sale and handles the tax. Your share, the price less our fee
+          {rate ? ` of ${rate}` : ` of ${bothRates}`}, is sent to you separately, so we need to know where. A paid vault cannot go live until
+          this is filled in; free vaults can be published without it.
         </p>
       </div>
 
       <form className="card stack" onSubmit={submit}>
         <Field
-          label="Country"
+          label="Currency"
           hint={
-            form.country.length === 2
-              ? `Paid in ${form.country}, your rate is ${feePercentFor(form.country)}% + ${formatPrice(PLATFORM_FEE_FIXED_CENTS)} per sale.`
-              : `Two-letter code for where your account is held, for example ${PLATFORM_COUNTRY}, US or DE. It sets your rate: sending money abroad costs more.`
+            rate
+              ? `Paid in ${form.currency}, your rate is ${rate} per sale. If yours is missing we cannot pay out in it yet.`
+              : `What you want to receive. It sets your rate: ${bothRates}, because sending money abroad costs more. If yours is missing we cannot pay out in it yet.`
           }
         >
-          <input
-            className="input"
-            value={form.country}
-            onChange={(e) => set({ country: e.target.value.toUpperCase().slice(0, 2) })}
-            placeholder="IN"
-            style={{ textTransform: 'uppercase' }}
-            maxLength={2}
-          />
-        </Field>
-
-        <Field label="Currency" hint="What you want to receive. If yours is missing we cannot pay out in it yet.">
           <select className="input" value={form.currency} onChange={(e) => set({ currency: e.target.value })}>
             <option value="">Select a currency</option>
             {currencies.map((c) => (

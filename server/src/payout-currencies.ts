@@ -22,6 +22,20 @@ export const PAYOUT_CURRENCIES = [
 
 const SUPPORTED = new Set<string>(PAYOUT_CURRENCIES);
 
+/**
+ * The region a payout in this currency goes to, stored in seller_payouts.country.
+ *
+ * The seller is not asked where their account is: the currency they want says enough,
+ * because what the country decided was only whether the transfer is domestic or abroad,
+ * and an INR payout is a domestic transfer wherever the person lives. ISO 4217 codes open
+ * with the ISO 3166 code of the issuer, so INR is IN and GBP is GB; the euro gives EU and
+ * the shared African and Caribbean francs and dollars give a regional code, which is as
+ * precise as a currency can be. Mirrored in web/src/lib/config.ts for the live fee preview.
+ */
+export function regionForCurrency(currency: string): string {
+  return currency.trim().toUpperCase().slice(0, 2);
+}
+
 export function isPayoutCurrency(code: string): boolean {
   return SUPPORTED.has(code.trim().toUpperCase());
 }
