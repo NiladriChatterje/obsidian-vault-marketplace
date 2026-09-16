@@ -71,7 +71,7 @@ export const PROVIDER_FIXED_FEE_CENTS = Number(process.env.NEXT_PUBLIC_PROVIDER_
  *
  * Mirrored in server/src/config.ts, which enforces it; keep the two in step.
  */
-const MIN_PRICE_FLOOR_CENTS = 14900;
+const MIN_PRICE_FLOOR_CENTS = 4900;
 
 function deriveMinPriceCents(): number {
   // The domestic rate is the lower of the two, so it is the one that has to clear.
