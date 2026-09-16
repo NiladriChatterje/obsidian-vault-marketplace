@@ -32,7 +32,18 @@ export const cfg = {
   supabase: {
     url: env('NEXT_PUBLIC_SUPABASE_URL') || env('EXPO_PUBLIC_SUPABASE_URL'),
     serviceKey: env('SUPABASE_SERVICE_ROLE_KEY'),
+    /**
+     * Used for exactly one thing: checking a password on the caller's behalf during sign-in,
+     * on a throwaway client. Never to read data -- that is the service key's job.
+     */
+    anonKey: env('NEXT_PUBLIC_SUPABASE_ANON_KEY') || env('EXPO_PUBLIC_SUPABASE_KEY'),
   },
+
+  /**
+   * Where sign-in challenges live (see redis.ts). They expire in minutes and are read once,
+   * so they belong somewhere that forgets on its own rather than in a table.
+   */
+  redisUrl: env('REDIS_URL'),
 
   /** Brevo transactional email (see email.ts). No API key = the server sends no mail. */
   brevo: {

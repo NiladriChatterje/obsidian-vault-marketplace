@@ -17,10 +17,10 @@ interface AuthValue {
   setMode(mode: Mode): void;
   loading: boolean;
   isDemo: boolean;
-  /** Emails a one-time sign-in code. Answers the same way for an address with no account. */
-  sendSignInCode(email: string): Promise<void>;
-  /** Exchanges an emailed code for a session. */
-  verifySignInCode(email: string, code: string): Promise<void>;
+  /** Step one: the server checks the password and emails a code. Returns no session. */
+  startSignIn(email: string, password: string): Promise<{ challengeId: string; expiresInSeconds: number }>;
+  /** Step two: the code buys a session. */
+  verifySignIn(challengeId: string, code: string): Promise<void>;
   signUp(email: string, password: string, username: string, role?: AccountRole): Promise<{ needsEmailConfirm: boolean }>;
   signOut(): Promise<void>;
   isUsernameAvailable(username: string): Promise<boolean>;
@@ -91,8 +91,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setMode,
       loading,
       isDemo: api.isDemo,
-      sendSignInCode: (email) => api.sendSignInCode(email),
-      verifySignInCode: (email, code) => api.verifySignInCode(email, code),
+      startSignIn: (email, password) => api.startSignIn(email, password),
+      verifySignIn: (challengeId, code) => api.verifySignIn(challengeId, code),
       signUp: (email, password, username, role) => api.signUp(email, password, username, role),
       signOut: async () => {
         await api.signOut();

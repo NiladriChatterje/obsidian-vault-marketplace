@@ -39,12 +39,13 @@ export interface Backend {
   getCurrentUser(): Promise<AuthUser | null>;
   onAuthChange(cb: (user: AuthUser | null) => void): () => void;
   /**
-   * Emails a one-time sign-in code. Resolves for unknown addresses too, so it cannot be used
-   * to probe for accounts; a wrong address simply never produces a code that verifies.
+   * Step one of signing in: the server checks the password and emails a code. Deliberately
+   * returns no session — the password alone must not sign anyone in, which is the whole point
+   * of the second step. The challenge id names the attempt; on its own it authorises nothing.
    */
-  sendSignInCode(email: string): Promise<void>;
-  /** Exchanges an emailed code for a session. Throws if the code is wrong, used or expired. */
-  verifySignInCode(email: string, code: string): Promise<void>;
+  startSignIn(email: string, password: string): Promise<{ challengeId: string; expiresInSeconds: number }>;
+  /** Step two: the code buys a session. Throws if it is wrong, used or expired. */
+  verifySignIn(challengeId: string, code: string): Promise<void>;
   /** `role` travels with the account so a seller's profile is created as one, even before the email is confirmed. */
   signUp(email: string, password: string, username: string, role?: AccountRole): Promise<{ needsEmailConfirm: boolean }>;
   signOut(): Promise<void>;

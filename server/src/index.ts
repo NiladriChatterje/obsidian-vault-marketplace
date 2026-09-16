@@ -13,9 +13,11 @@ import { createClient } from '@sanity/client';
 import { SANITY_API_TOKEN, SANITY_DATASET, SANITY_ENABLED, SANITY_PROJECT_ID, useSanityClientFactory } from './sanity/index.ts';
 import { IS_DEMO, cfg } from './config.ts';
 import { EMAIL_ENABLED } from './email.ts';
+import { REDIS_ENABLED } from './redis.ts';
 import { DODO_ENABLED } from './dodo.ts';
 import { startKeepAwake } from './keepalive.ts';
 import { startPayoutWatch } from './payout-watch.ts';
+import authRoutes from './routes/auth.ts';
 import catalogRoutes from './routes/catalog.ts';
 import adminPayoutRoutes from './routes/admin-payouts.ts';
 import dodoWebhookRoutes from './routes/dodo.ts';
@@ -37,9 +39,12 @@ app.get('/health', async () => ({
   provider: 'dodo',
   dodo: DODO_ENABLED ? { configured: true, mode: cfg.dodo.live ? 'live' : 'test', webhook: !!cfg.dodo.webhookSecret } : { configured: false },
   email: EMAIL_ENABLED ? { provider: 'brevo', from: cfg.brevo.senderEmail } : null,
+  // Sign-in codes live here, so without it nobody can complete a sign-in.
+  redis: REDIS_ENABLED,
   catalog: SANITY_ENABLED ? { source: 'sanity', projectId: SANITY_PROJECT_ID, dataset: SANITY_DATASET, canWrite: !!SANITY_API_TOKEN } : { source: 'none' },
 }));
 
+await app.register(authRoutes); // the only unauthenticated POSTs: the caller has no session yet
 await app.register(catalogRoutes); // own scope: multipart parser for zip uploads
 await app.register(checkoutRoutes);
 await app.register(payoutRoutes);

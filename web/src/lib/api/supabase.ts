@@ -149,6 +149,19 @@ async function apiFetch<T = Record<string, any>>(path: string, init: { method?: 
   return json;
 }
 
+/** Calls the payment server without a session, which sign-in is the only case for. */
+async function publicFetch<T = Record<string, any>>(path: string, body: unknown): Promise<T> {
+  if (!API_URL) throw new Error('Sign-in needs the payment server. Set NEXT_PUBLIC_SERVER_API_URL.');
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const json = (await res.json().catch(() => ({}))) as T & { error?: string };
+  if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
+  return json;
+}
+
 /**
  * Supabase states auth failures in its own vocabulary ("Invalid login credentials",
  * "User already registered"). Buyers see these verbatim, so translate the ones people
@@ -222,16 +235,18 @@ export const supabaseBackend: Backend = {
     });
     return () => data.subscription.unsubscribe();
   },
-  async sendSignInCode(email) {
-    // shouldCreateUser: false keeps this a sign-in, not a back door that registers whoever
-    // types an address. Supabase then refuses unknown addresses, and that refusal is
-    // swallowed: answering differently for a registered address would turn this form into a
-    // way to test which emails have accounts. An unknown address just never gets a code.
-    const { error } = await requireSupabase().auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
-    if (error && !/signups? not allowed/i.test(error.message)) throw authError(error);
+  async startSignIn(email, password) {
+    // Note what is NOT here: signInWithPassword. The password goes to our server, which checks
+    // it and keeps the session to itself, so no amount of poking at this page from the console
+    // produces a session without the emailed code. See server/src/signin-otp.ts.
+    return publicFetch<{ challengeId: string; expiresInSeconds: number }>('/auth/sign-in/start', { email, password });
   },
-  async verifySignInCode(email, code) {
-    const { error } = await requireSupabase().auth.verifyOtp({ email, token: code, type: 'email' });
+  async verifySignIn(challengeId, code) {
+    // The server hands back a one-time token hash rather than a session; Supabase turns it
+    // into one here, so the session is created and stored by supabase-js exactly as it would
+    // be after any other sign-in, and refreshes itself the same way.
+    const { tokenHash } = await publicFetch<{ tokenHash: string }>('/auth/sign-in/verify', { challengeId, code });
+    const { error } = await requireSupabase().auth.verifyOtp({ token_hash: tokenHash, type: 'email' });
     if (error) throw authError(error);
   },
   async signUp(email, password, username, role = 'buyer') {
