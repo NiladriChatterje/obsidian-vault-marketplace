@@ -20,17 +20,20 @@ export default function CheckoutResultPage() {
 function CheckoutResult() {
   const params = useSearchParams();
   const status = params.get('status');
-  const ok = status === 'success';
-  const failed = status === 'failed';
   const vaultId = params.get('vault');
   const paymentId = params.get('payment');
   const appScheme = params.get('app');
   const { user, loading } = useAuth();
-  const [state, setState] = useState<'checking' | 'ready' | 'pending'>('checking');
+  const [state, setState] = useState<'checking' | 'ready' | 'pending' | 'failed'>('checking');
+  // The provider brings every outcome back to this same url, so a declined payment
+  // arrives looking like a successful one. Only the order row tells the two apart.
+  const paid = status === 'success';
+  const failed = status === 'failed' || state === 'failed';
+  const ok = paid && !failed;
 
   // The webhook can lag a second or two behind the redirect; poll briefly.
   useEffect(() => {
-    if (!ok || !vaultId || loading) return;
+    if (!paid || !vaultId || loading) return;
     if (!user) {
       setState('pending');
       return;
@@ -42,6 +45,10 @@ function CheckoutResult() {
           if (!cancelled) setState('ready');
           return;
         }
+        if ((await api.lastOrderStatus(vaultId).catch(() => null)) === 'failed') {
+          if (!cancelled) setState('failed');
+          return;
+        }
         await new Promise((r) => setTimeout(r, 1500));
       }
       if (!cancelled) setState('pending');
@@ -49,16 +56,16 @@ function CheckoutResult() {
     return () => {
       cancelled = true;
     };
-  }, [ok, vaultId, user?.id, loading]);
+  }, [paid, vaultId, user?.id, loading]);
 
   return (
     <div className="narrow center stack" style={{ margin: '40px auto', gap: 16 }}>
       <div style={{ fontSize: 56 }}>{ok ? '✓' : '×'}</div>
-      <h1>{ok ? 'Payment received' : failed ? 'Payment could not be verified' : 'Checkout cancelled'}</h1>
+      <h1>{ok ? 'Payment received' : failed ? 'Payment did not go through' : 'Checkout cancelled'}</h1>
       {paymentId ? <p className="mono muted">Payment {paymentId}</p> : null}
       <p className="muted">
         {failed
-          ? 'The payment could not be confirmed. If money left your account, contact support with the payment id below and we will sort it out.'
+          ? 'The payment did not complete, so no vault was added to your library. If money did leave your account, contact support and we will sort it out.'
           : !ok
           ? 'No charge was made. You can come back to the vault any time.'
           : state === 'checking'
@@ -69,7 +76,7 @@ function CheckoutResult() {
       </p>
       <div className="row" style={{ justifyContent: 'center' }}>
         {appScheme ? (
-          <a href={`${appScheme}://checkout-result?status=${ok ? 'success' : 'cancelled'}${vaultId ? `&vault=${vaultId}` : ''}`} className="btn">
+          <a href={`${appScheme}://checkout-result?status=${ok ? 'success' : failed ? 'failed' : 'cancelled'}${vaultId ? `&vault=${vaultId}` : ''}`} className="btn">
             Return to the app
           </a>
         ) : null}

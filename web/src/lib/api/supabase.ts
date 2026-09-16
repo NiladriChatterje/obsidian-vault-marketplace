@@ -430,6 +430,18 @@ export const supabaseBackend: Backend = {
     if (!data.url) throw new Error('Checkout could not be started.');
     return { url: data.url };
   },
+  async lastOrderStatus(vaultId) {
+    // Row level security keeps this to the signed-in buyer's own orders.
+    const { data, error } = await requireSupabase()
+      .from('orders')
+      .select('status')
+      .eq('vault_id', vaultId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data?.status ?? null;
+  },
   async getDownloadUrl() {
     throw new Error(FILES_NEED_SERVER);
   },
