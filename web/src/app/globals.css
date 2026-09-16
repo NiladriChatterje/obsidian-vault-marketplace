@@ -189,14 +189,19 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
 .site-footer a:hover { color: var(--text); }
 
 /* legal pages */
-.legal { max-width: 720px; margin: 0 auto; }
-.legal h1 { margin-bottom: 4px; }
-.legal h2 { font-size: 17px; margin: 28px 0 8px; }
-.legal h3 { font-size: 14.5px; margin: 18px 0 4px; color: var(--muted); }
+.legal { max-width: 720px; margin: 0 auto; padding: 8px 0 32px; }
+.legal-head { padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+.legal-head h1 { margin-bottom: 6px; }
+.legal-head p { margin: 0; }
+.legal h2 { font-size: 17px; margin: 32px 0 10px; }
+.legal h3 { font-size: 14.5px; font-weight: 600; margin: 20px 0 6px; }
 .legal p { margin-bottom: 12px; line-height: 1.65; }
-.legal ul { margin: 0 0 12px; padding-left: 20px; }
-.legal li { margin-bottom: 8px; line-height: 1.6; }
+.legal ul { margin: 0 0 12px; padding-left: 22px; }
+.legal li { margin-bottom: 6px; padding-left: 2px; line-height: 1.6; }
+.legal li::marker { color: var(--muted); }
+.legal strong { font-weight: 600; }
 .legal a { text-decoration: underline; text-underline-offset: 2px; }
+.legal-contact { line-height: 1.7; }
 
 /* Tablets. Room for a sidebar and a denser grid, but not for a desktop's proportions.
    Listed before the narrower queries so those still win where they apply. */
@@ -312,7 +317,7 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
   .textarea { min-height: 110px; }
   .empty { padding: 28px 12px; }
   .site-footer-inner { padding: 16px 14px; }
-  .legal h2 { margin: 22px 0 8px; }
+  .legal h2 { margin: 26px 0 8px; }
 
   /* A long id sits beside a label here, so let it break rather than widen the row. */
   .mono { overflow-wrap: anywhere; }

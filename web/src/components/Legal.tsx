@@ -5,10 +5,12 @@ import { BUSINESS } from '@/lib/legal';
 export function LegalPage({ title, children }: { title: string; children: ReactNode }) {
   return (
     <article className="legal">
-      <h1>{title}</h1>
-      <p className="muted small">
-        Last updated {BUSINESS.lastUpdated} · {BUSINESS.tradingName}, operated by {BUSINESS.legalName}
-      </p>
+      <header className="legal-head">
+        <h1>{title}</h1>
+        <p className="muted small">
+          Last updated {BUSINESS.lastUpdated}. {BUSINESS.tradingName} is operated by {BUSINESS.legalName}.
+        </p>
+      </header>
       {children}
     </article>
   );
