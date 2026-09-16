@@ -13,8 +13,13 @@
  * clearing.ts guarantees: a sale is not payable until it can no longer be reversed. A
  * balance can still go negative if a reversal arrives after the window, and is then carried
  * against the seller's next sale rather than written off.
+ *
+ * Payouts go out once a month (payout-cycle.ts). A run is prepared from the balance as it
+ * stood at the start of the payout day, so a sale clearing the day after waits a month
+ * rather than slipping into a batch that is already being paid.
  */
 import { cfg } from './config.ts';
+import { payoutCycle } from './payout-cycle.ts';
 import { payoutThresholdCents, transferCostCents, type PayoutMethod } from './payout-thresholds.ts';
 import { admin } from './supabase.ts';
 
@@ -70,30 +75,35 @@ export interface SellerBalance {
 type Row = Record<string, any>;
 
 /**
- * Whether a sale may be paid on. Two things have to be true: the buyer can no longer
- * reverse it, and Dodo has settled it to us. The first protects against a refund landing on
- * money already sent; the second against sending money we have not yet received.
+ * Whether a sale may be paid on, as of the given instant. Two things have to be true by
+ * then: the buyer can no longer reverse it, and Dodo has settled it to us. The first
+ * protects against a refund landing on money already sent; the second against sending
+ * money we have not yet received.
  *
  * No clears_at means the row predates the clearing window; its window has long passed.
  */
-function saleCleared(p: Row, now: number): boolean {
-  const pastWindow = !p.clears_at || new Date(p.clears_at).getTime() <= now;
-  return pastWindow && (!cfg.payoutRequireSettlement || !!p.settled_at);
+function saleCleared(p: Row, asOf: number): boolean {
+  const pastWindow = !p.clears_at || new Date(p.clears_at).getTime() <= asOf;
+  const settled = !cfg.payoutRequireSettlement || (!!p.settled_at && new Date(p.settled_at).getTime() <= asOf);
+  return pastWindow && settled;
 }
 
 /** Past the buyer's window, so only the settlement is outstanding. */
-function saleAwaitingSettlement(p: Row, now: number): boolean {
-  const pastWindow = !p.clears_at || new Date(p.clears_at).getTime() <= now;
-  return pastWindow && cfg.payoutRequireSettlement && !p.settled_at;
+function saleAwaitingSettlement(p: Row, asOf: number): boolean {
+  return !saleCleared(p, asOf) && (!p.clears_at || new Date(p.clears_at).getTime() <= asOf);
 }
 
 /**
  * Every seller with either sales or payments, and what is outstanding for each.
  *
+ * `asOf` is the instant cleared money is measured at: now by default, or the start of the
+ * payout day when a run is being prepared, so the batch reflects that day and not whatever
+ * has cleared since. Paid and pending runs always count in full, whenever they were made.
+ *
  * Purchases made before the seller was recorded on the row are skipped rather than guessed
  * at: an unattributable sale must not appear as someone's debt.
  */
-export async function sellerBalances(): Promise<SellerBalance[]> {
+export async function sellerBalances(asOf: Date = new Date()): Promise<SellerBalance[]> {
   const db = admin();
 
   const [{ data: purchases, error: pErr }, { data: runs, error: rErr }] = await Promise.all([
@@ -110,14 +120,14 @@ export async function sellerBalances(): Promise<SellerBalance[]> {
     return t;
   };
 
-  const now = Date.now();
+  const at = asOf.getTime();
   for (const p of (purchases ?? []) as Row[]) {
     const t = get(p.seller_id);
     t.gross += p.amount_cents ?? 0;
     t.fee += p.fee_cents ?? 0;
     const net = (p.amount_cents ?? 0) - (p.fee_cents ?? 0);
-    if (saleCleared(p, now)) t.cleared += net;
-    else if (saleAwaitingSettlement(p, now)) t.unsettled += net;
+    if (saleCleared(p, at)) t.cleared += net;
+    else if (saleAwaitingSettlement(p, at)) t.unsettled += net;
     // Free claims are purchases too; they are not sales and should not inflate the count.
     if ((p.amount_cents ?? 0) > 0) t.sales++;
   }
@@ -196,6 +206,9 @@ export async function sellerBalance(sellerId: string): Promise<{
   holdingCents: number;
   thresholdCents: number;
   payable: boolean;
+  /** The day of the month payouts go out, and when the next one is. */
+  cycleDay: number;
+  nextPayoutAt: string;
 }> {
   const db = admin();
   const [{ data: purchases, error: pErr }, { data: runs, error: rErr }] = await Promise.all([
@@ -224,6 +237,7 @@ export async function sellerBalance(sellerId: string): Promise<{
   const { data: d } = await db.from('seller_payouts').select('method, country').eq('user_id', sellerId).maybeSingle();
   const thresholdCents = payoutThresholdCents((d?.method ?? null) as PayoutMethod | null, d?.country ?? null);
   const available = cleared - paid - pending;
+  const cycle = payoutCycle();
   return {
     earnedCents: earned,
     paidCents: paid,
@@ -233,6 +247,8 @@ export async function sellerBalance(sellerId: string): Promise<{
     holdingCents: earned - cleared,
     thresholdCents,
     payable: !!d && available >= thresholdCents,
+    cycleDay: cycle.day,
+    nextPayoutAt: cycle.next.toISOString(),
   };
 }
 
@@ -284,10 +300,16 @@ export async function recordPayout(input: RecordPayoutInput): Promise<Row> {
 }
 
 /**
- * Writes a `pending` run for every seller whose balance has cleared its region's window and
- * is worth the transfer fee. This is the step that stops a cleared balance being forgotten:
+ * Writes a `pending` run for every seller who, at the start of the current payout day, had
+ * cleared their threshold. This is the step that stops a cleared balance being forgotten:
  * once a run exists the debt is recorded as an instruction, not left implicit in a table
  * nobody reads.
+ *
+ * Balances are measured as of the payout day, not now, so it does not matter which day of
+ * the month this runs on: a tick on the 28th and a tick on the 30th (after a host that was
+ * asleep on the 28th) prepare the same batch, and a sale that cleared on the 29th is in
+ * neither. `asOf` overrides that instant for an operator who wants a batch from the
+ * balances as they stand today.
  *
  * It does not move money. Nothing here can: Dodo is the merchant of record and settles only
  * to the platform, so the transfer itself is made by the operator (or, one day, by a payout
@@ -297,8 +319,8 @@ export async function recordPayout(input: RecordPayoutInput): Promise<Row> {
  * balances subtract pending from available, and a unique index allows one pending run per
  * seller, so a double fire cannot promise the same money twice.
  */
-export async function preparePayoutRuns(): Promise<Row[]> {
-  const due = (await sellerBalances()).filter((r) => r.payable && r.availableCents > 0);
+export async function preparePayoutRuns(asOf: Date = payoutCycle().current): Promise<Row[]> {
+  const due = (await sellerBalances(asOf)).filter((r) => r.payable && r.availableCents > 0);
   if (!due.length) return [];
 
   const prepared: Row[] = [];

@@ -239,7 +239,7 @@ export const demoBackend: Backend = {
 
   async getPayoutDetails() {
     // Demo grants purchases in the browser, so there is nobody to pay and nothing to gate.
-    return { details: null, currencies: [] };
+    return { details: null, currencies: [], terms: null };
   },
   async savePayoutDetails(details: PayoutDetails) {
     return details;

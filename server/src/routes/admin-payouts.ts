@@ -6,7 +6,7 @@
  *   POST /admin/payouts            record a transfer you have made
  *   GET  /admin/payouts/:sellerId  one seller's payment history
  *   GET  /admin/payouts/runs       runs prepared and awaiting a transfer
- *   POST /admin/payouts/runs       prepare runs now, instead of waiting for the timer
+ *   POST /admin/payouts/runs       prepare this cycle's runs now; { asOfNow: true } batches today's balances instead
  *   POST /admin/payouts/runs/:id/confirm  { reference } the transfer has been made
  *   POST /admin/payouts/runs/:id/cancel   it has not, and will not be
  *
@@ -18,6 +18,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { requireAdmin } from '../admin.ts';
+import { payoutCycle } from '../payout-cycle.ts';
 import { cancelPayoutRun, confirmPayoutRun, payoutHistory, pendingPayoutRuns, preparePayoutRuns, recordPayout, runsToCsv, sellerBalances } from '../payout-ledger.ts';
 
 export default async function adminPayoutRoutes(app: FastifyInstance) {
@@ -29,8 +30,11 @@ export default async function adminPayoutRoutes(app: FastifyInstance) {
     // would cost more than the sales behind it earned.
     const payable = owed.filter((r) => r.payable);
     const accruing = owed.filter((r) => r.payout && !r.payable);
+    const cycle = payoutCycle();
     return {
       sellers: rows,
+      // Payouts go out monthly; the balances above are live, the batch is cut on this day.
+      cycle: { day: cycle.day, timeZone: cycle.timeZone, lastPayoutAt: cycle.current.toISOString(), nextPayoutAt: cycle.next.toISOString() },
       totalOutstandingCents: owed.reduce((s, r) => s + r.outstandingCents, 0),
       payableNowCents: payable.reduce((s, r) => s + r.availableCents, 0),
       // Owed, but still inside a buyer's reversal window or not yet settled to us by Dodo.
@@ -63,10 +67,14 @@ export default async function adminPayoutRoutes(app: FastifyInstance) {
     };
   });
 
-  /** Prepares runs on demand. The timer does this daily; this is for doing it now. */
-  app.post('/admin/payouts/runs', async (req, reply) => {
+  /**
+   * Prepares runs on demand. The timer does this daily from the current payout day's
+   * balances; this is for doing it now. `asOfNow` cuts a batch from today's balances
+   * instead, for an operator who has decided to pay early and knows what that includes.
+   */
+  app.post<{ Body?: { asOfNow?: boolean } }>('/admin/payouts/runs', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;
-    const prepared = await preparePayoutRuns();
+    const prepared = await preparePayoutRuns(req.body?.asOfNow ? new Date() : undefined);
     return { prepared, count: prepared.length };
   });
 

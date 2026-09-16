@@ -138,6 +138,9 @@ export interface SellerStats {
   availableCents?: number;
   /** Earned, but still inside the buyer's reversal window. */
   holdingCents?: number;
+  /** Payouts go out monthly on this day of the month; the next one is at nextPayoutAt. */
+  payoutCycleDay?: number;
+  nextPayoutAt?: string;
 }
 
 export type SortMode = 'new' | 'popular' | 'top';

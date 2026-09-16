@@ -1,4 +1,4 @@
-import type { AdminOverview, PayoutDetails, Profile, Purchase, Review, SellerStats, SortMode, Vault, VaultInput, VaultInsights, VaultSales, VaultStatus } from '../../types';
+import type { AdminOverview, PayoutDetails, PayoutTerms, Profile, Purchase, Review, SellerStats, SortMode, Vault, VaultInput, VaultInsights, VaultSales, VaultStatus } from '../../types';
 import { decodeCursor, encodeCursor, type Cursor } from '../cursor';
 import { API_URL, MIN_PASSWORD_LENGTH, REDIRECT_ORIGIN, STORAGE_BUCKETS } from '../config';
 import { requireSupabase } from '../supabase';
@@ -280,8 +280,8 @@ export const supabaseBackend: Backend = {
   },
 
   async getPayoutDetails() {
-    const data = await apiFetch<{ details: PayoutDetails | null; currencies: string[] }>('/me/payout-details');
-    return { details: data.details ?? null, currencies: data.currencies ?? [] };
+    const data = await apiFetch<{ details: PayoutDetails | null; currencies: string[]; terms?: PayoutTerms }>('/me/payout-details');
+    return { details: data.details ?? null, currencies: data.currencies ?? [], terms: data.terms ?? null };
   },
   async savePayoutDetails(details: PayoutDetails) {
     const data = await apiFetch<{ details: PayoutDetails }>('/me/payout-details', { method: 'PUT', body: { details } });

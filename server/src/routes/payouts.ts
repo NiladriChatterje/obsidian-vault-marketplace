@@ -1,7 +1,7 @@
 /**
  * The seller's own payout details, held by the platform.
  *
- *   GET /me/payout-details  -> { details, currencies } (details is null until they set it)
+ *   GET /me/payout-details  -> { details, currencies, terms } (details is null until they set it)
  *   PUT /me/payout-details  { details } -> { details }
  *
  * This is not an onboarding to the payment provider. Dodo is the merchant of record: it
@@ -10,17 +10,27 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { requireRequester } from '../access.ts';
-import { IS_DEMO } from '../config.ts';
+import { IS_DEMO, cfg } from '../config.ts';
 import { PAYOUT_CURRENCIES, suggestedCurrency } from '../payout-currencies.ts';
+import { payoutCycle } from '../payout-cycle.ts';
 import { getPayoutDetails, savePayoutDetails, validatePayoutDetails, type PayoutDetails } from '../seller-payouts.ts';
 
 export default async function payoutRoutes(app: FastifyInstance) {
   app.get('/me/payout-details', async (req, reply) => {
     const r = await requireRequester(req, reply);
     if (!r) return;
-    // The currencies ride along so the form offers only what can actually be paid out.
-    if (IS_DEMO) return { details: null, currencies: PAYOUT_CURRENCIES, demo: true };
-    return { details: await getPayoutDetails(r.id), currencies: PAYOUT_CURRENCIES };
+    // The currencies ride along so the form offers only what can actually be paid out, and
+    // the terms so the page states the real numbers rather than a copy of them.
+    const cycle = payoutCycle();
+    const terms = {
+      currency: cfg.platformCurrency,
+      domesticThresholdCents: cfg.payoutThresholdDomesticCents,
+      internationalThresholdCents: cfg.payoutThresholdInternationalCents,
+      cycleDay: cycle.day,
+      nextPayoutAt: cycle.next.toISOString(),
+    };
+    if (IS_DEMO) return { details: null, currencies: PAYOUT_CURRENCIES, terms, demo: true };
+    return { details: await getPayoutDetails(r.id), currencies: PAYOUT_CURRENCIES, terms };
   });
 
   app.put<{ Body: { details: PayoutDetails } }>(

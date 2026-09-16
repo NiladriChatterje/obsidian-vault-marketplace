@@ -86,8 +86,20 @@ export const cfg = {
   },
   /** Headroom over the break-even threshold, so a payout is never marginal. */
   payoutSafetyFactor: Number(env('PAYOUT_SAFETY_FACTOR', '1.35')),
-  /** No payout below this however cheap the transfer, so payouts stay worth processing. */
-  payoutMinCents: Number(env('PAYOUT_MIN_CENTS', '50000')),
+  /**
+   * The least a seller is paid, by where the money goes, in the platform currency's minor
+   * units. Rs 5,000 for a domestic payout; for one abroad, Rs 6,200, which is about USD 70.
+   * The break-even threshold derived from the transfer cost still applies on top, so an
+   * expensive route (an international bank wire) waits for more than this.
+   */
+  payoutThresholdDomesticCents: Number(env('PAYOUT_THRESHOLD_DOMESTIC_CENTS', '500000')),
+  payoutThresholdInternationalCents: Number(env('PAYOUT_THRESHOLD_INTERNATIONAL_CENTS', '620000')),
+  /**
+   * Payouts go out once a month, on this day, reckoned in this time zone. Balances are
+   * measured as they stood at the start of that day; whatever clears later waits a month.
+   */
+  payoutCycleDay: Math.min(28, Math.max(1, Number(env('PAYOUT_CYCLE_DAY', '28')) || 28)),
+  payoutTimeZone: env('PAYOUT_CYCLE_TIMEZONE', 'Asia/Kolkata'),
   /**
    * Days a sale is held before it can be paid out. The longer window covers the statutory
    * right of withdrawal on digital goods in the EU, the EEA and the UK; everywhere else a
