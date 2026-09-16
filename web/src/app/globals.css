@@ -57,7 +57,9 @@ p { margin: 0; }
 /* nav */
 .nav { border-bottom: 1px solid var(--border); background: var(--bg); position: sticky; top: 0; z-index: 10; }
 .nav-inner { max-width: 1080px; margin: 0 auto; padding: 0 20px; height: var(--nav-h); display: flex; align-items: center; gap: 24px; }
-.brand { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+.brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+/* The mark carries its own dark body, so on the bar it reads by its edges and its one highlight. */
+.brand-mark { width: 26px; height: 26px; flex-shrink: 0; display: block; }
 .nav-links { display: flex; gap: 4px; flex: 1; }
 .nav-links a { padding: 6px 10px; border-radius: var(--r-md); color: var(--muted); font-size: 13.5px; }
 .nav-links a:hover, .nav-links a.active { color: var(--text); background: var(--raised); }
@@ -404,4 +406,4 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
 }
 
 /* The side of the site this visit is on, beside the brand, since the trimmed tabs otherwise do not say. */
-.brand-mode { margin-left: 8px; font-size: 11px; font-weight: 600; color: var(--muted); border: 1px solid var(--border); padding: 1px 7px; border-radius: 999px; vertical-align: 2px; }
+.brand-mode { font-size: 11px; font-weight: 600; color: var(--muted); border: 1px solid var(--border); padding: 1px 7px; border-radius: 999px; }
