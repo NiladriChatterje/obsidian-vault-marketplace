@@ -37,6 +37,16 @@ export interface Profile {
  */
 export type PayoutMethod = 'bank' | 'wise' | 'payoneer' | 'paypal';
 
+/** The platform's payout terms, as the server states them: when it pays and from what balance. */
+export interface PayoutTerms {
+  /** What the thresholds are in: the platform currency, which balances are held in. */
+  currency: string;
+  domesticThresholdCents: number;
+  internationalThresholdCents: number;
+  cycleDay: number;
+  nextPayoutAt: string;
+}
+
 export interface PayoutDetails {
   /**
    * The region the payout goes to, set by the server from the currency (IN for INR, EU for
@@ -161,6 +171,9 @@ export interface SellerStats {
   availableCents?: number;
   /** Earned, but still inside the buyer's reversal window. */
   holdingCents?: number;
+  /** Payouts go out monthly on this day of the month; the next one is at nextPayoutAt. */
+  payoutCycleDay?: number;
+  nextPayoutAt?: string;
 }
 
 export type SortMode = 'new' | 'popular' | 'top';

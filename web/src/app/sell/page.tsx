@@ -8,7 +8,7 @@ import { errorMessage } from '@/lib/web';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/lib/api';
 import { PLATFORM_FEE_FIXED_CENTS, PLATFORM_FEE_PERCENT_DOMESTIC, PLATFORM_FEE_PERCENT_INTERNATIONAL } from '@/lib/config';
-import { formatCount, formatMoney, formatPrice } from '@/lib/format';
+import { formatCount, formatDate, formatMoney, formatPrice } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 import type { Vault, VaultSales, VaultStatus } from '@/types';
 
@@ -30,7 +30,7 @@ function Sell() {
   // Dodo settles to the platform and never pays a seller, so a paid listing can only go
   // live once we know where to send their share.
   const payout = useAsync(
-    () => (user && isSeller && !isDemo ? api.getPayoutDetails() : Promise.resolve({ details: null, currencies: [] })),
+    () => (user && isSeller && !isDemo ? api.getPayoutDetails() : Promise.resolve({ details: null, currencies: [], terms: null })),
     [user?.id, isSeller]
   );
   const payoutMissing = !isDemo && isSeller && !payout.loading && !payout.data?.details;
@@ -161,11 +161,17 @@ function Sell() {
             <div className="stat">
               <div className="label">Awaiting payout</div>
               <div className="value">{formatMoney(stats.data.availableCents)}</div>
+              {/* Payouts go out monthly, so the date matters as much as the threshold: a seller
+                  over it is told when, and one under it is told what to reach by then. */}
               {stats.data.payoutThresholdCents ? (
                 <div className="label" style={{ marginTop: 4 }}>
                   {stats.data.availableCents >= stats.data.payoutThresholdCents
-                    ? 'Ready to be sent'
-                    : `Sent once you reach ${formatPrice(stats.data.payoutThresholdCents)}`}
+                    ? stats.data.nextPayoutAt
+                      ? `Goes out on ${formatDate(stats.data.nextPayoutAt)}`
+                      : 'Ready to be sent'
+                    : stats.data.nextPayoutAt
+                      ? `Reach ${formatPrice(stats.data.payoutThresholdCents)} to be paid on ${formatDate(stats.data.nextPayoutAt)}`
+                      : `Sent once you reach ${formatPrice(stats.data.payoutThresholdCents)}`}
                 </div>
               ) : null}
             </div>

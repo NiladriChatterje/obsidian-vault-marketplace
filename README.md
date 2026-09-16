@@ -224,6 +224,18 @@ because Vault Market is the seller of record; these are simply the platform's ow
 who to pay. Dodo settles one amount to the platform and never pays a seller, so a paid vault
 cannot be published or bought until the seller can be paid. Free vaults are unaffected.
 
+### Paying sellers
+
+Payouts go out once a month, on the 28th (`PAYOUT_CYCLE_DAY`, in `PAYOUT_CYCLE_TIMEZONE`).
+On that day the server prepares a run for every seller whose cleared balance, as it stood at
+the start of the day, has reached their threshold: Rs 5,000 for a payout inside India,
+about USD 70 (Rs 6,200) for one abroad (`PAYOUT_THRESHOLD_DOMESTIC_CENTS`,
+`PAYOUT_THRESHOLD_INTERNATIONAL_CENTS`). Routes that cost more to send than that covers,
+such as an international bank wire, derive a higher threshold from `TRANSFER_COST_*` so no
+payout can cost more than the commission behind it. Anything clearing after the 28th waits
+for the next one. The operator makes the transfers from the batch file and confirms each run
+at `/admin/payouts/runs`.
+
 ## Project layout
 
 ```

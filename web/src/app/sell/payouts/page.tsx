@@ -6,8 +6,8 @@ import { useEffect, useState } from 'react';
 import { Empty, Field, Loading, Toast } from '@/components/ui';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/lib/api';
-import { DEFAULT_CURRENCY, PLATFORM_FEE_FIXED_CENTS, PLATFORM_FEE_PERCENT_DOMESTIC, PLATFORM_FEE_PERCENT_INTERNATIONAL, feePercentFor, regionForCurrency } from '@/lib/config';
-import { formatPrice } from '@/lib/format';
+import { DEFAULT_CURRENCY, PLATFORM_COUNTRY, PLATFORM_FEE_FIXED_CENTS, PLATFORM_FEE_PERCENT_DOMESTIC, PLATFORM_FEE_PERCENT_INTERNATIONAL, feePercentFor, regionForCurrency } from '@/lib/config';
+import { formatDate, formatPrice } from '@/lib/format';
 import { errorMessage } from '@/lib/web';
 import { useAuth } from '@/store/auth';
 import type { PayoutDetails, PayoutMethod } from '@/types';
@@ -31,6 +31,14 @@ const PAYOUT_SPEED: Record<PayoutMethod, string> = {
   paypal: 'Cheap internationally. Note PayPal takes its own cut from what arrives.',
 };
 
+/** 1 -> 1st, 2 -> 2nd, 28 -> 28th. */
+function ordinal(n: number): string {
+  const rem100 = n % 100;
+  if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
+  const suffix = { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th';
+  return `${n}${suffix}`;
+}
+
 const EMPTY: PayoutDetails = { currency: '', method: 'bank', accountName: '', accountRef: '', bankCode: '', notes: '' };
 
 /**
@@ -46,7 +54,7 @@ export default function PayoutDetailsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const existing = useAsync(() => (user ? api.getPayoutDetails() : Promise.resolve({ details: null, countries: [], currencies: [] })), [user?.id]);
+  const existing = useAsync(() => (user ? api.getPayoutDetails() : Promise.resolve({ details: null, currencies: [], terms: null })), [user?.id]);
 
   useEffect(() => {
     if (existing.data?.details) setForm({ ...EMPTY, ...existing.data.details });
@@ -74,6 +82,9 @@ export default function PayoutDetailsPage() {
   // one is chosen there is no single number to show, and quoting the international rate as
   // if it were theirs would misprice most sellers, so both are shown instead.
   const rate = form.currency ? `${feePercentFor(regionForCurrency(form.currency))}% + ${fixed}` : null;
+  // The payout terms come from the server so the page quotes the numbers actually enforced.
+  const terms = existing.data?.terms ?? null;
+  const domestic = form.currency ? regionForCurrency(form.currency) === PLATFORM_COUNTRY : null;
   const bothRates = `${PLATFORM_FEE_PERCENT_DOMESTIC}% + ${fixed} if paid in ${DEFAULT_CURRENCY}, ${PLATFORM_FEE_PERCENT_INTERNATIONAL}% + ${fixed} in any other currency`;
 
   const set = (patch: Partial<PayoutDetails>) => setForm((f) => ({ ...f, ...patch }));
@@ -171,10 +182,24 @@ export default function PayoutDetailsPage() {
       </form>
 
       <p className="muted small">
-        Earnings build up and are sent once they are worth transferring, because every transfer costs a fee and a tiny payout would
-        be mostly fee. Cheaper routes reach that point sooner. A sale also clears for a few days first, longer for buyers in the EU,
-        EEA or UK who have a statutory right to withdraw, so that a reversed payment is never one we have already paid out. Your seller dashboard shows how far along you are. These details are
-        stored for paying you and are never shown publicly or shared with buyers.
+        {terms ? (
+          <>
+            Payouts go out once a month, on the {ordinal(terms.cycleDay)}; the next is on {formatDate(terms.nextPayoutAt)}. You are included once
+            your cleared balance has reached{' '}
+            {domestic === null
+              ? `${formatPrice(terms.domesticThresholdCents)} for a payout in ${DEFAULT_CURRENCY}, or ${formatPrice(terms.internationalThresholdCents)} (about USD 70) in any other currency`
+              : domestic
+                ? `${formatPrice(terms.domesticThresholdCents)}`
+                : `${formatPrice(terms.internationalThresholdCents)}, about USD 70`}
+            . Whatever clears after the {ordinal(terms.cycleDay)} waits for the following month.{' '}
+          </>
+        ) : (
+          <>Payouts go out once a month, once your cleared balance has reached the threshold for your currency. </>
+        )}
+        The threshold exists because every transfer costs a fee, and a tiny payout would be mostly fee; an international bank wire costs the
+        most, so it waits for a higher balance than the other routes. A sale also clears for a few days first, longer for buyers in the EU, EEA
+        or UK who have a statutory right to withdraw, so that a reversed payment is never one we have already paid out. Your seller dashboard
+        shows how far along you are. These details are stored for paying you and are never shown publicly or shared with buyers.
       </p>
 
       {saved ? <Toast title="Payout details saved" message="You can now publish paid vaults." onClose={() => setSaved(false)} /> : null}

@@ -13,8 +13,12 @@
  *
  *   - cleared: past the buyer's reversal window, so sending it cannot strand us, and
  *     settled to us by Dodo, so it is our money being sent and not a loan against theirs
- *   - above threshold: worth more than roughly 23x what the transfer itself costs, which is
- *     derived per region, since a domestic transfer is cheap and a SWIFT one is not
+ *   - above threshold: the region's floor (Rs 5,000 at home, about USD 70 abroad), or the
+ *     break-even for the route when that is higher, since a SWIFT wire is not cheap
+ *
+ * Payouts are monthly. Runs are cut from balances as they stood at the start of the payout
+ * day (payout-cycle.ts), so the daily tick prepares nothing new between one payout day and
+ * the next; it only reminds about runs still waiting on a transfer.
  *
  * Nothing here moves money or changes a balance. It writes runs, and it writes an email.
  *
