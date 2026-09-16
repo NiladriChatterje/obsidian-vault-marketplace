@@ -19,12 +19,8 @@ export default function ContactPage() {
         <a href={`mailto:${BUSINESS.supportEmail}`}>{BUSINESS.supportEmail}</a>
       </p>
 
-      <h2>Registered address</h2>
-      <p>
-        {BUSINESS.legalName}
-        <br />
-        {BUSINESS.address}
-      </p>
+      <h2>Operated by</h2>
+      <p>{BUSINESS.legalName}</p>
 
       <h2>What to include</h2>
       <ul>
