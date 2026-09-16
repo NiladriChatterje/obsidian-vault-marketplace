@@ -16,7 +16,9 @@
  *   POST /vaults  { input, id? }       create / update a listing (seller)
  *   POST /vaults/:id/status { status } | DELETE /vaults/:id
  *   POST /vaults/:id/refresh-rating    recompute rating from Supabase reviews into Sanity
- *   POST /uploads/vault-zip            multipart zip -> note/attachment documents -> { path: bundleId, ... }
+ *   POST /uploads/vault-zip?vaultId=   multipart zip -> note/attachment documents -> { path: bundleId, ... }
+ *                                      vaultId is the listing being replaced, so its current
+ *                                      size is left out of the seller's storage quota
  *   POST /uploads/cover                multipart image -> Sanity image asset -> { url }
  */
 import multipart from '@fastify/multipart';
@@ -34,6 +36,30 @@ import { admin } from '../supabase.ts';
 /** The authority on vault size. The clients copy it as MAX_VAULT_ZIP_BYTES to reject early. */
 const MAX_ZIP_BYTES = 70 * 1024 * 1024;
 const MAX_ZIP_LABEL = `${MAX_ZIP_BYTES / (1024 * 1024)} MB`;
+
+/**
+ * All of one seller's vaults together. Storage is the scarce resource here, so the ceiling is
+ * on what they keep listed rather than on how many listings they have. The clients copy it as
+ * MAX_SELLER_STORAGE_BYTES to show a meter and to refuse an upload before it is spent.
+ */
+const MAX_SELLER_STORAGE_BYTES = 1024 * 1024 * 1024;
+const MAX_SELLER_STORAGE_LABEL = `${MAX_SELLER_STORAGE_BYTES / (1024 * 1024 * 1024)} GB`;
+
+function mb(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * What a seller's listings occupy, counted from the vault documents themselves.
+ *
+ * `excludeVaultId` leaves out the listing a replacement zip is about to overwrite, because
+ * saving it deletes the old contents. Excluding by id is safe: only the seller's own vaults
+ * are summed in the first place, so an id that is not theirs changes nothing.
+ */
+async function storageUsed(userId: string, excludeVaultId?: string): Promise<number> {
+  const mine = await catalog.getSellerVaults(userId, true);
+  return mine.filter((v) => v.id !== excludeVaultId).reduce((sum, v) => sum + (v.sizeBytes || 0), 0);
+}
 const MAX_COVER_BYTES = 5 * 1024 * 1024;
 
 export default async function catalogRoutes(app: FastifyInstance) {
@@ -189,6 +215,8 @@ export default async function catalogRoutes(app: FastifyInstance) {
       salesCount: 0,
       downloads: mine.reduce((s, v) => s + v.downloads, 0),
       publishedCount: mine.filter((v) => v.status === 'published').length,
+      storageUsedBytes: mine.reduce((s, v) => s + (v.sizeBytes || 0), 0),
+      storageLimitBytes: MAX_SELLER_STORAGE_BYTES,
     };
     if (!r.demo && mine.length) {
       const { data } = await admin()
@@ -282,7 +310,7 @@ export default async function catalogRoutes(app: FastifyInstance) {
     return { ok: true, ratingAvg: avg, ratingCount: count };
   });
 
-  app.post('/uploads/vault-zip', async (req, reply) => {
+  app.post<{ Querystring: { vaultId?: string } }>('/uploads/vault-zip', async (req, reply) => {
     const r = await requireRequester(req, reply);
     if (!r) return;
     const part = await req.file();
@@ -299,6 +327,17 @@ export default async function catalogRoutes(app: FastifyInstance) {
       .filter(([path, data]) => !path.endsWith('/') && data.byteLength > 0)
       .map(([path, data]) => ({ path, data }));
     if (!files.length) return reply.code(400).send({ error: 'The zip is empty' });
+
+    // Checked against the unpacked bytes, not the zip: what the quota measures is what gets
+    // stored. Done before ingest so a vault that will not fit is never written at all.
+    const incoming = catalog.bundleBytes(files);
+    const used = await storageUsed(r.id, req.query.vaultId);
+    if (used + incoming > MAX_SELLER_STORAGE_BYTES) {
+      return reply.code(413).send({
+        error: `That vault unpacks to ${mb(incoming)}, and only ${mb(Math.max(0, MAX_SELLER_STORAGE_BYTES - used))} of your ${MAX_SELLER_STORAGE_LABEL} is free. Delete a listing you no longer sell, or upload a smaller vault.`,
+      });
+    }
+
     try {
       const summary = await catalog.ingestBundle(files, r.id);
       if (!summary.noteCount) return reply.code(400).send({ error: 'No markdown notes found in the zip. Zip the vault folder itself.' });

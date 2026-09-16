@@ -136,10 +136,12 @@ export function withServerCatalog(base: Backend): Backend {
       const { url } = await call<{ url: string }>(demo, '/uploads/cover', { method: 'POST', form });
       return url;
     },
-    async uploadVaultFile(localUri, fileName): Promise<UploadedFile> {
+    async uploadVaultFile(localUri, fileName, vaultId): Promise<UploadedFile> {
       const form = new FormData();
       form.append('file', await blobFor(localUri), fileName);
-      const res = await call<{ path: string; sizeBytes: number; noteCount: number }>(demo, '/uploads/vault-zip', { method: 'POST', form });
+      // The listing being replaced, so the storage quota does not count the copy this one
+      // supersedes. Absent for a listing that has not been saved yet.
+      const res = await call<{ path: string; sizeBytes: number; noteCount: number }>(demo, `/uploads/vault-zip${qs({ vaultId })}`, { method: 'POST', form });
       return { path: res.path, sizeBytes: res.sizeBytes };
     },
   };

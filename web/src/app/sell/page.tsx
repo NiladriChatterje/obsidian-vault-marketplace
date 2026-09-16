@@ -7,8 +7,8 @@ import { Empty, ErrorBox, Loading, StatusPill, VaultRow } from '@/components/ui'
 import { errorMessage } from '@/lib/web';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/lib/api';
-import { PLATFORM_FEE_FIXED_CENTS, PLATFORM_FEE_PERCENT_DOMESTIC, PLATFORM_FEE_PERCENT_INTERNATIONAL } from '@/lib/config';
-import { formatCount, formatDate, formatMoney, formatPrice } from '@/lib/format';
+import { MAX_SELLER_STORAGE_BYTES, PLATFORM_FEE_FIXED_CENTS, PLATFORM_FEE_PERCENT_DOMESTIC, PLATFORM_FEE_PERCENT_INTERNATIONAL } from '@/lib/config';
+import { formatBytes, formatCount, formatDate, formatMoney, formatPrice } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 import type { Vault, VaultSales, VaultStatus } from '@/types';
 
@@ -208,6 +208,15 @@ function Sell() {
         <Loading />
       ) : null}
 
+      {/* Storage is the one seller limit that is not about money, and the only way to get room
+          back is to delete a listing. Shown before the listings so the fix is next to it. */}
+      {vaults.data?.length ? (
+        <StorageMeter
+          usedBytes={stats.data?.storageUsedBytes ?? vaults.data.reduce((s, v) => s + (v.sizeBytes || 0), 0)}
+          limitBytes={stats.data?.storageLimitBytes ?? MAX_SELLER_STORAGE_BYTES}
+        />
+      ) : null}
+
       <section className="stack">
         <h2>Your listings</h2>
         {vaults.error ? <ErrorBox message={vaults.error} onRetry={vaults.refresh} /> : null}
@@ -283,5 +292,33 @@ function Perk({ title, body }: { title: string; body: string }) {
         {body}
       </p>
     </div>
+  );
+}
+
+/**
+ * How much of the seller's storage allowance their listings hold. The bar turns to the warning
+ * treatment near the top so the squeeze is visible before an upload is refused.
+ */
+function StorageMeter({ usedBytes, limitBytes }: { usedBytes: number; limitBytes: number }) {
+  const pct = limitBytes > 0 ? Math.min(100, Math.round((usedBytes / limitBytes) * 100)) : 0;
+  const freeBytes = Math.max(0, limitBytes - usedBytes);
+  const tight = pct >= 85;
+  return (
+    <section className="card stack" style={{ gap: 8 }}>
+      <div className="row between wrap">
+        <h3>Storage</h3>
+        <span className="muted small">
+          {formatBytes(usedBytes)} of {formatBytes(limitBytes)} used
+        </span>
+      </div>
+      <div className="meter" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Storage used">
+        <div className={tight ? 'meter-fill tight' : 'meter-fill'} style={{ width: `${pct}%` }} />
+      </div>
+      <p className="muted small">
+        {tight
+          ? `Only ${formatBytes(freeBytes)} left. Delete a listing you no longer sell to make room for another.`
+          : `${formatBytes(freeBytes)} free. Vaults are measured unpacked, so a listing takes more room than its zip.`}
+      </p>
+    </section>
   );
 }
