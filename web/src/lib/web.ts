@@ -1,9 +1,9 @@
 /** Browser helpers that bridge DOM files to the shared (uri-based) upload API. */
 
 /**
- * Object URL for a picked file. The extension is appended as a fragment so
- * `extFromUri` in the shared backend can infer the content type; the shim
- * strips it again before fetching.
+ * Object URL for a picked file. The extension is appended as a fragment so a
+ * backend can infer the content type from the uri; the shim strips it again
+ * before fetching.
  */
 export function fileToUri(file: File): string {
   const ext = file.name.split('.').pop()?.toLowerCase();

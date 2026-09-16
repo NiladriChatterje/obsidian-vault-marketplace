@@ -120,9 +120,4 @@ export const REDIRECT_ORIGIN: string =
   process.env.NEXT_PUBLIC_REDIRECT_ORIGIN ||
   (typeof location !== 'undefined' && /^https?:/.test(location.origin ?? '') ? location.origin : `${APP_SCHEME}:/`);
 
-export const STORAGE_BUCKETS = {
-  covers: 'vault-covers',
-  files: 'vault-files',
-} as const;
-
 export const MAX_VAULT_ZIP_BYTES = 200 * 1024 * 1024;
