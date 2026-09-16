@@ -163,14 +163,17 @@ export const demoBackend: Backend = {
     listeners.add(cb);
     return () => listeners.delete(cb);
   },
-  async sendSignInCode() {
-    // Demo mode mails nobody, so there is no code to send and any six digits are taken below.
+  async startSignIn(email) {
+    // Demo mode has no server and mails nobody, so the challenge id is just the address and
+    // any six digits are taken below.
     await wait(300);
+    return { challengeId: `demo:${email.toLowerCase()}`, expiresInSeconds: 600 };
   },
-  async verifySignInCode(email, code) {
+  async verifySignIn(challengeId, code) {
     const s = await load();
     await wait(400);
     if (!/^\d{6}$/.test(code)) throw new Error('That code is wrong or has expired. Ask for a new one.');
+    const email = challengeId.replace(/^demo:/, '');
     const id = `demo-${email.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
     if (!s.profiles.some((p) => p.id === id)) {
       s.profiles.push({

@@ -27,7 +27,7 @@ function AuthForm() {
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get('next') ?? '/';
-  const { sendSignInCode, verifySignInCode, signUp, isUsernameAvailable, sendPasswordReset, resendConfirmation, refreshProfile, setMode: rememberSide, isDemo } = useAuth();
+  const { startSignIn, verifySignIn, signUp, isUsernameAvailable, sendPasswordReset, resendConfirmation, refreshProfile, setMode: rememberSide, isDemo } = useAuth();
 
   const [mode, setMode] = useState<Mode>('in');
   // Nobody is asked which side they are here for: everyone arrives buying and crosses over on
@@ -36,10 +36,10 @@ function AuthForm() {
   const role: AccountRole = next.startsWith('/sell') ? 'seller' : 'buyer';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  // Signing in is two steps: the address gets a code, the code gets a session. `codeSent`
-  // is which of the two the form is showing.
+  // Signing in is two steps: the password earns a code, the code earns a session. Holding a
+  // challenge id is what says the first step is done — there is no session until the second.
   const [code, setCode] = useState('');
-  const [codeSent, setCodeSent] = useState(false);
+  const [challengeId, setChallengeId] = useState<string | null>(null);
   const [username, setUsername] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,13 +52,11 @@ function AuthForm() {
     setError(null);
     setInfo(null);
     setUnconfirmed(false);
-    setCodeSent(false);
+    setChallengeId(null);
     setCode('');
   };
 
-  /** Neutral on purpose: the same sentence for an address with an account and one without. */
-  const codeSentNotice = (address: string) =>
-    `If an account exists for ${address}, a six-digit code is on its way. Enter it below — it expires shortly.`;
+  const codeSentNotice = (address: string) => `We emailed a six-digit code to ${address}. Enter it below — it expires in 5 minutes.`;
 
   /**
    * Signed in, with a session in hand. Coming through the Sell tab turns selling on for the
@@ -93,12 +91,14 @@ function AuthForm() {
         await sendPasswordReset(address);
         // Deliberately the same answer whether or not the address has an account.
         setInfo(`If an account exists for ${address}, a reset link is on its way. The link opens this site and expires in an hour.`);
-      } else if (mode === 'in' && !codeSent) {
-        await sendSignInCode(address);
-        setCodeSent(true);
+      } else if (mode === 'in' && !challengeId) {
+        // The password buys a code, not a session: nothing is signed in until the code is back.
+        const started = await startSignIn(address, password);
+        setChallengeId(started.challengeId);
+        setPassword('');
         setInfo(codeSentNotice(address));
-      } else if (mode === 'in') {
-        await verifySignInCode(address, code.trim());
+      } else if (mode === 'in' && challengeId) {
+        await verifySignIn(challengeId, code.trim());
         await arrive();
       } else {
         if (!USERNAME_RE.test(username)) throw new Error('Username: 3–24 lowercase letters, digits, dots or underscores.');
@@ -129,10 +129,11 @@ function AuthForm() {
     setBusy(true);
     setError(null);
     try {
-      const address = email.trim().toLowerCase();
-      await sendSignInCode(address);
+      // A new code means a new challenge, so the password is asked for again rather than
+      // being held in the page while the first code sits unused in an inbox.
+      setChallengeId(null);
       setCode('');
-      setInfo(codeSentNotice(address));
+      setInfo('Enter your password again and we will send a new code.');
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -154,7 +155,7 @@ function AuthForm() {
     }
   };
 
-  const title = mode === 'forgot' ? 'Reset your password' : mode === 'up' ? 'Create account' : codeSent ? 'Sign in' : 'Send me a code';
+  const title = mode === 'forgot' ? 'Reset your password' : mode === 'up' ? 'Create account' : challengeId ? 'Sign in' : 'Continue';
 
   return (
     <div className="narrow" style={{ margin: '0 auto' }}>
@@ -167,12 +168,12 @@ function AuthForm() {
             Create account
           </button>
         </div>
-        {isDemo ? <div className="notice">Demo mode: any email signs you in, and any six digits work as the code.</div> : null}
+        {isDemo ? <div className="notice">Demo mode: any email and password signs you in, and any six digits work as the code.</div> : null}
         <form className="stack" onSubmit={submit}>
           {mode === 'forgot' ? (
             <p className="help">Enter the email you signed up with and we will send a link to set a new password.</p>
-          ) : mode === 'in' && !codeSent ? (
-            <p className="help">No password needed. We email you a six-digit code and you sign in with that.</p>
+          ) : mode === 'in' && !challengeId ? (
+            <p className="help">After your password we email you a six-digit code. Both are needed, so a stolen password is not enough on its own.</p>
           ) : role === 'seller' ? (
             <p className="help">You will be asked where to send your earnings next. Free vaults can be listed before that; paid ones cannot.</p>
           ) : null}
@@ -196,24 +197,24 @@ function AuthForm() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               autoComplete="email"
-              readOnly={mode === 'in' && codeSent}
+              readOnly={mode === 'in' && !!challengeId}
               required
             />
           </Field>
-          {mode === 'up' ? (
-            <Field label="Password" hint={isDemo ? undefined : `At least ${MIN_PASSWORD_LENGTH} characters.`}>
+          {mode === 'up' || (mode === 'in' && !challengeId) ? (
+            <Field label="Password" hint={mode === 'up' && !isDemo ? `At least ${MIN_PASSWORD_LENGTH} characters.` : undefined}>
               <input
                 className="input"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoComplete="new-password"
-                minLength={isDemo ? undefined : MIN_PASSWORD_LENGTH}
+                autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
+                minLength={mode === 'up' && !isDemo ? MIN_PASSWORD_LENGTH : undefined}
                 required
               />
             </Field>
           ) : null}
-          {mode === 'in' && codeSent ? (
+          {mode === 'in' && challengeId ? (
             <Field label="Six-digit code" hint="Check your inbox, and the spam folder if it is not there.">
               <input
                 className="input"
@@ -238,7 +239,7 @@ function AuthForm() {
           <button className="btn block" disabled={busy}>
             {busy ? 'Please wait…' : title}
           </button>
-          {mode === 'in' && codeSent ? (
+          {mode === 'in' && challengeId ? (
             <>
               <button className="btn ghost block" type="button" onClick={resendCode} disabled={busy}>
                 Send another code
@@ -248,9 +249,9 @@ function AuthForm() {
               </button>
             </>
           ) : null}
-          {mode === 'in' && !codeSent ? (
+          {mode === 'in' && !challengeId ? (
             <button className="btn ghost block" type="button" onClick={() => go('forgot')}>
-              Reset your password
+              Forgot your password?
             </button>
           ) : null}
           {mode === 'forgot' ? (
