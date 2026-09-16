@@ -266,6 +266,25 @@ const MAX_NOTE_BYTES = 2 * 1024 * 1024;
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
 /**
+ * What `ingestBundle` would store for these files, for a quota check that has to run before
+ * anything is written. It applies the same three rules the loop below does, so keep the two in
+ * step: the common root is stripped, ignored paths are dropped, and a file over its type's cap
+ * is skipped rather than stored.
+ */
+export function bundleBytes(files: BundleFile[]): number {
+  const strip = stripCommonRoot(files.map((f) => f.path));
+  let total = 0;
+  for (const file of files) {
+    const path = strip(file.path);
+    if (!path || isIgnoredPath(path)) continue;
+    const cap = MARKDOWN_EXT.test(path) ? MAX_NOTE_BYTES : MAX_ATTACHMENT_BYTES;
+    if (file.data.byteLength > cap) continue;
+    total += file.data.byteLength;
+  }
+  return total;
+}
+
+/**
  * Writes the files of an uploaded zip as `note`/`attachment` documents tagged
  * with a new bundle id but no vault yet. `attachBundle` links them when the
  * listing is saved, so uploading before the listing exists works.

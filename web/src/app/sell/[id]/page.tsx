@@ -7,7 +7,7 @@ import { Cover, Field, Loading, Toast } from '@/components/ui';
 import { errorMessage, fileToUri, releaseUri } from '@/lib/web';
 import { inspectVaultZip } from '@/lib/vault-zip';
 import { api } from '@/lib/api';
-import { MAX_VAULT_ZIP_BYTES, MIN_PRICE_CENTS, PLATFORM_COUNTRY, PLATFORM_FEE_FIXED_CENTS, feePercentFor, platformFee } from '@/lib/config';
+import { MAX_SELLER_STORAGE_BYTES, MAX_VAULT_ZIP_BYTES, MIN_PRICE_CENTS, PLATFORM_COUNTRY, PLATFORM_FEE_FIXED_CENTS, feePercentFor, platformFee } from '@/lib/config';
 import { formatBytes, formatPrice, parsePriceToCents, parseTags } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 import { CATEGORIES, type CategorySlug, type Vault, type VaultInput } from '@/types';
@@ -42,13 +42,18 @@ export default function ListingEditorPage() {
   const [saving, setSaving] = useState<'draft' | 'publish' | null>(null);
   const [error, setError] = useState<string | null>(null);
   // A zip refused before it is uploaded. The picker sits at the top of a long form, so the
-  // page's error banner further down would not be seen.
-  const [rejected, setRejected] = useState<string | null>(null);
+  // page's error banner further down would not be seen. The title says which kind of refusal
+  // it is, because a vault that does not fit is a different problem from one we cannot read.
+  const [rejected, setRejected] = useState<{ title: string; message: string } | null>(null);
   // Whether the seller can be paid at all. The server refuses to publish a paid vault
   // without it; checking here means the refusal arrives before the save round trip.
   const [canBePaid, setCanBePaid] = useState<boolean | null>(null);
   // Where they bank sets their rate: a domestic payout costs the platform less to send.
   const [payoutCountry, setPayoutCountry] = useState<string | null>(null);
+  // Storage their other listings already hold. This one is left out, because replacing its zip
+  // frees whatever the old one took. Null while unknown, which never blocks an upload.
+  const [usedByOthers, setUsedByOthers] = useState<number | null>(null);
+  const freeBytes = usedByOthers === null ? null : Math.max(0, MAX_SELLER_STORAGE_BYTES - usedByOthers);
 
   const zipInput = useRef<HTMLInputElement>(null);
   const coverInput = useRef<HTMLInputElement>(null);
@@ -111,10 +116,23 @@ export default function ListingEditorPage() {
       .catch(() => setCanBePaid(null));
   }, [user?.id, isDemo]);
 
+  useEffect(() => {
+    if (!user) return;
+    api
+      .getMyVaults()
+      .then((mine) => setUsedByOthers(mine.filter((v) => v.id !== id).reduce((sum, v) => sum + (v.sizeBytes || 0), 0)))
+      // Unknown rather than zero. The server holds the real quota and refuses the upload itself.
+      .catch(() => setUsedByOthers(null));
+  }, [user?.id, id]);
+
   const pickZip = async (file: File | undefined) => {
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith('.zip')) return setRejected('Zip files only. Export your vault folder as a .zip archive first.');
-    if (file.size > MAX_VAULT_ZIP_BYTES) return setRejected(`Vault archives must be under ${formatBytes(MAX_VAULT_ZIP_BYTES)}.`);
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      return setRejected({ title: 'That file is not a zip', message: 'Zip files only. Export your vault folder as a .zip archive first.' });
+    }
+    if (file.size > MAX_VAULT_ZIP_BYTES) {
+      return setRejected({ title: 'That zip is too large', message: `Vault archives must be under ${formatBytes(MAX_VAULT_ZIP_BYTES)}.` });
+    }
 
     setUploadingFile(true);
     setError(null);
@@ -124,7 +142,16 @@ export default function ListingEditorPage() {
     try {
       const check = await inspectVaultZip(file);
       if (!check.ok) {
-        setRejected(check.reason ?? 'That zip is not an Obsidian vault.');
+        setRejected({ title: 'That zip is not an Obsidian vault', message: check.reason ?? 'That zip is not an Obsidian vault.' });
+        setUploadingFile(false);
+        return;
+      }
+      // Unpacked, not zipped: storage holds the notes and attachments, not the archive.
+      if (freeBytes !== null && check.sizeBytes > freeBytes) {
+        setRejected({
+          title: 'Not enough storage left',
+          message: `That vault unpacks to ${formatBytes(check.sizeBytes)}, and only ${formatBytes(freeBytes)} of your ${formatBytes(MAX_SELLER_STORAGE_BYTES)} is free. Delete a listing you no longer sell, or upload a smaller vault.`,
+        });
         setUploadingFile(false);
         return;
       }
@@ -134,7 +161,7 @@ export default function ListingEditorPage() {
 
     const uri = fileToUri(file);
     try {
-      const uploaded = await api.uploadVaultFile(uri, file.name);
+      const uploaded = await api.uploadVaultFile(uri, file.name, isNew ? undefined : id);
       setFilePath(uploaded.path);
       setFileName(file.name);
       setSizeBytes(uploaded.sizeBytes || file.size);
@@ -154,7 +181,10 @@ export default function ListingEditorPage() {
     if (priceError || priceCents === null) return setError(priceError ?? 'Enter a valid price.');
     if (publish && !filePath) return setError('Attach the .zip before publishing. You can still save a draft.');
     if (publish && priceCents > 0 && canBePaid === false) {
-      return setRejected('Add your payout details before publishing a paid vault. Nobody can pay you until we know where to send your share. You can save it as a draft, or set the price to free.');
+      return setRejected({
+        title: 'Add your payout details first',
+        message: 'Nobody can pay you for a paid vault until we know where to send your share. You can save it as a draft, or set the price to free.',
+      });
     }
 
     setSaving(publish ? 'publish' : 'draft');
@@ -220,6 +250,7 @@ export default function ListingEditorPage() {
           <p className="help">
             Zip your vault folder (including .obsidian if your setup depends on it), up to {formatBytes(MAX_VAULT_ZIP_BYTES)}. Remove personal notes first.
             Buyers download this zip or read it over MCP.
+            {freeBytes === null ? null : <> You have {formatBytes(freeBytes)} of storage left across all your listings.</>}
           </p>
         )}
         <input ref={zipInput} type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden onChange={(e) => pickZip(e.target.files?.[0])} />
@@ -340,7 +371,7 @@ export default function ListingEditorPage() {
       </div>
 
       {rejected ? (
-        <Toast title="That zip is not an Obsidian vault" message={rejected} onClose={() => setRejected(null)} />
+        <Toast title={rejected.title} message={rejected.message} onClose={() => setRejected(null)} />
       ) : null}
     </div>
   );

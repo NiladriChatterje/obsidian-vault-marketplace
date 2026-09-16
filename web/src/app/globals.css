@@ -160,6 +160,13 @@ p { margin: 0; }
 .stat .label { font-size: 12px; }
 .stat .value { font-size: 20px; font-weight: 700; margin-top: 4px; }
 .stat.accent { border-color: var(--text); }
+
+/* Storage meter on the seller dashboard. The palette is monochrome, so a tight allowance
+   reads as a brighter bar rather than a red one. */
+.meter { height: 6px; border-radius: 999px; background: var(--raised); overflow: hidden; }
+.meter-fill { height: 100%; min-width: 2px; border-radius: 999px; background: var(--muted); transition: width 0.3s ease; }
+.meter-fill.tight { background: var(--text); }
+@media (prefers-reduced-motion: reduce) { .meter-fill { transition: none; } }
 .stars { letter-spacing: 1px; color: var(--text); font-size: 12.5px; }
 .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--raised); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13.5px; }
 .detail { display: grid; grid-template-columns: 1fr 320px; gap: 32px; align-items: start; }

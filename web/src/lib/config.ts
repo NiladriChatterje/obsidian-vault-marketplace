@@ -122,3 +122,10 @@ export const REDIRECT_ORIGIN: string =
 
 /** Keep in step with MAX_ZIP_BYTES in server/src/routes/catalog.ts, which is the authority. */
 export const MAX_VAULT_ZIP_BYTES = 70 * 1024 * 1024;
+
+/**
+ * Everything one seller has listed, measured unpacked. The server enforces it; this copy only
+ * lets the sell pages draw a meter and refuse an upload before it is spent. Keep it in step
+ * with MAX_SELLER_STORAGE_BYTES in server/src/routes/catalog.ts.
+ */
+export const MAX_SELLER_STORAGE_BYTES = 1024 * 1024 * 1024;

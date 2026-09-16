@@ -88,7 +88,8 @@ export interface Backend {
   setVaultStatus(id: string, status: VaultStatus): Promise<void>;
   deleteVault(id: string): Promise<void>;
   uploadCover(localUri: string): Promise<string>;
-  uploadVaultFile(localUri: string, fileName: string): Promise<UploadedFile>;
+  /** `vaultId` is the listing being replaced, which the storage quota then leaves out. */
+  uploadVaultFile(localUri: string, fileName: string, vaultId?: string): Promise<UploadedFile>;
 
   // Who bought what, and what they said
   /** How each of my listings has sold. */
