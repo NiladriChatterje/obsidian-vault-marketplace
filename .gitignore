@@ -43,3 +43,6 @@ mobile/android
 .env.local
 supabase/functions/.env
 supabase/.temp
+
+obsidian-templates
+server/scripts
