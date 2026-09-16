@@ -408,6 +408,10 @@ export const demoBackend: Backend = {
     await persist();
     return { url };
   },
+  async lastOrderStatus() {
+    // Demo checkout grants the purchase itself, so no order is left to fail.
+    return null;
+  },
   async getDownloadUrl(vaultId) {
     const s = await load();
     const vault = s.vaults.find((v) => v.id === vaultId);

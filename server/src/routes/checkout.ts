@@ -115,6 +115,9 @@ export default async function checkoutRoutes(app: FastifyInstance) {
           product_cart: [{ product_id: await productForVault(vault), quantity: 1 }],
           customer: order.buyerEmail ? { email: order.buyerEmail, name: order.buyerEmail.split('@')[0] } : undefined,
           return_url: returnUrl(returnOrigin, '/checkout-result', { status: 'success', vault: order.vaultId }),
+          // Dodo uses one return_url for both outcomes, so this is the only way a buyer who
+          // backs out is told apart from one who paid. Without it Dodo hides the back button.
+          cancel_url: returnUrl(returnOrigin, '/checkout-result', { status: 'cancelled', vault: order.vaultId }),
           metadata: { vault_id: order.vaultId, buyer_id: order.buyerId ?? '' },
         });
         if (!session.checkout_url) throw new Error('Dodo returned no checkout url');

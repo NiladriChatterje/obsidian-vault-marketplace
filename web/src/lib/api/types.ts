@@ -85,6 +85,8 @@ export interface Backend {
   claimFreeVault(vaultId: string): Promise<void>;
   /** Returns the provider's hosted checkout URL to open in the browser. */
   createCheckout(vaultId: string): Promise<{ url: string }>;
+  /** Status of this buyer's latest order for a vault, or null if they have none. */
+  lastOrderStatus(vaultId: string): Promise<'created' | 'paid' | 'failed' | 'refunded' | null>;
   /** Short-lived download URL for the vault zip. Caller must have access. */
   getDownloadUrl(vaultId: string): Promise<string>;
 
