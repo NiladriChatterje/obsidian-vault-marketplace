@@ -158,6 +158,11 @@ async function apiFetch<T = Record<string, any>>(path: string, init: { method?: 
 function authMessage(message: string): string {
   const m = message.toLowerCase();
   if (m.includes('invalid login credentials')) return 'That email and password do not match an account.';
+  // Supabase says the same thing for a wrong code, a used one and an expired one, and so do
+  // we: which of the three it was is only useful to someone guessing.
+  if (m.includes('token has expired or is invalid') || m.includes('otp_expired') || m.includes('invalid otp')) {
+    return 'That code is wrong or has expired. Ask for a new one.';
+  }
   if (m.includes('email not confirmed')) return 'Confirm your email first — open the link we sent, then sign in.';
   if (m.includes('already registered') || m.includes('already been registered')) {
     return 'An account with that email already exists. Sign in instead, or reset your password.';
@@ -217,8 +222,16 @@ export const supabaseBackend: Backend = {
     });
     return () => data.subscription.unsubscribe();
   },
-  async signIn(email, password) {
-    const { error } = await requireSupabase().auth.signInWithPassword({ email, password });
+  async sendSignInCode(email) {
+    // shouldCreateUser: false keeps this a sign-in, not a back door that registers whoever
+    // types an address. Supabase then refuses unknown addresses, and that refusal is
+    // swallowed: answering differently for a registered address would turn this form into a
+    // way to test which emails have accounts. An unknown address just never gets a code.
+    const { error } = await requireSupabase().auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+    if (error && !/signups? not allowed/i.test(error.message)) throw authError(error);
+  },
+  async verifySignInCode(email, code) {
+    const { error } = await requireSupabase().auth.verifyOtp({ email, token: code, type: 'email' });
     if (error) throw authError(error);
   },
   async signUp(email, password, username, role = 'buyer') {

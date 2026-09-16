@@ -200,7 +200,9 @@ Tools: `list_vaults`, `list_notes`, `read_note`, `search_notes`, all reading the
    | Providers → Email → Confirm email | on, so an address is proven before it can buy |
    | Providers → Email → Minimum password length | 8, matching `MIN_PASSWORD_LENGTH` in `web/src/lib/config.ts` and `mobile/src/lib/config.ts` |
    | Providers → Email → Leaked password protection | on |
-   | Project Settings → Auth → SMTP | your own SMTP provider. The built-in sender is capped at a few messages an hour and is not for production: without it, confirmation and reset mails stop arriving as soon as you have real traffic. |
+   | Email Templates → Magic Link | **must contain `{{ .Token }}`.** Sign-in is a six-digit code, and the stock template only carries `{{ .ConfirmationURL }}` — leave it and the mail arrives with a link and no code in it. |
+   | Providers → Email → Email OTP Expiration | 600 seconds. The default is an hour, which is a long time for a code sitting in an inbox. |
+   | Project Settings → Auth → SMTP | your own SMTP provider. The built-in sender is capped at a few messages an hour and is not for production: without it, sign-in codes and confirmation mails stop arriving as soon as you have real traffic. Brevo can serve this, but the dashboard wants the SMTP credentials, not the `BREVO_API_KEY` the server uses. |
 1. **Sanity.** Log in once (`npx sanity login` in `sanity-studio/`), create an Editor token at sanity.io/manage → API → Tokens, put it in `.env` as `SANITY_API_TOKEN`, and make the dataset private. Deploy the Studio with `npm run deploy` in `sanity-studio/`.
 2. **App env.** Copy `.env.example` to `.env` and set the Supabase URL and anon key. Restart Expo.
 3. **Dodo Payments.** Create an account, take a read-write key from Developer → API Keys into `DODO_API_KEY`, and deploy `server/` somewhere public (any Node host). Set `SERVER_API_URL` to its URL, then add a webhook in Dodo pointing at `<api>/webhooks/dodo` with events `payment.succeeded`, `payment.failed`, `refund.succeeded`, `dispute.lost` and `payout.success`, putting its signing secret into `DODO_WEBHOOK_SECRET`. See `PAYMENTS_SETUP_GUIDE.md`.

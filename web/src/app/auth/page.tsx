@@ -27,7 +27,7 @@ function AuthForm() {
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get('next') ?? '/';
-  const { signIn, signUp, isUsernameAvailable, sendPasswordReset, resendConfirmation, refreshProfile, setMode: rememberSide, isDemo } = useAuth();
+  const { sendSignInCode, verifySignInCode, signUp, isUsernameAvailable, sendPasswordReset, resendConfirmation, refreshProfile, setMode: rememberSide, isDemo } = useAuth();
 
   const [mode, setMode] = useState<Mode>('in');
   // Nobody is asked which side they are here for: everyone arrives buying and crosses over on
@@ -36,6 +36,10 @@ function AuthForm() {
   const role: AccountRole = next.startsWith('/sell') ? 'seller' : 'buyer';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  // Signing in is two steps: the address gets a code, the code gets a session. `codeSent`
+  // is which of the two the form is showing.
+  const [code, setCode] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
   const [username, setUsername] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +52,13 @@ function AuthForm() {
     setError(null);
     setInfo(null);
     setUnconfirmed(false);
+    setCodeSent(false);
+    setCode('');
   };
+
+  /** Neutral on purpose: the same sentence for an address with an account and one without. */
+  const codeSentNotice = (address: string) =>
+    `If an account exists for ${address}, a six-digit code is on its way. Enter it below — it expires shortly.`;
 
   /**
    * Signed in, with a session in hand. Coming through the Sell tab turns selling on for the
@@ -83,8 +93,12 @@ function AuthForm() {
         await sendPasswordReset(address);
         // Deliberately the same answer whether or not the address has an account.
         setInfo(`If an account exists for ${address}, a reset link is on its way. The link opens this site and expires in an hour.`);
+      } else if (mode === 'in' && !codeSent) {
+        await sendSignInCode(address);
+        setCodeSent(true);
+        setInfo(codeSentNotice(address));
       } else if (mode === 'in') {
-        await signIn(address, password);
+        await verifySignInCode(address, code.trim());
         await arrive();
       } else {
         if (!USERNAME_RE.test(username)) throw new Error('Username: 3–24 lowercase letters, digits, dots or underscores.');
@@ -111,6 +125,21 @@ function AuthForm() {
     }
   };
 
+  const resendCode = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const address = email.trim().toLowerCase();
+      await sendSignInCode(address);
+      setCode('');
+      setInfo(codeSentNotice(address));
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const resend = async () => {
     setBusy(true);
     setError(null);
@@ -125,7 +154,7 @@ function AuthForm() {
     }
   };
 
-  const title = mode === 'forgot' ? 'Reset your password' : mode === 'in' ? 'Sign in' : 'Create account';
+  const title = mode === 'forgot' ? 'Reset your password' : mode === 'up' ? 'Create account' : codeSent ? 'Sign in' : 'Send me a code';
 
   return (
     <div className="narrow" style={{ margin: '0 auto' }}>
@@ -138,10 +167,12 @@ function AuthForm() {
             Create account
           </button>
         </div>
-        {isDemo ? <div className="notice">Demo mode: any email and password signs you in.</div> : null}
+        {isDemo ? <div className="notice">Demo mode: any email signs you in, and any six digits work as the code.</div> : null}
         <form className="stack" onSubmit={submit}>
           {mode === 'forgot' ? (
             <p className="help">Enter the email you signed up with and we will send a link to set a new password.</p>
+          ) : mode === 'in' && !codeSent ? (
+            <p className="help">No password needed. We email you a six-digit code and you sign in with that.</p>
           ) : role === 'seller' ? (
             <p className="help">You will be asked where to send your earnings next. Free vaults can be listed before that; paid ones cannot.</p>
           ) : null}
@@ -165,22 +196,38 @@ function AuthForm() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               autoComplete="email"
+              readOnly={mode === 'in' && codeSent}
               required
             />
           </Field>
-          {mode === 'forgot' ? null : (
-            <Field label="Password" hint={mode === 'up' && !isDemo ? `At least ${MIN_PASSWORD_LENGTH} characters.` : undefined}>
+          {mode === 'up' ? (
+            <Field label="Password" hint={isDemo ? undefined : `At least ${MIN_PASSWORD_LENGTH} characters.`}>
               <input
                 className="input"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
-                minLength={mode === 'up' && !isDemo ? MIN_PASSWORD_LENGTH : undefined}
+                autoComplete="new-password"
+                minLength={isDemo ? undefined : MIN_PASSWORD_LENGTH}
                 required
               />
             </Field>
-          )}
+          ) : null}
+          {mode === 'in' && codeSent ? (
+            <Field label="Six-digit code" hint="Check your inbox, and the spam folder if it is not there.">
+              <input
+                className="input"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                minLength={6}
+                autoFocus
+                required
+              />
+            </Field>
+          ) : null}
           {error ? <div className="error">{error}</div> : null}
           {unconfirmed ? (
             <button className="btn ghost block" type="button" onClick={resend} disabled={busy}>
@@ -191,9 +238,19 @@ function AuthForm() {
           <button className="btn block" disabled={busy}>
             {busy ? 'Please wait…' : title}
           </button>
-          {mode === 'in' ? (
+          {mode === 'in' && codeSent ? (
+            <>
+              <button className="btn ghost block" type="button" onClick={resendCode} disabled={busy}>
+                Send another code
+              </button>
+              <button className="btn ghost block" type="button" onClick={() => go('in')}>
+                Use a different email
+              </button>
+            </>
+          ) : null}
+          {mode === 'in' && !codeSent ? (
             <button className="btn ghost block" type="button" onClick={() => go('forgot')}>
-              Forgot your password?
+              Reset your password
             </button>
           ) : null}
           {mode === 'forgot' ? (

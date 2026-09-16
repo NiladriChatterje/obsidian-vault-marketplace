@@ -38,7 +38,13 @@ export interface Backend {
   // Auth
   getCurrentUser(): Promise<AuthUser | null>;
   onAuthChange(cb: (user: AuthUser | null) => void): () => void;
-  signIn(email: string, password: string): Promise<void>;
+  /**
+   * Emails a one-time sign-in code. Resolves for unknown addresses too, so it cannot be used
+   * to probe for accounts; a wrong address simply never produces a code that verifies.
+   */
+  sendSignInCode(email: string): Promise<void>;
+  /** Exchanges an emailed code for a session. Throws if the code is wrong, used or expired. */
+  verifySignInCode(email: string, code: string): Promise<void>;
   /** `role` travels with the account so a seller's profile is created as one, even before the email is confirmed. */
   signUp(email: string, password: string, username: string, role?: AccountRole): Promise<{ needsEmailConfirm: boolean }>;
   signOut(): Promise<void>;
