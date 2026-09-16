@@ -31,7 +31,9 @@ import { hasPayoutDetails } from '../seller-payouts.ts';
 import { buildVaultZip, signDownload, verifyDownload } from '../download.ts';
 import { admin } from '../supabase.ts';
 
-const MAX_ZIP_BYTES = 200 * 1024 * 1024;
+/** The authority on vault size. The clients copy it as MAX_VAULT_ZIP_BYTES to reject early. */
+const MAX_ZIP_BYTES = 70 * 1024 * 1024;
+const MAX_ZIP_LABEL = `${MAX_ZIP_BYTES / (1024 * 1024)} MB`;
 const MAX_COVER_BYTES = 5 * 1024 * 1024;
 
 export default async function catalogRoutes(app: FastifyInstance) {
@@ -286,7 +288,7 @@ export default async function catalogRoutes(app: FastifyInstance) {
     const part = await req.file();
     if (!part) return reply.code(400).send({ error: 'Attach the .zip as multipart field "file"' });
     const buf = await part.toBuffer();
-    if (part.file.truncated) return reply.code(413).send({ error: 'Zip is larger than 200 MB' });
+    if (part.file.truncated) return reply.code(413).send({ error: `Zip is larger than ${MAX_ZIP_LABEL}` });
     let entries: Record<string, Uint8Array>;
     try {
       entries = unzipSync(new Uint8Array(buf));

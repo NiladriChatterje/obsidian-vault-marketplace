@@ -217,7 +217,10 @@ export default function ListingEditorPage() {
             </div>
           </div>
         ) : (
-          <p className="help">Zip your vault folder (including .obsidian if your setup depends on it). Remove personal notes first. Buyers download this zip or read it over MCP.</p>
+          <p className="help">
+            Zip your vault folder (including .obsidian if your setup depends on it), up to {formatBytes(MAX_VAULT_ZIP_BYTES)}. Remove personal notes first.
+            Buyers download this zip or read it over MCP.
+          </p>
         )}
         <input ref={zipInput} type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden onChange={(e) => pickZip(e.target.files?.[0])} />
         <div>
