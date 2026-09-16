@@ -274,6 +274,6 @@ supabase/                  migrations/0001_init.sql … 0017_signup_role.sql
 
 - Seller agreement and buyer license text (personal, non-transferable).
 - Content moderation: a `reports` table and an admin flag to unlist a vault.
-- Virus scan uploaded zips before publishing (Supabase storage webhook to a scanner).
+- Virus scan uploaded zips before publishing (scan on the server before the notes are written to Sanity).
 - Email receipts (Dodo issues the tax invoice itself), update notifications when a seller ships a new version.
 - Store keywords: obsidian vault, obsidian templates, second brain, zettelkasten, PKM, note templates.

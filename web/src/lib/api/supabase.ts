@@ -1,6 +1,6 @@
 import type { AdminOverview, PayoutDetails, PayoutTerms, Profile, Purchase, Review, SellerStats, SortMode, Vault, VaultInput, VaultInsights, VaultSales, VaultStatus } from '../../types';
 import { decodeCursor, encodeCursor, type Cursor } from '../cursor';
-import { API_URL, MIN_PASSWORD_LENGTH, REDIRECT_ORIGIN, STORAGE_BUCKETS } from '../config';
+import { API_URL, MIN_PASSWORD_LENGTH, REDIRECT_ORIGIN } from '../config';
 import { requireSupabase } from '../supabase';
 import type { AuthUser, Backend } from './types';
 
@@ -125,16 +125,13 @@ async function currentUserId(): Promise<string> {
   return data.user.id;
 }
 
-/** `localUri` is an object URL from lib/web.ts (`blob:...#.ext`); the fragment only carries the extension. */
-async function readBytes(localUri: string): Promise<Uint8Array> {
-  const res = await fetch(localUri.split('#')[0]);
-  return new Uint8Array(await res.arrayBuffer());
-}
-
-function extFromUri(uri: string, fallback: string): string {
-  const match = /\.([a-zA-Z0-9]+)(\?|$)/.exec(uri);
-  return match?.[1]?.toLowerCase() ?? fallback;
-}
+/**
+ * Vault files and covers live in Sanity, reached through the payment server (see
+ * catalog.ts). Supabase keeps accounts, purchases, reviews and the payout ledger, and no
+ * files. These are the file methods the Backend interface still requires; without the
+ * server there is nowhere to send a file, and they say so.
+ */
+const FILES_NEED_SERVER = 'Vault files are stored in Sanity through the catalog server. Set NEXT_PUBLIC_API_URL to upload or download.';
 
 /** Calls the payment server with the current Supabase session token. */
 async function apiFetch<T = Record<string, any>>(path: string, init: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown } = {}): Promise<T> {
@@ -405,17 +402,8 @@ export const supabaseBackend: Backend = {
     if (!data.url) throw new Error('Checkout could not be started.');
     return { url: data.url };
   },
-  async getDownloadUrl(vaultId) {
-    const sb = requireSupabase();
-    const { data: vault, error } = await sb.from('vaults').select('file_path').eq('id', vaultId).single();
-    if (error) throw new Error(error.message);
-    if (!vault?.file_path) throw new Error('This vault has no file attached yet.');
-    const { data, error: urlError } = await sb.storage.from(STORAGE_BUCKETS.files).createSignedUrl(vault.file_path, 300, {
-      download: true,
-    });
-    if (urlError || !data) throw new Error(urlError?.message ?? 'Could not create download link.');
-    await sb.rpc('increment_downloads', { p_vault_id: vaultId });
-    return data.signedUrl;
+  async getDownloadUrl() {
+    throw new Error(FILES_NEED_SERVER);
   },
 
   async getMyVaults() {
@@ -467,31 +455,11 @@ export const supabaseBackend: Backend = {
     const { error } = await requireSupabase().from('vaults').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
-  async uploadCover(localUri) {
-    const sb = requireSupabase();
-    const userId = await currentUserId();
-    const ext = extFromUri(localUri, 'jpg');
-    const path = `${userId}/${Date.now()}.${ext}`;
-    const bytes = await readBytes(localUri);
-    const { error } = await sb.storage.from(STORAGE_BUCKETS.covers).upload(path, bytes, {
-      contentType: ext === 'png' ? 'image/png' : 'image/jpeg',
-      upsert: false,
-    });
-    if (error) throw new Error(error.message);
-    return sb.storage.from(STORAGE_BUCKETS.covers).getPublicUrl(path).data.publicUrl;
+  async uploadCover() {
+    throw new Error(FILES_NEED_SERVER);
   },
-  async uploadVaultFile(localUri, fileName) {
-    const sb = requireSupabase();
-    const userId = await currentUserId();
-    const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = `${userId}/${Date.now()}-${safeName}`;
-    const bytes = await readBytes(localUri);
-    const { error } = await sb.storage.from(STORAGE_BUCKETS.files).upload(path, bytes, {
-      contentType: 'application/zip',
-      upsert: false,
-    });
-    if (error) throw new Error(error.message);
-    return { path, sizeBytes: bytes.byteLength };
+  async uploadVaultFile() {
+    throw new Error(FILES_NEED_SERVER);
   },
 
   // Purchases and reviews are joined to the catalog on the server, which holds the service
