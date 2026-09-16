@@ -64,7 +64,7 @@ export const cfg = {
   providerPercentFee: Number(env('NEXT_PUBLIC_PROVIDER_PERCENT_FEE', env('EXPO_PUBLIC_PROVIDER_PERCENT_FEE', '4'))),
   providerFixedFeeCents: Number(env('NEXT_PUBLIC_PROVIDER_FIXED_FEE_CENTS', env('EXPO_PUBLIC_PROVIDER_FIXED_FEE_CENTS', '3500'))),
   /** Cheapest paid listing allowed. A product choice now, not a solvency one. */
-  minPriceCents: Number(env('MIN_PRICE_CENTS', '14900')),
+  minPriceCents: Number(env('MIN_PRICE_CENTS', '4900')),
 
   /** Where the platform banks. A payout inside this country is a cheap domestic transfer. */
   platformCountry: env('PLATFORM_COUNTRY', 'IN').toUpperCase(),
