@@ -63,4 +63,5 @@ export const STORAGE_BUCKETS = {
   files: 'vault-files',
 } as const;
 
-export const MAX_VAULT_ZIP_BYTES = 200 * 1024 * 1024;
+/** Keep in step with MAX_ZIP_BYTES in server/src/routes/catalog.ts, which is the authority. */
+export const MAX_VAULT_ZIP_BYTES = 70 * 1024 * 1024;

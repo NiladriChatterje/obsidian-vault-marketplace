@@ -120,4 +120,5 @@ export const REDIRECT_ORIGIN: string =
   process.env.NEXT_PUBLIC_REDIRECT_ORIGIN ||
   (typeof location !== 'undefined' && /^https?:/.test(location.origin ?? '') ? location.origin : `${APP_SCHEME}:/`);
 
-export const MAX_VAULT_ZIP_BYTES = 200 * 1024 * 1024;
+/** Keep in step with MAX_ZIP_BYTES in server/src/routes/catalog.ts, which is the authority. */
+export const MAX_VAULT_ZIP_BYTES = 70 * 1024 * 1024;
