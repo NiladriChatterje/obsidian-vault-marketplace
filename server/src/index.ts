@@ -13,6 +13,7 @@ import { createClient } from '@sanity/client';
 import { SANITY_API_TOKEN, SANITY_DATASET, SANITY_ENABLED, SANITY_PROJECT_ID, useSanityClientFactory } from './sanity/index.ts';
 import { IS_DEMO, cfg } from './config.ts';
 import { EMAIL_ENABLED } from './email.ts';
+import { MALWARE_SCAN_ENABLED } from './malware.ts';
 import { REDIS_ENABLED } from './redis.ts';
 import { DODO_ENABLED } from './dodo.ts';
 import { startKeepAwake } from './keepalive.ts';
@@ -41,6 +42,8 @@ app.get('/health', async () => ({
   email: EMAIL_ENABLED ? { provider: 'brevo', from: cfg.brevo.senderEmail } : null,
   // Sign-in codes live here, so without it nobody can complete a sign-in.
   redis: REDIS_ENABLED,
+  // Off means uploaded vaults reach Sanity unscanned; see malware.ts.
+  uploadScan: MALWARE_SCAN_ENABLED,
   catalog: SANITY_ENABLED ? { source: 'sanity', projectId: SANITY_PROJECT_ID, dataset: SANITY_DATASET, canWrite: !!SANITY_API_TOKEN } : { source: 'none' },
 }));
 

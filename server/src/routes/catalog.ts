@@ -31,6 +31,7 @@ import { IS_DEMO, cfg, minPriceCents, platformFee } from '../config.ts';
 import { sellerBalance } from '../payout-ledger.ts';
 import { hasPayoutDetails } from '../seller-payouts.ts';
 import { buildVaultZip, signDownload, verifyDownload } from '../download.ts';
+import { MALWARE_SCAN_ENABLED, scanForMalware } from '../malware.ts';
 import { admin } from '../supabase.ts';
 
 /** The authority on vault size. The clients copy it as MAX_VAULT_ZIP_BYTES to reject early. */
@@ -317,6 +318,23 @@ export default async function catalogRoutes(app: FastifyInstance) {
     if (!part) return reply.code(400).send({ error: 'Attach the .zip as multipart field "file"' });
     const buf = await part.toBuffer();
     if (part.file.truncated) return reply.code(413).send({ error: `Zip is larger than ${MAX_ZIP_LABEL}` });
+
+    // Scanned as it arrives, before a byte of it is unpacked or written: this archive becomes
+    // a product other people download, and being named .zip says nothing about what is inside.
+    // A scanner we cannot reach refuses the upload; the alternative is a check that disappears
+    // exactly when something is wrong.
+    if (MALWARE_SCAN_ENABLED) {
+      const verdict = await scanForMalware(buf).catch((e) => {
+        req.log.error(e, 'malware scan failed');
+        return null;
+      });
+      if (!verdict) return reply.code(503).send({ error: 'The malware scanner is not answering, so this upload was not accepted. Try again in a few minutes.' });
+      if (!verdict.clean) {
+        req.log.warn({ sellerId: r.id, signature: verdict.signature }, 'upload rejected by malware scan');
+        return reply.code(422).send({ error: `That zip was refused: the scanner found ${verdict.signature} in it. Check the vault on your own machine before uploading it again.` });
+      }
+    }
+
     let entries: Record<string, Uint8Array>;
     try {
       entries = unzipSync(new Uint8Array(buf));

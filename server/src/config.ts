@@ -45,6 +45,16 @@ export const cfg = {
    */
   redisUrl: env('REDIS_URL'),
 
+  /**
+   * ClamAV daemon every uploaded vault zip is streamed past before it is unpacked (see
+   * malware.ts). No host = nothing is scanned, which is for laptops: a listing is downloaded
+   * by strangers, so anywhere that accepts uploads should point this at one.
+   */
+  clamav: {
+    host: env('CLAMAV_HOST'),
+    port: Number(env('CLAMAV_PORT', '3310')),
+  },
+
   /** Brevo transactional email (see email.ts). No API key = the server sends no mail. */
   brevo: {
     apiKey: env('BREVO_API_KEY'),
