@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Cover, Field, Loading, Toast } from '@/components/ui';
 import { errorMessage, fileToUri, releaseUri } from '@/lib/web';
 import { inspectVaultZip } from '@/lib/vault-zip';
-import { api } from '@/lib/api';
+import { api, type UploadStage } from '@/lib/api';
 import { MAX_SELLER_STORAGE_BYTES, MAX_VAULT_ZIP_BYTES, MIN_PRICE_CENTS, PLATFORM_COUNTRY, PLATFORM_FEE_FIXED_CENTS, feePercentFor, platformFee } from '@/lib/config';
 import { formatBytes, formatPrice, parsePriceToCents, parseTags } from '@/lib/format';
 import { useAuth } from '@/store/auth';
@@ -38,7 +38,8 @@ export default function ListingEditorPage() {
   const [sizeBytes, setSizeBytes] = useState(0);
 
   const [uploadingCover, setUploadingCover] = useState(false);
-  const [uploadingFile, setUploadingFile] = useState(false);
+  // Null when idle; otherwise which half of the wait this is (see UploadStage).
+  const [uploadingFile, setUploadingFile] = useState<UploadStage | null>(null);
   const [saving, setSaving] = useState<'draft' | 'publish' | null>(null);
   const [error, setError] = useState<string | null>(null);
   // A zip refused before it is uploaded. The picker sits at the top of a long form, so the
@@ -134,7 +135,7 @@ export default function ListingEditorPage() {
       return setRejected({ title: 'That zip is too large', message: `Vault archives must be under ${formatBytes(MAX_VAULT_ZIP_BYTES)}.` });
     }
 
-    setUploadingFile(true);
+    setUploadingFile('uploading');
     setError(null);
     setRejected(null);
     // Read the archive here rather than letting the server refuse it after a long upload.
@@ -143,7 +144,7 @@ export default function ListingEditorPage() {
       const check = await inspectVaultZip(file);
       if (!check.ok) {
         setRejected({ title: 'That zip is not an Obsidian vault', message: check.reason ?? 'That zip is not an Obsidian vault.' });
-        setUploadingFile(false);
+        setUploadingFile(null);
         return;
       }
       // Unpacked, not zipped: storage holds the notes and attachments, not the archive.
@@ -152,7 +153,7 @@ export default function ListingEditorPage() {
           title: 'Not enough storage left',
           message: `That vault unpacks to ${formatBytes(check.sizeBytes)}, and only ${formatBytes(freeBytes)} of your ${formatBytes(MAX_SELLER_STORAGE_BYTES)} is free. Delete a listing you no longer sell, or upload a smaller vault.`,
         });
-        setUploadingFile(false);
+        setUploadingFile(null);
         return;
       }
     } catch {
@@ -161,7 +162,7 @@ export default function ListingEditorPage() {
 
     const uri = fileToUri(file);
     try {
-      const uploaded = await api.uploadVaultFile(uri, file.name, isNew ? undefined : id);
+      const uploaded = await api.uploadVaultFile(uri, file.name, isNew ? undefined : id, setUploadingFile);
       setFilePath(uploaded.path);
       setFileName(file.name);
       setSizeBytes(uploaded.sizeBytes || file.size);
@@ -169,7 +170,7 @@ export default function ListingEditorPage() {
       setError(errorMessage(e, 'Upload failed.'));
     } finally {
       releaseUri(uri);
-      setUploadingFile(false);
+      setUploadingFile(null);
     }
   };
 
@@ -255,8 +256,8 @@ export default function ListingEditorPage() {
         )}
         <input ref={zipInput} type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden onChange={(e) => pickZip(e.target.files?.[0])} />
         <div>
-          <button type="button" className="btn secondary" onClick={() => zipInput.current?.click()} disabled={uploadingFile}>
-            {uploadingFile ? 'Uploading…' : filePath ? 'Replace .zip' : 'Upload .zip'}
+          <button type="button" className="btn secondary" onClick={() => zipInput.current?.click()} disabled={!!uploadingFile}>
+            {uploadingFile === 'scanning' ? 'Scanning…' : uploadingFile ? 'Uploading…' : filePath ? 'Replace .zip' : 'Upload .zip'}
           </button>
         </div>
       </section>

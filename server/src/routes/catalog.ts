@@ -16,51 +16,29 @@
  *   POST /vaults  { input, id? }       create / update a listing (seller)
  *   POST /vaults/:id/status { status } | DELETE /vaults/:id
  *   POST /vaults/:id/refresh-rating    recompute rating from Supabase reviews into Sanity
- *   POST /uploads/vault-zip?vaultId=   multipart zip -> note/attachment documents -> { path: bundleId, ... }
+ *   POST /uploads/vault-zip?vaultId=   multipart zip -> scanned, unpacked, note/attachment documents -> { path: bundleId, ... }
  *                                      vaultId is the listing being replaced, so its current
  *                                      size is left out of the seller's storage quota
+ *   POST /uploads/vault-zip/init       { mode: 'direct' } or { mode: 'queued', key, url }: where the
+ *                                      client should send the zip (see upload-queue.ts)
+ *   POST /uploads/vault-zip/complete?vaultId=  { key } -> { jobId }   the zip is in the store; queue it
+ *   GET  /uploads/vault-zip/jobs/:id   { state, result? | error? }    poll a queued upload
  *   POST /uploads/cover                multipart image -> Sanity image asset -> { url }
  */
 import multipart from '@fastify/multipart';
 import type { FastifyInstance } from 'fastify';
-import { unzipSync } from 'fflate';
 import type { CategorySlug, SellerStats, SortMode, VaultInput, VaultStatus } from '../types.ts';
 import * as catalog from '../sanity/index.ts';
 import { ownsVault, requester, requireRequester, sellerProfile } from '../access.ts';
-import { IS_DEMO, cfg, minPriceCents, platformFee } from '../config.ts';
+import { IS_DEMO, cfg, minPriceCents } from '../config.ts';
 import { sellerBalance } from '../payout-ledger.ts';
 import { hasPayoutDetails } from '../seller-payouts.ts';
 import { buildVaultZip, signDownload, verifyDownload } from '../download.ts';
-import { MALWARE_SCAN_ENABLED, scanForMalware } from '../malware.ts';
+import { UPLOAD_QUEUE_ENABLED, enqueueScan, uploadJobStatus } from '../upload-queue.ts';
+import { incomingKey, objectSize, ownsKey, presignUpload, removeObject } from '../upload-store.ts';
+import { MAX_SELLER_STORAGE_BYTES, MAX_ZIP_BYTES, MAX_ZIP_LABEL, UploadRejected, processVaultZip } from '../vault-upload.ts';
 import { admin } from '../supabase.ts';
 
-/** The authority on vault size. The clients copy it as MAX_VAULT_ZIP_BYTES to reject early. */
-const MAX_ZIP_BYTES = 70 * 1024 * 1024;
-const MAX_ZIP_LABEL = `${MAX_ZIP_BYTES / (1024 * 1024)} MB`;
-
-/**
- * All of one seller's vaults together. Storage is the scarce resource here, so the ceiling is
- * on what they keep listed rather than on how many listings they have. The clients copy it as
- * MAX_SELLER_STORAGE_BYTES to show a meter and to refuse an upload before it is spent.
- */
-const MAX_SELLER_STORAGE_BYTES = 1024 * 1024 * 1024;
-const MAX_SELLER_STORAGE_LABEL = `${MAX_SELLER_STORAGE_BYTES / (1024 * 1024 * 1024)} GB`;
-
-function mb(bytes: number): string {
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/**
- * What a seller's listings occupy, counted from the vault documents themselves.
- *
- * `excludeVaultId` leaves out the listing a replacement zip is about to overwrite, because
- * saving it deletes the old contents. Excluding by id is safe: only the seller's own vaults
- * are summed in the first place, so an id that is not theirs changes nothing.
- */
-async function storageUsed(userId: string, excludeVaultId?: string): Promise<number> {
-  const mine = await catalog.getSellerVaults(userId, true);
-  return mine.filter((v) => v.id !== excludeVaultId).reduce((sum, v) => sum + (v.sizeBytes || 0), 0);
-}
 const MAX_COVER_BYTES = 5 * 1024 * 1024;
 
 export default async function catalogRoutes(app: FastifyInstance) {
@@ -319,52 +297,64 @@ export default async function catalogRoutes(app: FastifyInstance) {
     const buf = await part.toBuffer();
     if (part.file.truncated) return reply.code(413).send({ error: `Zip is larger than ${MAX_ZIP_LABEL}` });
 
-    // Scanned as it arrives, before a byte of it is unpacked or written: this archive becomes
-    // a product other people download, and being named .zip says nothing about what is inside.
-    // A scanner we cannot reach refuses the upload; the alternative is a check that disappears
-    // exactly when something is wrong.
-    if (MALWARE_SCAN_ENABLED) {
-      const verdict = await scanForMalware(buf).catch((e) => {
-        req.log.error(e, 'malware scan failed');
-        return null;
-      });
-      if (!verdict) return reply.code(503).send({ error: 'The malware scanner is not answering, so this upload was not accepted. Try again in a few minutes.' });
-      if (!verdict.clean) {
-        req.log.warn({ sellerId: r.id, signature: verdict.signature }, 'upload rejected by malware scan');
-        return reply.code(422).send({ error: `That zip was refused: the scanner found ${verdict.signature} in it. Check the vault on your own machine before uploading it again.` });
-      }
-    }
-
-    let entries: Record<string, Uint8Array>;
+    // The whole job, inline: scan, unpack, quota, ingest (vault-upload.ts). The worker runs the
+    // same function on zips that came through the queue.
     try {
-      entries = unzipSync(new Uint8Array(buf));
-    } catch {
-      return reply.code(400).send({ error: 'That file is not a valid zip archive' });
-    }
-    const files = Object.entries(entries)
-      .filter(([path, data]) => !path.endsWith('/') && data.byteLength > 0)
-      .map(([path, data]) => ({ path, data }));
-    if (!files.length) return reply.code(400).send({ error: 'The zip is empty' });
-
-    // Checked against the unpacked bytes, not the zip: what the quota measures is what gets
-    // stored. Done before ingest so a vault that will not fit is never written at all.
-    const incoming = catalog.bundleBytes(files);
-    const used = await storageUsed(r.id, req.query.vaultId);
-    if (used + incoming > MAX_SELLER_STORAGE_BYTES) {
-      return reply.code(413).send({
-        error: `That vault unpacks to ${mb(incoming)}, and only ${mb(Math.max(0, MAX_SELLER_STORAGE_BYTES - used))} of your ${MAX_SELLER_STORAGE_LABEL} is free. Delete a listing you no longer sell, or upload a smaller vault.`,
-      });
-    }
-
-    try {
-      const summary = await catalog.ingestBundle(files, r.id);
-      if (!summary.noteCount) return reply.code(400).send({ error: 'No markdown notes found in the zip. Zip the vault folder itself.' });
-      // `path` keeps the client's VaultInput.filePath contract: it now carries the bundle id.
-      return { path: summary.bundle, sizeBytes: summary.sizeBytes, noteCount: summary.noteCount, attachmentCount: summary.attachmentCount, skipped: summary.skipped, fee: platformFee(0) };
+      return await processVaultZip(buf, r.id, req.log, req.query.vaultId);
     } catch (e) {
+      if (e instanceof UploadRejected) return reply.code(e.statusCode).send({ error: e.message });
       req.log.error(e);
       return reply.code(502).send({ error: e instanceof Error ? e.message : 'Upload failed' });
     }
+  });
+
+  /* ---------- queued uploads (upload-queue.ts, upload-store.ts, worker/) ---------- */
+
+  // Answered whether or not the queue is on, so one client works against both kinds of
+  // deployment: it asks here first, then either posts the zip to /uploads/vault-zip or PUTs it
+  // at the link and reports back. A store that is not answering falls back to the inline
+  // path rather than refusing the upload; the scanner still runs either way.
+  app.post('/uploads/vault-zip/init', async (req, reply) => {
+    const r = await requireRequester(req, reply);
+    if (!r) return;
+    if (!UPLOAD_QUEUE_ENABLED) return { mode: 'direct' };
+    const key = incomingKey(r.id);
+    try {
+      return { mode: 'queued', key, url: await presignUpload(key), maxBytes: MAX_ZIP_BYTES };
+    } catch (e) {
+      req.log.error(e, 'upload store unavailable, falling back to the inline upload');
+      return { mode: 'direct' };
+    }
+  });
+
+  app.post<{ Body: { key?: unknown }; Querystring: { vaultId?: string } }>('/uploads/vault-zip/complete', async (req, reply) => {
+    const r = await requireRequester(req, reply);
+    if (!r) return;
+    if (!UPLOAD_QUEUE_ENABLED) return reply.code(404).send({ error: 'Queued uploads are not enabled here. Post the zip to /uploads/vault-zip.' });
+    const key = req.body?.key;
+    // Their own prefix only: the key is the one /init handed them, not a path of their choosing.
+    if (typeof key !== 'string' || !ownsKey(key, r.id)) return reply.code(400).send({ error: 'Unknown upload key' });
+    const size = await objectSize(key);
+    if (size === null) return reply.code(400).send({ error: 'The zip never reached the upload store. Try the upload again.' });
+    if (size > MAX_ZIP_BYTES) {
+      await removeObject(key);
+      return reply.code(413).send({ error: `Zip is larger than ${MAX_ZIP_LABEL}` });
+    }
+    try {
+      return { jobId: await enqueueScan({ key, userId: r.id, replacingVaultId: req.query.vaultId || undefined }) };
+    } catch (e) {
+      req.log.error(e, 'upload queue unavailable');
+      return reply.code(503).send({ error: 'The upload queue is not answering, so this upload was not accepted. Try again in a few minutes.' });
+    }
+  });
+
+  app.get<{ Params: { id: string } }>('/uploads/vault-zip/jobs/:id', async (req, reply) => {
+    const r = await requireRequester(req, reply);
+    if (!r) return;
+    if (!UPLOAD_QUEUE_ENABLED) return reply.code(404).send({ error: 'Queued uploads are not enabled here.' });
+    const status = await uploadJobStatus(req.params.id, r.id);
+    if (!status) return reply.code(404).send({ error: 'Upload not found' });
+    return status;
   });
 
   app.post('/uploads/cover', async (req, reply) => {

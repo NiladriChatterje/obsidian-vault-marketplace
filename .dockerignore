@@ -1,0 +1,8 @@
+# Build context for worker/Dockerfile is the repo root, because the worker runs the API's
+# ingest code out of server/src. Send only what that Dockerfile copies; nothing else here
+# (least of all .env) has any business in an image. The other images build from their own
+# folders and read their own .dockerignore.
+*
+!worker/
+!server/src/
+worker/node_modules/

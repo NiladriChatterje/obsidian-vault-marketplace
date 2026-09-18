@@ -29,6 +29,13 @@ export interface UploadedFile {
 }
 
 /**
+ * Where a vault upload is, for the button label. A server with the upload queue takes the zip
+ * into its store first and scans it afterwards; the two take comparable time and feel
+ * different to wait through, so the UI is told which one it is in.
+ */
+export type UploadStage = 'uploading' | 'scanning';
+
+/**
  * Everything the UI needs from a backend. Two implementations exist:
  * `demoBackend` (in-memory, runs anywhere) and `supabaseBackend` (production).
  */
@@ -97,8 +104,11 @@ export interface Backend {
   setVaultStatus(id: string, status: VaultStatus): Promise<void>;
   deleteVault(id: string): Promise<void>;
   uploadCover(localUri: string): Promise<string>;
-  /** `vaultId` is the listing being replaced, which the storage quota then leaves out. */
-  uploadVaultFile(localUri: string, fileName: string, vaultId?: string): Promise<UploadedFile>;
+  /**
+   * `vaultId` is the listing being replaced, which the storage quota then leaves out. `onStage`
+   * is told when the zip has left the browser and the wait is now for the scan.
+   */
+  uploadVaultFile(localUri: string, fileName: string, vaultId?: string, onStage?: (stage: UploadStage) => void): Promise<UploadedFile>;
 
   // Who bought what, and what they said
   /** How each of my listings has sold. */

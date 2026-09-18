@@ -1,0 +1,129 @@
+/**
+ * What happens to a seller's zip once it is in hand: scanned, unpacked, checked against their
+ * storage quota, and written to Sanity as a bundle of note and attachment documents.
+ *
+ * One function with two callers. `POST /uploads/vault-zip` (routes/catalog.ts) runs it inline
+ * and answers the seller when it is done. The worker in `worker/` runs the very same steps on a
+ * zip it pulled out of the upload store (see upload-queue.ts), then reports through the queue.
+ * The steps live here so the two paths cannot drift: a zip is accepted or refused for the same
+ * reasons, with the same words, whichever way it arrived.
+ */
+import { unzipSync } from 'fflate';
+import * as catalog from './sanity/index.ts';
+import { platformFee } from './config.ts';
+import { MALWARE_SCAN_ENABLED, scanForMalware } from './malware.ts';
+
+/** The authority on vault size. The clients copy it as MAX_VAULT_ZIP_BYTES to reject early. */
+export const MAX_ZIP_BYTES = 70 * 1024 * 1024;
+export const MAX_ZIP_LABEL = `${MAX_ZIP_BYTES / (1024 * 1024)} MB`;
+
+/**
+ * All of one seller's vaults together. Storage is the scarce resource here, so the ceiling is
+ * on what they keep listed rather than on how many listings they have. The clients copy it as
+ * MAX_SELLER_STORAGE_BYTES to show a meter and to refuse an upload before it is spent.
+ */
+export const MAX_SELLER_STORAGE_BYTES = 1024 * 1024 * 1024;
+export const MAX_SELLER_STORAGE_LABEL = `${MAX_SELLER_STORAGE_BYTES / (1024 * 1024 * 1024)} GB`;
+
+function mb(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * What a seller's listings occupy, counted from the vault documents themselves.
+ *
+ * `excludeVaultId` leaves out the listing a replacement zip is about to overwrite, because
+ * saving it deletes the old contents. Excluding by id is safe: only the seller's own vaults
+ * are summed in the first place, so an id that is not theirs changes nothing.
+ */
+export async function storageUsed(userId: string, excludeVaultId?: string): Promise<number> {
+  const mine = await catalog.getSellerVaults(userId, true);
+  return mine.filter((v) => v.id !== excludeVaultId).reduce((sum, v) => sum + (v.sizeBytes || 0), 0);
+}
+
+/**
+ * A zip refused for a reason the seller is told about. `statusCode` is what the HTTP route
+ * answers with. Only the 503 is worth trying again later: the scanner was not answering, which
+ * says nothing about the zip. Every other code is final for that archive.
+ */
+export class UploadRejected extends Error {
+  readonly statusCode: 400 | 413 | 422 | 503;
+
+  constructor(statusCode: 400 | 413 | 422 | 503, message: string) {
+    super(message);
+    this.name = 'UploadRejected';
+    this.statusCode = statusCode;
+  }
+
+  /** True when the same zip may well go through on a retry. */
+  get transient(): boolean {
+    return this.statusCode === 503;
+  }
+}
+
+/** What the seller gets back. `path` keeps the client's VaultInput.filePath contract: it carries the bundle id. */
+export interface VaultUploadResult {
+  path: string;
+  sizeBytes: number;
+  noteCount: number;
+  attachmentCount: number;
+  skipped: string[];
+  fee: number;
+}
+
+/** The two log calls this makes, in pino's (object, message) shape; console fits it too. */
+export interface UploadLog {
+  warn(obj: object, msg: string): void;
+  error(obj: unknown, msg: string): void;
+}
+
+/**
+ * Scans, unpacks, quota-checks and ingests one zip. Throws `UploadRejected` for anything the
+ * seller did; lets anything else (Sanity down, a bug) propagate for the caller to report.
+ *
+ * `replacingVaultId` is the listing this zip will replace, whose current size is left out of the
+ * quota since saving frees it. Absent for a listing that has not been saved yet.
+ */
+export async function processVaultZip(zip: Uint8Array, userId: string, log: UploadLog, replacingVaultId?: string): Promise<VaultUploadResult> {
+  // Scanned before a byte of it is unpacked or written: this archive becomes a product other
+  // people download, and being named .zip says nothing about what is inside. A scanner we
+  // cannot reach refuses the upload; the alternative is a check that disappears exactly when
+  // something is wrong.
+  if (MALWARE_SCAN_ENABLED) {
+    const verdict = await scanForMalware(zip).catch((e) => {
+      log.error(e, 'malware scan failed');
+      return null;
+    });
+    if (!verdict) throw new UploadRejected(503, 'The malware scanner is not answering, so this upload was not accepted. Try again in a few minutes.');
+    if (!verdict.clean) {
+      log.warn({ sellerId: userId, signature: verdict.signature }, 'upload rejected by malware scan');
+      throw new UploadRejected(422, `That zip was refused: the scanner found ${verdict.signature} in it. Check the vault on your own machine before uploading it again.`);
+    }
+  }
+
+  let entries: Record<string, Uint8Array>;
+  try {
+    entries = unzipSync(new Uint8Array(zip.buffer, zip.byteOffset, zip.byteLength));
+  } catch {
+    throw new UploadRejected(400, 'That file is not a valid zip archive');
+  }
+  const files = Object.entries(entries)
+    .filter(([path, data]) => !path.endsWith('/') && data.byteLength > 0)
+    .map(([path, data]) => ({ path, data }));
+  if (!files.length) throw new UploadRejected(400, 'The zip is empty');
+
+  // Checked against the unpacked bytes, not the zip: what the quota measures is what gets
+  // stored. Done before ingest so a vault that will not fit is never written at all.
+  const incoming = catalog.bundleBytes(files);
+  const used = await storageUsed(userId, replacingVaultId);
+  if (used + incoming > MAX_SELLER_STORAGE_BYTES) {
+    throw new UploadRejected(
+      413,
+      `That vault unpacks to ${mb(incoming)}, and only ${mb(Math.max(0, MAX_SELLER_STORAGE_BYTES - used))} of your ${MAX_SELLER_STORAGE_LABEL} is free. Delete a listing you no longer sell, or upload a smaller vault.`,
+    );
+  }
+
+  const summary = await catalog.ingestBundle(files, userId);
+  if (!summary.noteCount) throw new UploadRejected(400, 'No markdown notes found in the zip. Zip the vault folder itself.');
+  return { path: summary.bundle, sizeBytes: summary.sizeBytes, noteCount: summary.noteCount, attachmentCount: summary.attachmentCount, skipped: summary.skipped, fee: platformFee(0) };
+}

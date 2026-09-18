@@ -61,6 +61,28 @@ export const cfg = {
     token: env('SCANNER_TOKEN'),
   },
 
+  /**
+   * Queued uploads (upload-queue.ts, upload-store.ts, worker/). With the queue and the store
+   * both set, a zip goes from the browser into the store and a worker scans and unpacks it
+   * while the API answers at once. With either missing, POST /uploads/vault-zip does the whole
+   * job inline, as it always has.
+   */
+  uploadQueue: {
+    /** Where the tickets live. Not REDIS_URL on purpose; the two may point at one instance. */
+    redisUrl: env('QUEUE_REDIS_URL'),
+    /** Zips one worker process handles at once. Each holds up to 70 MB and a scanner thread. */
+    concurrency: Math.max(1, Number(env('WORKER_CONCURRENCY', '2')) || 2),
+  },
+  uploadStore: {
+    /** The S3 endpoint the API and worker reach the store at, e.g. http://minio:9000. */
+    endpoint: env('MINIO_ENDPOINT').replace(/\/+$/, ''),
+    /** The same store as the browser reaches it; presigned links carry this host. Defaults to the endpoint. */
+    publicUrl: env('MINIO_PUBLIC_URL').replace(/\/+$/, ''),
+    accessKey: env('MINIO_ACCESS_KEY'),
+    secretKey: env('MINIO_SECRET_KEY'),
+    bucket: env('MINIO_BUCKET', 'vault-uploads'),
+  },
+
   /** Brevo transactional email (see email.ts). No API key = the server sends no mail. */
   brevo: {
     apiKey: env('BREVO_API_KEY'),
