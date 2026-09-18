@@ -1,6 +1,6 @@
 # Runs the payment server and the website together. Both read the repo-root .env.
 #   docker compose up --build
-#   web: http://localhost:3000   api: http://localhost:4000/health
+#   web: http://localhost:3000   api: http://localhost:4000/health   minio console: http://localhost:9001
 #
 # NEXT_PUBLIC_* are baked into the web bundle at build time (build args below); changing them
 # in .env requires `docker compose build web`. Server values are read at runtime.
@@ -11,16 +11,85 @@ services:
     environment:
       API_PORT: 4000
       SCANNER_URL: http://antivirus:8080
+      # Queued uploads (server/src/upload-queue.ts): the zip goes browser -> minio, a ticket goes
+      # into redis, and the worker below does the scanning and unpacking. The api only writes
+      # tickets and answers polls. Leave these three out and it does the whole job inline.
+      QUEUE_REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: http://minio:9000
+      # How the BROWSER reaches minio; presigned upload links carry this host. Set it in .env when
+      # the site is not opened from the machine running compose.
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-vaultmarket}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-vaultmarket-dev-secret}
     ports:
       - "4000:4000"
     depends_on:
       - antivirus
+      - redis
+      - minio
     restart: unless-stopped
 
-  # The vault scanner, built from antivirus/: ClamAV's daemon with a small HTTP front. The api
-  # posts every uploaded zip to it before unpacking one (server/src/malware.ts) and refuses the
-  # upload when it cannot get an answer. No ports are published: clamd has no authentication of
-  # any kind, so nothing outside this network has any business reaching it.
+  # The consumer of the upload queue, built from worker/ with the repo root as context (it runs
+  # the api's own ingest code out of server/src). No ports: it talks to redis, minio, antivirus
+  # and Sanity, and nothing talks to it. Scale it with `docker compose up --scale worker=3`.
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    env_file: .env
+    environment:
+      SCANNER_URL: http://antivirus:8080
+      QUEUE_REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-vaultmarket}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-vaultmarket-dev-secret}
+      # Zips one worker holds at once. Each is up to 70 MB in memory and one scanner thread.
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+    depends_on:
+      antivirus:
+        condition: service_started
+      redis:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Where upload tickets wait. Nothing outside this network needs it, so no ports. The volume
+  # keeps tickets across a restart so an upload in flight is not forgotten.
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  # Where the zip itself waits: an S3-compatible store the browser PUTs to directly. Port 9000 is
+  # the S3 API and has to be reachable from the browser (see MINIO_PUBLIC_URL); 9001 is the web
+  # console for looking at the bucket. The api creates the bucket and its one-day sweep rule.
+  minio:
+    # quay.io, not Docker Hub: MinIO stopped publishing there in 2025.
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-vaultmarket}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-vaultmarket-dev-secret}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # The vault scanner, built from antivirus/: ClamAV's daemon with a small HTTP front. Every
+  # uploaded zip is posted to it before unpacking (server/src/malware.ts), by the api inline or
+  # by the worker from the queue, and refused when it cannot get an answer. No ports are
+  # published: clamd has no authentication of any kind, so nothing outside this network has any
+  # business reaching it.
   # The signature database is baked into the image, so the first start is quick; the volume is
   # what keeps freshclam's daily updates across restarts. Its size limits live in the Dockerfile.
   antivirus:
@@ -55,3 +124,5 @@ services:
 
 volumes:
   clamav-db:
+  redis-data:
+  minio-data:

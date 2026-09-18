@@ -15,6 +15,7 @@ import { IS_DEMO, cfg } from './config.ts';
 import { EMAIL_ENABLED } from './email.ts';
 import { MALWARE_SCAN_ENABLED } from './malware.ts';
 import { REDIS_ENABLED } from './redis.ts';
+import { UPLOAD_QUEUE_ENABLED } from './upload-queue.ts';
 import { DODO_ENABLED } from './dodo.ts';
 import { startKeepAwake } from './keepalive.ts';
 import { startPayoutWatch } from './payout-watch.ts';
@@ -44,6 +45,8 @@ app.get('/health', async () => ({
   redis: REDIS_ENABLED,
   // Off means uploaded vaults reach Sanity unscanned; see malware.ts.
   uploadScan: MALWARE_SCAN_ENABLED,
+  // On means zips go through the store and a worker; off, POST /uploads/vault-zip does it inline.
+  uploadQueue: UPLOAD_QUEUE_ENABLED,
   catalog: SANITY_ENABLED ? { source: 'sanity', projectId: SANITY_PROJECT_ID, dataset: SANITY_DATASET, canWrite: !!SANITY_API_TOKEN } : { source: 'none' },
 }));
 

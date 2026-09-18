@@ -1,0 +1,23 @@
+{
+  "name": "vaultmarket-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=../.env src/index.ts",
+    "start": "node src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sanity/client": "^8.6.0",
+    "bullmq": "^6.3.7",
+    "dotenv": "^17.2.0",
+    "fflate": "^0.8.3",
+    "ioredis": "^5.11.1",
+    "minio": "^8.0.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~6.0.3"
+  }
+}

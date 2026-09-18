@@ -74,6 +74,7 @@ Studio structure: Vaults → each vault → Listing / Notes / Attachments, plus 
 | `GET /vaults/:id/download-link` → `GET /downloads/:token` | Five-minute signed link; the zip is built from the vault's notes and attachments. |
 | `POST /vaults`, `POST /vaults/:id/status`, `DELETE /vaults/:id`, `GET /me/vaults`, `GET /me/stats` | Seller listing management, written to Sanity. |
 | `POST /uploads/vault-zip` | Multipart zip → scanned for malware → `note`/`attachment` documents; returns the bundle id the listing form saves as `filePath`. |
+| `POST /uploads/vault-zip/init`, `POST /uploads/vault-zip/complete`, `GET /uploads/vault-zip/jobs/:id` | The queued variant: a presigned link into the upload store, then a ticket for the worker, then polling until it is done. `init` answers `{ mode: 'direct' }` where the queue is off. |
 | `/mcp` | Model Context Protocol endpoint (Streamable HTTP) over the caller's purchased vaults. |
 
 ```bash
@@ -91,6 +92,14 @@ is the switch: without it nothing is scanned, which is fine on a laptop; with it
 cannot be reached refuses the upload rather than quietly passing it on. See
 [antivirus/README.md](antivirus/README.md) for deploying it.
 
+With `QUEUE_REDIS_URL` and the `MINIO_*` values set, uploads are queued instead of handled
+inline: the browser PUTs the zip straight into an S3-compatible store by presigned link, the API
+writes a ticket to Redis (BullMQ) and answers at once, and the worker in `worker/` pulls tickets
+a few at a time, running the same scan → unpack → quota → Sanity step (`server/src/vault-upload.ts`)
+the inline path does. A rush of uploads waits in line rather than timing out against the scanner,
+and the API never holds a 70 MB body. The browser asks `POST /uploads/vault-zip/init` which way to
+go, so one client works against both. See [worker/README.md](worker/README.md).
+
 Runs on plain Node 22.18+ (TypeScript type stripping, no build step). Without Supabase keys it runs in demo mode: orders are kept in memory, purchases are granted by the client, and the client identifies itself with an `x-demo-user` header (never expose demo mode publicly).
 
 ## Docker
@@ -106,6 +115,13 @@ The `antivirus` service comes up alongside them, built from `antivirus/`. Its si
 ships inside the image, so it is scanning about a minute after boot; until then uploads answer
 503 and the rest of the site is unaffected. Budget for it: clamd holds the whole database in
 memory, about 1.1 GB idle, so a 512 MB instance will not run it.
+
+Three more services back the upload queue: `redis` (the tickets), `minio` (the zips, S3 API on
+:9000, console on :9001) and `worker` (the consumer, built from `worker/` with the repo root as
+context). Compose wires the api and worker to them, so under compose every upload takes the
+queued path; run the api on its own without those variables and it is inline as before. The
+browser reaches MinIO by `MINIO_PUBLIC_URL`, which defaults to `http://localhost:9000`; set it in
+`.env` when the site is opened from another machine. More workers: `docker compose up --scale worker=3`.
 
 `server/Dockerfile` runs the TypeScript sources directly on Node 24 (no build step). `web/Dockerfile` builds Next.js in standalone mode and inlines the `NEXT_PUBLIC_*` values as build args (compose passes them from `.env`). Each image builds from its own folder. Rebuild the web image after changing those; server values are read at runtime. The Expo app is not containerised: run it with `npm start` in `mobile/` against the running api.
 
@@ -279,7 +295,12 @@ server/                    Fastify (own package.json)
   src/admin.ts             The ADMIN_USER_IDS gate shared by every /admin route
   src/payout-ledger.ts     Earned minus paid, per seller
   src/routes/catalog.ts    Sanity catalog, notes, uploads, downloads, seller CRUD
+  src/vault-upload.ts      One zip: scan, unpack, quota, ingest; shared by the route and the worker
+  src/upload-store.ts      The S3/MinIO bucket a queued zip waits in; presigned links
+  src/upload-queue.ts      The BullMQ ticket queue between api and worker
   src/malware.ts           Posts each uploaded zip to the scanner before it is unpacked
+worker/                    Upload worker: consumes the queue, runs server/src/vault-upload.ts (own Dockerfile, repo-root context)
+  src/index.ts             The BullMQ Worker: store -> scan -> Sanity, retries vs. final refusals
   src/routes/mcp.ts        MCP endpoint over purchased vaults
   src/sanity/              GROQ queries, mappers, markdown parsing, writes
   src/orders.ts            Order + purchase bookkeeping, provider-neutral, refunds

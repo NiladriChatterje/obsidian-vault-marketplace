@@ -4,7 +4,7 @@ import { demoBackend } from './demo';
 import { supabaseBackend } from './supabase';
 import type { Backend } from './types';
 
-export type { AuthUser, Backend, UploadedFile } from './types';
+export type { AuthUser, Backend, UploadStage, UploadedFile } from './types';
 
 const base: Backend = IS_DEMO ? demoBackend : supabaseBackend;
 
