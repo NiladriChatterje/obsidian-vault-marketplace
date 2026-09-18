@@ -1,0 +1,23 @@
+# Blueprint for the vault scanner as a Render private service: reachable by the API over the
+# private network, never from the internet. Apply it with New -> Blueprint, and set the
+# Blueprint Path to `antivirus/render.yaml`.
+#
+# Two things to check before deploying:
+#   region  must be the SAME as the API's, or the private network will not connect them
+#   plan    clamd holds its whole signature database in memory, about 1.5 GB
+#
+# Afterwards, copy the service's internal address from the dashboard (it carries a generated
+# suffix, e.g. vault-antivirus-a1b2:8080) into SCANNER_URL on the API service, along with the
+# SCANNER_TOKEN value generated below.
+services:
+  - type: pserv
+    name: vault-antivirus
+    runtime: docker
+    region: singapore
+    plan: 1c-2g
+    dockerfilePath: ./antivirus/Dockerfile
+    dockerContext: ./antivirus
+    envVars:
+      # Generated once by Render. Set the same value as SCANNER_TOKEN on the API service.
+      - key: SCANNER_TOKEN
+        generateValue: true

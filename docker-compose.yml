@@ -10,28 +10,21 @@ services:
     env_file: .env
     environment:
       API_PORT: 4000
-      CLAMAV_HOST: clamav
+      SCANNER_URL: http://antivirus:8080
     ports:
       - "4000:4000"
     depends_on:
-      - clamav
+      - antivirus
     restart: unless-stopped
 
-  # Scans every uploaded vault zip before it is unpacked into Sanity (server/src/malware.ts).
-  # The first start downloads the signature database, which takes a few minutes and is what the
-  # volume keeps; freshclam refreshes it in the background afterwards. Uploads are refused with
-  # a 503 until it answers, so the marketplace serves normally while it warms up.
-  # The three limits are pinned rather than raised: 1.4 already defaults to exactly these, but
-  # its own clamd.conf.sample still documents StreamMaxLength as 25M, well under a 70 MB vault,
-  # and a scan that silently refuses the largest uploads is not something to leave to a default.
-  # StreamMaxLength is what one upload may be, MaxFileSize covers the archive and its largest
-  # member, and MaxScanSize is the total it will decompress before it gives up on a zip bomb.
-  clamav:
-    image: clamav/clamav:1.4
-    environment:
-      CLAMD_CONF_StreamMaxLength: 100M
-      CLAMD_CONF_MaxFileSize: 100M
-      CLAMD_CONF_MaxScanSize: 400M
+  # The vault scanner, built from antivirus/: ClamAV's daemon with a small HTTP front. The api
+  # posts every uploaded zip to it before unpacking one (server/src/malware.ts) and refuses the
+  # upload when it cannot get an answer. No ports are published: clamd has no authentication of
+  # any kind, so nothing outside this network has any business reaching it.
+  # The signature database is baked into the image, so the first start is quick; the volume is
+  # what keeps freshclam's daily updates across restarts. Its size limits live in the Dockerfile.
+  antivirus:
+    build: ./antivirus
     volumes:
       - clamav-db:/var/lib/clamav
     restart: unless-stopped

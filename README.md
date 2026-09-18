@@ -84,12 +84,12 @@ curl localhost:4000/health
 ```
 
 Uploaded vaults are scanned before they are unpacked. A listing is other people's files going
-out to every buyer who downloads it, so the archive is streamed past a ClamAV daemon as it
-arrives (`server/src/malware.ts`), whole and still zipped, and rejected on a hit. The browser's
-`.zip` check stays where it is, for the fast no; it is not evidence about the contents. Compose
-runs the daemon as the `clamav` service and points `CLAMAV_HOST` at it. Without that variable
-nothing is scanned, which is fine on a laptop; with it, a daemon that cannot be reached refuses
-the upload rather than quietly passing it on.
+out to every buyer who downloads it, so the archive is posted to the scanner in `antivirus/`
+(`server/src/malware.ts`), whole and still zipped, and rejected on a hit. The browser's `.zip`
+check stays where it is, for the fast no; it is not evidence about the contents. `SCANNER_URL`
+is the switch: without it nothing is scanned, which is fine on a laptop; with it, a scanner that
+cannot be reached refuses the upload rather than quietly passing it on. See
+[antivirus/README.md](antivirus/README.md) for deploying it.
 
 Runs on plain Node 22.18+ (TypeScript type stripping, no build step). Without Supabase keys it runs in demo mode: orders are kept in memory, purchases are granted by the client, and the client identifies itself with an `x-demo-user` header (never expose demo mode publicly).
 
@@ -102,10 +102,10 @@ docker compose up --build      # web on :3000, api on :4000
 docker compose logs -f api
 ```
 
-The `clamav` service comes up alongside them. Its first start downloads the signature database,
-a few minutes kept on the `clamav-db` volume, and uploads answer 503 until it is ready; the rest
-of the site is unaffected. Budget for it: the daemon holds the whole database in memory, around
-1.5 GB, so a 512 MB instance will not run it.
+The `antivirus` service comes up alongside them, built from `antivirus/`. Its signature database
+ships inside the image, so it is scanning about a minute after boot; until then uploads answer
+503 and the rest of the site is unaffected. Budget for it: clamd holds the whole database in
+memory, about 1.1 GB idle, so a 512 MB instance will not run it.
 
 `server/Dockerfile` runs the TypeScript sources directly on Node 24 (no build step). `web/Dockerfile` builds Next.js in standalone mode and inlines the `NEXT_PUBLIC_*` values as build args (compose passes them from `.env`). Each image builds from its own folder. Rebuild the web image after changing those; server values are read at runtime. The Expo app is not containerised: run it with `npm start` in `mobile/` against the running api.
 
@@ -266,6 +266,9 @@ web/                       Next.js site (own package.json), no server-side secre
   src/app/                 Pages: explore, browse, vault, library, sell (store + per-vault insights), admin, connect (MCP), auth
   src/components/          UI kit, VaultContents
   src/lib/                 Browser copy of the data layer + mcp-token.ts, web.ts
+antivirus/                 Vault scanner: ClamAV + a small HTTP front (own Dockerfile, render.yaml)
+  src/index.ts             POST /scan, GET /health
+  src/clamd.ts             The clamd INSTREAM client
 server/                    Fastify (own package.json)
   src/routes/checkout.ts   Opens a Dodo checkout session for a vault
   src/routes/payouts.ts    Seller payout details; gates publishing a paid vault
@@ -276,6 +279,7 @@ server/                    Fastify (own package.json)
   src/admin.ts             The ADMIN_USER_IDS gate shared by every /admin route
   src/payout-ledger.ts     Earned minus paid, per seller
   src/routes/catalog.ts    Sanity catalog, notes, uploads, downloads, seller CRUD
+  src/malware.ts           Posts each uploaded zip to the scanner before it is unpacked
   src/routes/mcp.ts        MCP endpoint over purchased vaults
   src/sanity/              GROQ queries, mappers, markdown parsing, writes
   src/orders.ts            Order + purchase bookkeeping, provider-neutral, refunds
@@ -290,6 +294,5 @@ supabase/                  migrations/0001_init.sql … 0017_signup_role.sql
 
 - Seller agreement and buyer license text (personal, non-transferable).
 - Content moderation: a `reports` table and an admin flag to unlist a vault.
-- Virus scan uploaded zips before publishing (scan on the server before the notes are written to Sanity).
 - Email receipts (Dodo issues the tax invoice itself), update notifications when a seller ships a new version.
 - Store keywords: obsidian vault, obsidian templates, second brain, zettelkasten, PKM, note templates.

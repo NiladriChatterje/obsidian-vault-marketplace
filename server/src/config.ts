@@ -11,6 +11,11 @@ const env = (key: string, fallback = '') => (process.env[key] ?? fallback).trim(
 // picked up when API_PORT is unset, so no host-specific config is needed.
 const port = Number(env('API_PORT') || env('PORT', '4000'));
 
+// Render prints a private service's address as `host:port` with no scheme, which is exactly
+// what gets pasted in. Fill one in rather than failing on every upload.
+const rawScanner = env('SCANNER_URL').replace(/\/+$/, '');
+const scannerUrl = rawScanner && !/^https?:\/\//i.test(rawScanner) ? `http://${rawScanner}` : rawScanner;
+
 export const cfg = {
   port,
   /** Public URL of this server; the buyer is sent back here after checkout. */
@@ -46,13 +51,14 @@ export const cfg = {
   redisUrl: env('REDIS_URL'),
 
   /**
-   * ClamAV daemon every uploaded vault zip is streamed past before it is unpacked (see
-   * malware.ts). No host = nothing is scanned, which is for laptops: a listing is downloaded
-   * by strangers, so anywhere that accepts uploads should point this at one.
+   * The vault scanner in `antivirus/`: every uploaded zip is posted to it before it is unpacked
+   * (see malware.ts). No URL = nothing is scanned, which is for laptops: a listing is
+   * downloaded by strangers, so anywhere that accepts uploads should point this at one.
+   * The token is optional and must match the scanner's own SCANNER_TOKEN when it is set.
    */
-  clamav: {
-    host: env('CLAMAV_HOST'),
-    port: Number(env('CLAMAV_PORT', '3310')),
+  scanner: {
+    url: scannerUrl,
+    token: env('SCANNER_TOKEN'),
   },
 
   /** Brevo transactional email (see email.ts). No API key = the server sends no mail. */

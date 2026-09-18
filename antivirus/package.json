@@ -1,0 +1,14 @@
+{
+  "name": "vaultmarket-antivirus",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ClamAV with a small HTTP front: scans vault uploads before the API stores them.",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~6.0.3"
+  }
+}
