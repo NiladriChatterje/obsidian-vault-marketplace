@@ -73,7 +73,7 @@ Studio structure: Vaults → each vault → Listing / Notes / Attachments, plus 
 | `GET /vaults/:id/access`, `POST /vaults/:id/claim`, `GET /me/library` | Ownership check, free-vault claim, the buyer's library. |
 | `GET /vaults/:id/download-link` → `GET /downloads/:token` | Five-minute signed link; the zip is built from the vault's notes and attachments. |
 | `POST /vaults`, `POST /vaults/:id/status`, `DELETE /vaults/:id`, `GET /me/vaults`, `GET /me/stats` | Seller listing management, written to Sanity. |
-| `POST /uploads/vault-zip` | Multipart zip → `note`/`attachment` documents; returns the bundle id the listing form saves as `filePath`. |
+| `POST /uploads/vault-zip` | Multipart zip → scanned for malware → `note`/`attachment` documents; returns the bundle id the listing form saves as `filePath`. |
 | `/mcp` | Model Context Protocol endpoint (Streamable HTTP) over the caller's purchased vaults. |
 
 ```bash
@@ -82,6 +82,14 @@ npm install
 npm run dev        # http://localhost:4000, reads the repo-root .env
 curl localhost:4000/health
 ```
+
+Uploaded vaults are scanned before they are unpacked. A listing is other people's files going
+out to every buyer who downloads it, so the archive is streamed past a ClamAV daemon as it
+arrives (`server/src/malware.ts`), whole and still zipped, and rejected on a hit. The browser's
+`.zip` check stays where it is, for the fast no; it is not evidence about the contents. Compose
+runs the daemon as the `clamav` service and points `CLAMAV_HOST` at it. Without that variable
+nothing is scanned, which is fine on a laptop; with it, a daemon that cannot be reached refuses
+the upload rather than quietly passing it on.
 
 Runs on plain Node 22.18+ (TypeScript type stripping, no build step). Without Supabase keys it runs in demo mode: orders are kept in memory, purchases are granted by the client, and the client identifies itself with an `x-demo-user` header (never expose demo mode publicly).
 
@@ -93,6 +101,11 @@ Both services ship with Dockerfiles and a root `docker-compose.yml` that reads `
 docker compose up --build      # web on :3000, api on :4000
 docker compose logs -f api
 ```
+
+The `clamav` service comes up alongside them. Its first start downloads the signature database,
+a few minutes kept on the `clamav-db` volume, and uploads answer 503 until it is ready; the rest
+of the site is unaffected. Budget for it: the daemon holds the whole database in memory, around
+1.5 GB, so a 512 MB instance will not run it.
 
 `server/Dockerfile` runs the TypeScript sources directly on Node 24 (no build step). `web/Dockerfile` builds Next.js in standalone mode and inlines the `NEXT_PUBLIC_*` values as build args (compose passes them from `.env`). Each image builds from its own folder. Rebuild the web image after changing those; server values are read at runtime. The Expo app is not containerised: run it with `npm start` in `mobile/` against the running api.
 
