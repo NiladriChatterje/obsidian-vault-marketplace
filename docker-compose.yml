@@ -3,8 +3,11 @@
 #   web: http://localhost:3000   api: http://localhost:4000/health
 #   minio consoles: scan buffer http://localhost:9001, vault store http://localhost:9002
 #
+# The two MinIOs and redis are local containers, so their credentials are written here as
+# plain dev values rather than read from .env; nothing outside this network can reach them.
 # The listings table lives in Supabase: apply supabase/migrations/0018_catalog_in_postgres.sql
-# to the project named in .env before the first `up` (SQL editor, or `supabase db push`).
+# to the project named in .env before the first `up`, or use docker-compose.dev.yml, which
+# points everything at the local Supabase stack (`npx supabase start`) instead.
 #
 # NEXT_PUBLIC_* are baked into the web bundle at build time (build args below); changing them
 # in .env requires `docker compose build web`. Server values are read at runtime.
@@ -22,14 +25,14 @@ services:
       MINIO_ENDPOINT: http://minio:9000
       # How the BROWSER reaches minio; presigned upload links carry this host. Set it in .env when
       # the site is not opened from the machine running compose.
-      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000}
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-vaultmarket}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-vaultmarket-dev-secret}
+      MINIO_PUBLIC_URL: http://localhost:9000
+      MINIO_ACCESS_KEY: vaultmarket
+      MINIO_SECRET_KEY: vaultmarket-dev-secret
       # The vault store (server/src/vault-store.ts): note bodies, attachments, covers and the
       # scanned zip, for good. The listings themselves are in Supabase (migration 0018).
       VAULT_STORE_ENDPOINT: http://minio-store:9000
-      VAULT_STORE_ACCESS_KEY: ${VAULT_STORE_ROOT_USER:-vaultstore}
-      VAULT_STORE_SECRET_KEY: ${VAULT_STORE_ROOT_PASSWORD:-vaultstore-dev-secret}
+      VAULT_STORE_ACCESS_KEY: vaultstore
+      VAULT_STORE_SECRET_KEY: vaultstore-dev-secret
     ports:
       - "4000:4000"
     depends_on:
@@ -51,13 +54,13 @@ services:
       SCANNER_URL: http://antivirus:8080
       QUEUE_REDIS_URL: redis://redis:6379
       MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-vaultmarket}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-vaultmarket-dev-secret}
+      MINIO_ACCESS_KEY: vaultmarket
+      MINIO_SECRET_KEY: vaultmarket-dev-secret
       VAULT_STORE_ENDPOINT: http://minio-store:9000
-      VAULT_STORE_ACCESS_KEY: ${VAULT_STORE_ROOT_USER:-vaultstore}
-      VAULT_STORE_SECRET_KEY: ${VAULT_STORE_ROOT_PASSWORD:-vaultstore-dev-secret}
+      VAULT_STORE_ACCESS_KEY: vaultstore
+      VAULT_STORE_SECRET_KEY: vaultstore-dev-secret
       # Zips one worker holds at once. Each is up to 70 MB in memory and one scanner thread.
-      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+      WORKER_CONCURRENCY: "2"
     depends_on:
       antivirus:
         condition: service_started
@@ -86,8 +89,8 @@ services:
     image: quay.io/minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-vaultmarket}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-vaultmarket-dev-secret}
+      MINIO_ROOT_USER: vaultmarket
+      MINIO_ROOT_PASSWORD: vaultmarket-dev-secret
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -109,8 +112,8 @@ services:
     image: quay.io/minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${VAULT_STORE_ROOT_USER:-vaultstore}
-      MINIO_ROOT_PASSWORD: ${VAULT_STORE_ROOT_PASSWORD:-vaultstore-dev-secret}
+      MINIO_ROOT_USER: vaultstore
+      MINIO_ROOT_PASSWORD: vaultstore-dev-secret
     ports:
       - "9002:9001"
     volumes:
