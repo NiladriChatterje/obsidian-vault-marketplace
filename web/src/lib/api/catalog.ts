@@ -1,8 +1,8 @@
 /**
- * Sanity-backed catalog. Listings and notes live in Sanity; the payment server
- * (server/) reads them with a token and enforces who may see note bodies. This
- * wrapper points the catalog half of a Backend at that server while auth,
- * purchases and reviews keep using the wrapped backend (Supabase or demo).
+ * Server-backed catalog. Listings live in Postgres and note bodies in the payment server's
+ * vault store; the server (server/) reads both with its own credentials and enforces who may
+ * see note bodies. This wrapper points the catalog half of a Backend at that server while
+ * auth, purchases and reviews keep using the wrapped backend (Supabase or demo).
  */
 import type { Purchase, SellerStats, Vault, VaultInput, VaultNote, VaultNoteContent, VaultPage, VaultStatus } from '../../types';
 import { API_URL } from '../config';

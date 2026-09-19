@@ -83,6 +83,26 @@ export const cfg = {
     bucket: env('MINIO_BUCKET', 'vault-uploads'),
   },
 
+  /**
+   * The vault store (vault-store.ts): where note bodies, attachments, covers and the scanned
+   * zip live for good. Required for the catalog at all; without it every catalog route answers
+   * 501. Falls back to the scan buffer's credentials when only the endpoint differs, which is
+   * the two-MinIO layout docker-compose runs.
+   */
+  vaultStore: {
+    endpoint: env('VAULT_STORE_ENDPOINT').replace(/\/+$/, ''),
+    accessKey: env('VAULT_STORE_ACCESS_KEY') || env('MINIO_ACCESS_KEY'),
+    secretKey: env('VAULT_STORE_SECRET_KEY') || env('MINIO_SECRET_KEY'),
+    bucket: env('VAULT_STORE_BUCKET', 'vault-store'),
+  },
+
+  /** Storage plans (plans.ts), in MB. The row a seller has may carry its own figure. */
+  plans: {
+    freeMb: Number(env('PLAN_FREE_MB', '600')),
+    plusMb: Number(env('PLAN_PLUS_MB', '2048')),
+    proMb: Number(env('PLAN_PRO_MB', '5120')),
+  },
+
   /** Brevo transactional email (see email.ts). No API key = the server sends no mail. */
   brevo: {
     apiKey: env('BREVO_API_KEY'),

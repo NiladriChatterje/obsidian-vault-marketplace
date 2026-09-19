@@ -16,7 +16,7 @@ import { getOrder, saveOrder, type Order } from '../orders.ts';
 import { payoutRegion } from '../seller-payouts.ts';
 import { resolveReturnOrigin, returnUrl } from '../redirect.ts';
 import { admin, userFromRequest } from '../supabase.ts';
-import { SANITY_ENABLED, getVault } from '../sanity/index.ts';
+import { CATALOG_ENABLED, getVault } from '../catalog/index.ts';
 import type { Vault } from '../types.ts';
 
 interface CheckoutBody {
@@ -72,7 +72,7 @@ export default async function checkoutRoutes(app: FastifyInstance) {
         const user = await userFromRequest(req);
         if (!user) return reply.code(401).send({ error: 'Not signed in' });
 
-        if (!SANITY_ENABLED) return reply.code(501).send({ error: 'Catalog is not configured' });
+        if (!CATALOG_ENABLED) return reply.code(501).send({ error: 'Catalog is not configured' });
         const v = await getVault(vaultId);
         if (!v) return reply.code(404).send({ error: 'Vault not found' });
         if (v.status !== 'published') return reply.code(400).send({ error: 'Vault is not available' });

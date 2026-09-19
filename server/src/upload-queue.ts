@@ -41,7 +41,7 @@ export function queueConnection(): Redis {
 }
 
 /**
- * Three tries with a growing pause covers a scanner that was briefly down or Sanity hiccuping.
+ * Three tries with a growing pause covers a scanner that was briefly down or Postgres hiccuping.
  * A zip the seller must fix is failed for good by the worker regardless (UnrecoverableError).
  * Finished jobs are kept long enough for the browser to read the answer, failures for a day so
  * a complaint can be looked into.

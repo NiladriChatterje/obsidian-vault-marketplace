@@ -126,12 +126,12 @@ async function currentUserId(): Promise<string> {
 }
 
 /**
- * Vault files and covers live in Sanity, reached through the payment server (see
- * catalog.ts). Supabase keeps accounts, purchases, reviews and the payout ledger, and no
- * files. These are the file methods the Backend interface still requires; without the
- * server there is nowhere to send a file, and they say so.
+ * Vault files and covers live in the payment server's vault store, reached through it (see
+ * catalog.ts). The browser's own Supabase client keeps to accounts, purchases, reviews and
+ * the payout ledger, and no files. These are the file methods the Backend interface still
+ * requires; without the server there is nowhere to send a file, and they say so.
  */
-const FILES_NEED_SERVER = 'Vault files are stored in Sanity through the catalog server. Set NEXT_PUBLIC_API_URL to upload or download.';
+const FILES_NEED_SERVER = 'Vault files are stored through the catalog server. Set NEXT_PUBLIC_SERVER_API_URL to upload or download.';
 
 /** Calls the payment server with the current Supabase session token. */
 async function apiFetch<T = Record<string, any>>(path: string, init: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown } = {}): Promise<T> {
@@ -385,7 +385,7 @@ export const supabaseBackend: Backend = {
     return [];
   },
   async getNote() {
-    throw new Error('Notes are only available with the Sanity catalog.');
+    throw new Error('Notes are only available with the server catalog.');
   },
   async addReview(vaultId, rating, body) {
     const userId = await currentUserId();
@@ -503,7 +503,7 @@ export const supabaseBackend: Backend = {
   },
 
   // Purchases and reviews are joined to the catalog on the server, which holds the service
-  // role and the Sanity token; the browser could see neither side in full on its own.
+  // role and the vault store; the browser could see neither side in full on its own.
   getMyInsights: () => apiFetch<VaultSales[]>('/me/insights'),
   getMyVaultInsights: (vaultId) => apiFetch<VaultInsights>(`/me/vaults/${encodeURIComponent(vaultId)}/insights`),
   getAdminOverview: () => apiFetch<AdminOverview>('/admin/overview'),

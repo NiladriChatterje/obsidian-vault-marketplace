@@ -1,6 +1,7 @@
 /**
- * Vault catalog backed by Sanity. The app and site never query Sanity directly;
- * the dataset is private and this server holds the token.
+ * The vault catalog: listings and the note index in Postgres, bytes in the vault store
+ * (catalog/index.ts). The app and site never touch either directly; this server holds the
+ * service role and decides who may read a note body.
  *
  *   GET  /vaults                       list published vaults (category, q, sort, featured, free, limit, ids)
  *   GET  /vaults/:id                   one vault (drafts only for their seller)
@@ -15,7 +16,7 @@
  *   GET  /me/vaults | /me/stats | /me/library
  *   POST /vaults  { input, id? }       create / update a listing (seller)
  *   POST /vaults/:id/status { status } | DELETE /vaults/:id
- *   POST /vaults/:id/refresh-rating    recompute rating from Supabase reviews into Sanity
+ *   POST /vaults/:id/refresh-rating    recompute the listing's rating from its reviews (a trigger does it too)
  *   POST /uploads/vault-zip?vaultId=   multipart zip -> scanned, unpacked, note/attachment documents -> { path: bundleId, ... }
  *                                      vaultId is the listing being replaced, so its current
  *                                      size is left out of the seller's storage quota
@@ -23,20 +24,25 @@
  *                                      client should send the zip (see upload-queue.ts)
  *   POST /uploads/vault-zip/complete?vaultId=  { key } -> { jobId }   the zip is in the store; queue it
  *   GET  /uploads/vault-zip/jobs/:id   { state, result? | error? }    poll a queued upload
- *   POST /uploads/cover                multipart image -> Sanity image asset -> { url }
+ *   POST /uploads/cover                multipart image -> vault store -> { url }
+ *   GET  /files/covers/:name           a cover image, public, cached for a year (names are uuids)
+ *   POST /admin/sellers/:userId/plan   { plan } put a seller on a storage plan (operators)
  */
 import multipart from '@fastify/multipart';
 import type { FastifyInstance } from 'fastify';
 import type { CategorySlug, SellerStats, SortMode, VaultInput, VaultStatus } from '../types.ts';
-import * as catalog from '../sanity/index.ts';
+import * as catalog from '../catalog/index.ts';
 import { ownsVault, requester, requireRequester, sellerProfile } from '../access.ts';
+import { requireAdmin } from '../admin.ts';
 import { IS_DEMO, cfg, minPriceCents } from '../config.ts';
 import { sellerBalance } from '../payout-ledger.ts';
 import { hasPayoutDetails } from '../seller-payouts.ts';
-import { buildVaultZip, signDownload, verifyDownload } from '../download.ts';
+import { signDownload, verifyDownload } from '../download.ts';
+import { isPlanId, planFor, setPlan } from '../plans.ts';
 import { UPLOAD_QUEUE_ENABLED, enqueueScan, uploadJobStatus } from '../upload-queue.ts';
 import { incomingKey, objectSize, ownsKey, presignUpload, removeObject } from '../upload-store.ts';
-import { MAX_SELLER_STORAGE_BYTES, MAX_ZIP_BYTES, MAX_ZIP_LABEL, UploadRejected, processVaultZip } from '../vault-upload.ts';
+import { MAX_ZIP_BYTES, MAX_ZIP_LABEL, UploadRejected, processVaultZip } from '../vault-upload.ts';
+import { contentTypeFor, coverKey, streamObject } from '../vault-store.ts';
 import { admin } from '../supabase.ts';
 
 const MAX_COVER_BYTES = 5 * 1024 * 1024;
@@ -45,7 +51,7 @@ export default async function catalogRoutes(app: FastifyInstance) {
   await app.register(multipart, { limits: { fileSize: MAX_ZIP_BYTES, files: 1 } });
 
   app.addHook('onRequest', async (_req, reply) => {
-    if (!catalog.SANITY_ENABLED) return reply.code(501).send({ error: 'Catalog is not configured (SANITY_PROJECT_ID / CATALOG_SOURCE).' });
+    if (!catalog.CATALOG_ENABLED) return reply.code(501).send({ error: 'Catalog is not configured: it needs Supabase and VAULT_STORE_ENDPOINT on the server.' });
   });
 
   /* ---------- public reads ---------- */
@@ -147,13 +153,16 @@ export default async function catalogRoutes(app: FastifyInstance) {
     if (!claim) return reply.code(410).send({ error: 'Download link expired. Open the vault again to get a fresh one.' });
     const v = await catalog.getVault(claim.vaultId);
     if (!v) return reply.code(404).send({ error: 'Vault not found' });
-    const zip = await buildVaultZip(v.id, v.title);
+    // The seller's own archive, straight out of the store: nothing is rebuilt or held in memory.
+    const zip = await catalog.openVaultZip(v);
+    if (!zip) return reply.code(404).send({ error: 'This listing has no vault file yet.' });
+    void catalog.incrementDownloads(v.id);
     const filename = `${v.title.replace(/[^\w\- ]+/g, '').trim() || 'vault'}.zip`;
     return reply
       .header('Content-Type', 'application/zip')
       .header('Content-Disposition', `attachment; filename="${filename}"`)
-      .header('Content-Length', String(zip.byteLength))
-      .send(Buffer.from(zip));
+      .header('Content-Length', String(zip.size))
+      .send(zip.stream);
   });
 
   app.get('/me/library', async (req, reply) => {
@@ -186,7 +195,7 @@ export default async function catalogRoutes(app: FastifyInstance) {
   app.get('/me/stats', async (req, reply) => {
     const r = await requireRequester(req, reply);
     if (!r) return;
-    const mine = await catalog.getSellerVaults(r.id, true);
+    const [mine, plan] = await Promise.all([catalog.getSellerVaults(r.id, true), planFor(r.id)]);
     const stats: SellerStats = {
       grossCents: 0,
       feeCents: 0,
@@ -195,7 +204,8 @@ export default async function catalogRoutes(app: FastifyInstance) {
       downloads: mine.reduce((s, v) => s + v.downloads, 0),
       publishedCount: mine.filter((v) => v.status === 'published').length,
       storageUsedBytes: mine.reduce((s, v) => s + (v.sizeBytes || 0), 0),
-      storageLimitBytes: MAX_SELLER_STORAGE_BYTES,
+      storageLimitBytes: plan.quotaBytes,
+      storagePlan: plan.label,
     };
     if (!r.demo && mine.length) {
       const { data } = await admin()
@@ -279,14 +289,12 @@ export default async function catalogRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post<{ Params: { id: string } }>('/vaults/:id/refresh-rating', async (req, reply) => {
+  // A trigger keeps the rating current as reviews land; this recomputes it on request, which
+  // the site still asks for after posting a review.
+  app.post<{ Params: { id: string } }>('/vaults/:id/refresh-rating', async (req) => {
     if (IS_DEMO) return { ok: true, demo: true };
-    const { data, error } = await admin().from('reviews').select('rating').eq('vault_id', req.params.id);
-    if (error) throw new Error(error.message);
-    const count = data?.length ?? 0;
-    const avg = count ? Math.round(((data ?? []).reduce((s: number, r: any) => s + r.rating, 0) / count) * 100) / 100 : 0;
-    await catalog.setRating(req.params.id, avg, count);
-    return { ok: true, ratingAvg: avg, ratingCount: count };
+    const { ratingAvg, ratingCount } = await catalog.refreshRating(req.params.id);
+    return { ok: true, ratingAvg, ratingCount };
   });
 
   app.post<{ Querystring: { vaultId?: string } }>('/uploads/vault-zip', async (req, reply) => {
@@ -366,11 +374,34 @@ export default async function catalogRoutes(app: FastifyInstance) {
     const buf = await part.toBuffer();
     if (buf.byteLength > MAX_COVER_BYTES) return reply.code(413).send({ error: 'Cover must be under 5 MB' });
     try {
-      return { url: await catalog.uploadCoverImage(buf, part.filename || 'cover') };
+      // The browser sends the file as "cover" with no extension; the type it declared names one.
+      return { url: await catalog.uploadCoverImage(buf, `cover.${part.mimetype.split('/')[1]}`) };
     } catch (e) {
       req.log.error(e);
       return reply.code(502).send({ error: e instanceof Error ? e.message : 'Upload failed' });
     }
   });
 
+  // Covers are public: they are on the storefront. Names are uuids, so the cache can be long.
+  app.get<{ Params: { name: string } }>('/files/covers/:name', async (req, reply) => {
+    const name = req.params.name;
+    if (!/^[\w-]+\.(png|jpe?g|webp|gif)$/i.test(name)) return reply.code(404).send({ error: 'Not found' });
+    const obj = await streamObject(coverKey(name));
+    if (!obj) return reply.code(404).send({ error: 'Not found' });
+    return reply
+      .header('Content-Type', contentTypeFor(name))
+      .header('Content-Length', String(obj.size))
+      .header('Cache-Control', 'public, max-age=31536000, immutable')
+      .send(obj.stream);
+  });
+
+  /* ---------- operators ---------- */
+
+  app.post<{ Params: { userId: string }; Body: { plan?: unknown; periodEnd?: unknown } }>('/admin/sellers/:userId/plan', async (req, reply) => {
+    if (!(await requireAdmin(req, reply))) return;
+    const plan = req.body?.plan;
+    if (!isPlanId(plan)) return reply.code(400).send({ error: 'plan must be free, plus or pro' });
+    const periodEnd = typeof req.body?.periodEnd === 'string' && !Number.isNaN(Date.parse(req.body.periodEnd)) ? new Date(req.body.periodEnd).toISOString() : null;
+    return setPlan(req.params.userId, plan, periodEnd);
+  });
 }

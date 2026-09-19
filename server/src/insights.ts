@@ -1,17 +1,18 @@
 /**
  * Who bought each vault, and what they said about it.
  *
- * Purchases and reviews live in Supabase; the listings they refer to live in Sanity. Nothing
- * joins the two, so this reads the rows with the service role, groups them by vault, and
- * hydrates the vault from the catalog afterwards. A vault that has since been deleted still
- * has its purchases, so a row's `vault` can be null and the id is carried separately.
+ * Purchases and reviews carry text vault ids with no foreign key to the listings (older rows
+ * predate the catalog's move into Postgres), so this reads the rows with the service role,
+ * groups them by vault, and hydrates the vault from the catalog afterwards. A vault that has
+ * since been deleted still has its purchases, so a row's `vault` can be null and the id is
+ * carried separately.
  *
  * Two readers, one shape. A seller sees this for their own vaults and the operator for all
  * of them; the routes decide who may ask, this only answers.
  */
 import type { AdminOverview, AdminVaultRow, PurchaseRecord, Review, UserSummary, Vault, VaultInsights, VaultSales } from './types.ts';
 import { cfg } from './config.ts';
-import * as catalog from './sanity/index.ts';
+import * as catalog from './catalog/index.ts';
 import { admin } from './supabase.ts';
 
 type Row = Record<string, any>;

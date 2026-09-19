@@ -55,7 +55,7 @@ export async function ownsVault(r: Requester | null, vault: Vault): Promise<bool
   return hasPurchase(r.id, vault.id);
 }
 
-/** Seller profile fields for the Sanity `seller` document. */
+/** The caller as a seller: their profile row, or what a demo caller said about themselves. */
 export async function sellerProfile(r: Requester): Promise<{ userId: string; username: string; displayName: string; bio?: string | null; avatarUrl?: string | null }> {
   if (r.demo) return { userId: r.id, username: r.seller?.username ?? 'seller', displayName: r.seller?.displayName ?? 'Seller' };
   const { data, error } = await admin().from('profiles').select('username, display_name, bio, avatar_url').eq('id', r.id).single();

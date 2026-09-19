@@ -83,10 +83,10 @@ export default function PrivacyPage() {
           and VAT in the buyer&rsquo;s country. It receives your email address and the billing details you enter at checkout, under its own privacy policy.
         </li>
         <li>
-          <strong>Supabase.</strong> Hosts accounts, purchases and orders.
+          <strong>Supabase.</strong> Hosts accounts, purchases, orders and vault listings.
         </li>
         <li>
-          <strong>Sanity.</strong> Hosts vault listings and note contents.
+          <strong>Our object storage.</strong> Holds the vault files, note contents and cover images that sellers upload.
         </li>
         <li>
           <strong>Sellers.</strong> See aggregate sales and download counts for their own vaults only. They never see buyer names, email addresses or contact

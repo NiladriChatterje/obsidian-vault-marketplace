@@ -103,12 +103,12 @@ export const APP_SCHEME = 'vaultmarket';
 export const API_URL = (process.env.NEXT_PUBLIC_SERVER_API_URL ?? '').replace(/\/$/, '');
 
 /**
- * Where listings and notes come from. 'sanity' routes the catalog through the
- * payment server (which reads the private Sanity dataset); 'local' keeps the
- * built-in demo data / Supabase tables. Defaults to sanity whenever a server is configured.
+ * Where listings and notes come from. 'server' routes the catalog through the payment server
+ * (Postgres index, bytes in its vault store); 'local' keeps the built-in demo data. Defaults
+ * to the server whenever one is configured.
  */
-export const CATALOG_SOURCE: 'sanity' | 'local' =
-  process.env.NEXT_PUBLIC_CATALOG_SOURCE === 'local' || !API_URL ? 'local' : 'sanity';
+export const CATALOG_SOURCE: 'server' | 'local' =
+  process.env.NEXT_PUBLIC_CATALOG_SOURCE === 'local' || !API_URL ? 'local' : 'server';
 
 /**
  * Where the payment server sends the buyer after checkout.
@@ -120,12 +120,7 @@ export const REDIRECT_ORIGIN: string =
   process.env.NEXT_PUBLIC_REDIRECT_ORIGIN ||
   (typeof location !== 'undefined' && /^https?:/.test(location.origin ?? '') ? location.origin : `${APP_SCHEME}:/`);
 
-/** Keep in step with MAX_ZIP_BYTES in server/src/routes/catalog.ts, which is the authority. */
+/** Keep in step with MAX_ZIP_BYTES in server/src/vault-upload.ts, which is the authority. */
 export const MAX_VAULT_ZIP_BYTES = 70 * 1024 * 1024;
-
-/**
- * Everything one seller has listed, measured unpacked. The server enforces it; this copy only
- * lets the sell pages draw a meter and refuse an upload before it is spent. Keep it in step
- * with MAX_SELLER_STORAGE_BYTES in server/src/routes/catalog.ts.
- */
-export const MAX_SELLER_STORAGE_BYTES = 1024 * 1024 * 1024;
+// The seller's storage ceiling is their plan's, which GET /me/stats reports as storageLimitBytes;
+// there is no constant to mirror.

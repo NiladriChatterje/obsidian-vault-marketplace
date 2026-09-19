@@ -7,7 +7,7 @@ import { Cover, Field, Loading, Toast } from '@/components/ui';
 import { errorMessage, fileToUri, releaseUri } from '@/lib/web';
 import { inspectVaultZip } from '@/lib/vault-zip';
 import { api, type UploadStage } from '@/lib/api';
-import { MAX_SELLER_STORAGE_BYTES, MAX_VAULT_ZIP_BYTES, MIN_PRICE_CENTS, PLATFORM_COUNTRY, PLATFORM_FEE_FIXED_CENTS, feePercentFor, platformFee } from '@/lib/config';
+import { MAX_VAULT_ZIP_BYTES, MIN_PRICE_CENTS, PLATFORM_COUNTRY, PLATFORM_FEE_FIXED_CENTS, feePercentFor, platformFee } from '@/lib/config';
 import { formatBytes, formatPrice, parsePriceToCents, parseTags } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 import { CATEGORIES, type CategorySlug, type Vault, type VaultInput } from '@/types';
@@ -51,10 +51,12 @@ export default function ListingEditorPage() {
   const [canBePaid, setCanBePaid] = useState<boolean | null>(null);
   // Where they bank sets their rate: a domestic payout costs the platform less to send.
   const [payoutCountry, setPayoutCountry] = useState<string | null>(null);
-  // Storage their other listings already hold. This one is left out, because replacing its zip
-  // frees whatever the old one took. Null while unknown, which never blocks an upload.
+  // Storage their other listings already hold, and their plan's ceiling. This listing is left
+  // out, because replacing its zip frees whatever the old one took. Null while unknown, which
+  // never blocks an upload: the server holds the real quota and refuses on its own.
   const [usedByOthers, setUsedByOthers] = useState<number | null>(null);
-  const freeBytes = usedByOthers === null ? null : Math.max(0, MAX_SELLER_STORAGE_BYTES - usedByOthers);
+  const [limitBytes, setLimitBytes] = useState<number | null>(null);
+  const freeBytes = usedByOthers === null || limitBytes === null ? null : Math.max(0, limitBytes - usedByOthers);
 
   const zipInput = useRef<HTMLInputElement>(null);
   const coverInput = useRef<HTMLInputElement>(null);
@@ -124,6 +126,10 @@ export default function ListingEditorPage() {
       .then((mine) => setUsedByOthers(mine.filter((v) => v.id !== id).reduce((sum, v) => sum + (v.sizeBytes || 0), 0)))
       // Unknown rather than zero. The server holds the real quota and refuses the upload itself.
       .catch(() => setUsedByOthers(null));
+    api
+      .getSellerStats()
+      .then((s) => setLimitBytes(s.storageLimitBytes ?? null))
+      .catch(() => setLimitBytes(null));
   }, [user?.id, id]);
 
   const pickZip = async (file: File | undefined) => {
@@ -148,10 +154,10 @@ export default function ListingEditorPage() {
         return;
       }
       // Unpacked, not zipped: storage holds the notes and attachments, not the archive.
-      if (freeBytes !== null && check.sizeBytes > freeBytes) {
+      if (freeBytes !== null && limitBytes !== null && check.sizeBytes > freeBytes) {
         setRejected({
           title: 'Not enough storage left',
-          message: `That vault unpacks to ${formatBytes(check.sizeBytes)}, and only ${formatBytes(freeBytes)} of your ${formatBytes(MAX_SELLER_STORAGE_BYTES)} is free. Delete a listing you no longer sell, or upload a smaller vault.`,
+          message: `That vault unpacks to ${formatBytes(check.sizeBytes)}, and only ${formatBytes(freeBytes)} of your ${formatBytes(limitBytes)} is free. Delete a listing you no longer sell, upload a smaller vault, or move to a bigger plan.`,
         });
         setUploadingFile(null);
         return;
