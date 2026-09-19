@@ -7,12 +7,15 @@
  * instead of arriving as a bare 400.
  *
  * The rules are deliberately identical, so keep them in step: a vault needs at least one
- * readable note, and everything else in the zip is kept as an attachment.
+ * readable note, everything in it must be a text file (see file-policy.ts: images and other
+ * binaries are refused by their bytes, not their names), and the text files that are not
+ * notes are kept as attachments.
  */
 import { unzipSync } from 'fflate';
+import { whyRefused } from './file-policy';
 
-/** Notes. Anything else in the zip becomes an attachment and travels with the vault. */
-const MARKDOWN_EXT = /\.(md|markdown|canvas)$/i;
+/** Notes. The other allowed text files (see file-policy.ts) become attachments and travel with the vault. */
+const MARKDOWN_EXT = /\.(md|canvas)$/i;
 
 /** Junk that is in the archive but not in the vault. `__MACOSX` is what Mac zipping adds. */
 function isIgnoredPath(path: string): boolean {
@@ -71,6 +74,9 @@ export async function inspectVaultZip(file: File): Promise<VaultZipCheck> {
       if (MARKDOWN_EXT.test(path)) ignoredNotes++;
       continue;
     }
+    // One file that is not text refuses the whole zip, named, exactly as the server will.
+    const refused = whyRefused(path, data);
+    if (refused) return { ok: false, noteCount: 0, attachmentCount: 0, sizeBytes: 0, reason: `"${path}" ${refused}. Remove it and try again.` };
     if (!MARKDOWN_EXT.test(path)) {
       if (data.byteLength > MAX_ATTACHMENT_BYTES) continue;
       attachmentCount++;
@@ -92,6 +98,6 @@ export async function inspectVaultZip(file: File): Promise<VaultZipCheck> {
     ? 'The only notes in that zip are inside a folder we skip, such as __MACOSX or .trash. Zip the vault folder itself rather than compressing it from the Finder sidebar.'
     : oversizeNotes
       ? 'Every note in that zip is over 2 MB, which is larger than a note can be. Check you zipped a vault and not an export.'
-      : 'That zip has no notes in it. An Obsidian vault needs at least one .md, .markdown or .canvas file; images, PDFs and your .obsidian config can come along with them.';
+      : 'That zip has no notes in it. An Obsidian vault needs at least one .md or .canvas file; .base, .json, .yaml, .toml and .txt files can come along with them.';
   return { ok: false, noteCount: 0, attachmentCount, sizeBytes: 0, reason };
 }

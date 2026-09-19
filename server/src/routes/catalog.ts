@@ -32,6 +32,7 @@ import multipart from '@fastify/multipart';
 import type { FastifyInstance } from 'fastify';
 import type { CategorySlug, SellerStats, SortMode, VaultInput, VaultStatus } from '../types.ts';
 import * as catalog from '../catalog/index.ts';
+import { imageKind } from '../catalog/file-policy.ts';
 import { ownsVault, requester, requireRequester, sellerProfile } from '../access.ts';
 import { requireAdmin } from '../admin.ts';
 import { IS_DEMO, cfg, minPriceCents } from '../config.ts';
@@ -370,12 +371,13 @@ export default async function catalogRoutes(app: FastifyInstance) {
     if (!r) return;
     const part = await req.file();
     if (!part) return reply.code(400).send({ error: 'Attach the image as multipart field "file"' });
-    if (!/^image\/(png|jpeg|webp|gif)$/.test(part.mimetype)) return reply.code(400).send({ error: 'Cover must be a PNG, JPEG, WebP or GIF' });
     const buf = await part.toBuffer();
     if (buf.byteLength > MAX_COVER_BYTES) return reply.code(413).send({ error: 'Cover must be under 5 MB' });
+    // Judged by its bytes, not the type the browser declared or the name it came with.
+    const kind = imageKind(buf);
+    if (!kind) return reply.code(400).send({ error: 'Cover must be a PNG, JPEG, WebP or GIF' });
     try {
-      // The browser sends the file as "cover" with no extension; the type it declared names one.
-      return { url: await catalog.uploadCoverImage(buf, `cover.${part.mimetype.split('/')[1]}`) };
+      return { url: await catalog.uploadCoverImage(buf, `cover.${kind === 'jpeg' ? 'jpg' : kind}`) };
     } catch (e) {
       req.log.error(e);
       return reply.code(502).send({ error: e instanceof Error ? e.message : 'Upload failed' });

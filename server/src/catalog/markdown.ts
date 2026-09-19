@@ -8,7 +8,8 @@ export interface ParsedNote {
   links: string[];
 }
 
-export const MARKDOWN_EXT = /\.(md|markdown|canvas)$/i;
+/** Notes. Everything else a vault may hold (see file-policy.ts) is an attachment. */
+export const MARKDOWN_EXT = /\.(md|canvas)$/i;
 
 /** Very small YAML subset: `key: value`, `key: [a, b]`, and `- item` lists. Enough for Obsidian frontmatter. */
 export function parseFrontmatter(content: string): { data: Record<string, unknown>; body: string } {

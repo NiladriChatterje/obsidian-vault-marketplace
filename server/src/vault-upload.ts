@@ -10,6 +10,8 @@
  */
 import { unzipSync } from 'fflate';
 import * as catalog from './catalog/index.ts';
+import { whyRefused } from './catalog/file-policy.ts';
+import { isIgnoredPath, stripCommonRoot } from './catalog/markdown.ts';
 import { platformFee } from './config.ts';
 import { MALWARE_SCAN_ENABLED, scanForMalware } from './malware.ts';
 import { planFor } from './plans.ts';
@@ -92,6 +94,17 @@ export async function processVaultZip(zip: Uint8Array, userId: string, log: Uplo
     .filter(([path, data]) => !path.endsWith('/') && data.byteLength > 0)
     .map(([path, data]) => ({ path, data }));
   if (!files.length) throw new UploadRejected(400, 'The zip is empty');
+
+  // Every file that would be stored is judged by its bytes (catalog/file-policy.ts): a vault
+  // is notes and text, and an image renamed `.md` is still an image. One bad file refuses the
+  // whole zip, named, rather than being dropped quietly; the seller should know what they packed.
+  const strip = stripCommonRoot(files.map((f) => f.path));
+  for (const file of files) {
+    const path = strip(file.path);
+    if (!path || isIgnoredPath(path)) continue;
+    const reason = whyRefused(path, file.data);
+    if (reason) throw new UploadRejected(422, `That zip was refused: "${path}" ${reason}. Remove it and upload again.`);
+  }
 
   // Checked against the unpacked bytes, not the zip: what the quota measures is what gets
   // stored. The ceiling is the seller's plan, across all their listings (plans.ts). Done

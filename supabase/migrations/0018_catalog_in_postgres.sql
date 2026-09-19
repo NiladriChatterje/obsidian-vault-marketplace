@@ -183,12 +183,20 @@ begin
   delete from public.bundles where id = any(stale);
   update public.bundles set vault_id = p_vault_id where id = p_bundle;
 
-  select path into entry from public.notes where bundle = p_bundle and is_preview order by path limit 1;
+  -- The note buyers open first. One the seller named wins if the bundle has it; otherwise the
+  -- most welcoming of the preview notes, "Start Here" before "Home" before "index" before "README".
+  select path into entry from public.notes
+  where bundle = p_bundle and is_preview
+  order by case lower(path) when 'start here.md' then 0 when 'home.md' then 1 when 'index.md' then 2 else 3 end, path
+  limit 1;
   update public.vaults set
     bundle = p_bundle,
     note_count = b.note_count,
     size_bytes = b.size_bytes,
-    entry_note = coalesce(entry, entry_note)
+    entry_note = case
+      when v.entry_note is not null and exists (select 1 from public.notes n where n.bundle = p_bundle and n.path = v.entry_note) then v.entry_note
+      else coalesce(entry, v.entry_note)
+    end
   where id = p_vault_id;
   return stale;
 end $$;

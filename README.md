@@ -43,7 +43,7 @@ An Obsidian vault is a folder of markdown files. What is *asked* about a vault l
 | `vaults` | The listing: title, slug, tagline, description, category, tags, `seller_id` → `profiles`, `cover_key`, price (minor units), currency, status, plugins, version, `entry_note` (start-here path), note count, size, downloads, rating (kept current by a trigger on `reviews`). |
 | `bundles` | One unpacked upload: id, uploader, `vault_id` (null until the listing is saved), counts. |
 | `notes` | One `.md` file's index: `path`, title, folder, parsed `frontmatter` (jsonb), tags (frontmatter + inline `#tags`), `links` (wikilink targets), `is_preview` (readable before purchase), size. The body is in the store. |
-| `attachments` | Any non-markdown file (images, PDFs, `.obsidian` config): path, MIME type, size. The bytes are in the store. |
+| `attachments` | The allowed files that are not notes — `.base`, `.json`, `.yaml`/`.yml`, `.toml`, `.txt`: path, MIME type, size. The bytes are in the store. Nothing else gets in: a vault may hold only `.md`, `.canvas` and those five, and every file is also judged by its bytes (`server/src/catalog/file-policy.ts`), so `image.png.md` is caught the same as `image.png`. |
 | `seller_plans` | Which storage plan a seller is on and until when. No row means free (`server/src/plans.ts`). |
 
 | Object key | What it is |
