@@ -1,12 +1,9 @@
 /**
- * Vault downloads. A vault is its notes, so the zip is assembled from Sanity on
- * demand: every note becomes `<path>` with its markdown body, attachments are
- * pulled from the asset CDN. Links are short-lived HMAC tokens because browsers
- * cannot attach an Authorization header to a navigation.
+ * Vault downloads. The buyer gets the zip the seller uploaded, exactly as it passed the
+ * scanner, streamed out of the vault store; nothing is rebuilt. Links are short-lived HMAC
+ * tokens because browsers cannot attach an Authorization header to a navigation.
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { zipSync } from 'fflate';
-import { SANITY_API_TOKEN, getAllNoteContents, incrementDownloads, listAttachments } from './sanity/index.ts';
 import { cfg } from './config.ts';
 
 const secret = () => cfg.downloadSecret;
@@ -32,23 +29,4 @@ export function verifyDownload(token: string): { vaultId: string; userId: string
   } catch {
     return null;
   }
-}
-
-/** Builds the zip in memory. Vaults are text-heavy, so this stays small; attachments are capped at ingest. */
-export async function buildVaultZip(vaultId: string, folderName: string): Promise<Uint8Array> {
-  const [notes, attachments] = await Promise.all([getAllNoteContents(vaultId), listAttachments(vaultId)]);
-  const files: Record<string, Uint8Array> = {};
-  const root = folderName.replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'vault';
-  const encoder = new TextEncoder();
-  for (const n of notes) files[`${root}/${n.path}`] = encoder.encode(n.content ?? '');
-  await Promise.all(
-    attachments.map(async (a) => {
-      if (!a.url) return;
-      const res = await fetch(a.url, { headers: SANITY_API_TOKEN ? { Authorization: `Bearer ${SANITY_API_TOKEN}` } : undefined });
-      if (res.ok) files[`${root}/${a.path}`] = new Uint8Array(await res.arrayBuffer());
-    })
-  );
-  if (!Object.keys(files).length) files[`${root}/README.md`] = encoder.encode('# Empty vault\n\nThis listing has no notes yet.\n');
-  void incrementDownloads(vaultId);
-  return zipSync(files, { level: 6 });
 }

@@ -1,21 +1,21 @@
 /**
  * Vault Market payment server (Fastify).
  * Owns everything with a secret:
- * the Dodo Payments checkout and its webhook, the Sanity-backed vault catalog, the seller
- * ledger and admin dashboard, and the MCP endpoint over purchased vaults.
+ * the Dodo Payments checkout and its webhook, the vault catalog (Postgres + the vault store),
+ * the seller ledger and admin dashboard, and the MCP endpoint over purchased vaults.
  *
  *   npm run dev      # reads ../.env, restarts on change
  */
 import './env.ts'; // must stay first: shared modules read process.env when imported
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
-import { createClient } from '@sanity/client';
-import { SANITY_API_TOKEN, SANITY_DATASET, SANITY_ENABLED, SANITY_PROJECT_ID, useSanityClientFactory } from './sanity/index.ts';
+import { CATALOG_ENABLED } from './catalog/index.ts';
 import { IS_DEMO, cfg } from './config.ts';
 import { EMAIL_ENABLED } from './email.ts';
 import { MALWARE_SCAN_ENABLED } from './malware.ts';
 import { REDIS_ENABLED } from './redis.ts';
 import { UPLOAD_QUEUE_ENABLED } from './upload-queue.ts';
+import { VAULT_STORE_ENABLED } from './vault-store.ts';
 import { DODO_ENABLED } from './dodo.ts';
 import { startKeepAwake } from './keepalive.ts';
 import { startPayoutWatch } from './payout-watch.ts';
@@ -28,9 +28,12 @@ import payoutRoutes from './routes/payouts.ts';
 import checkoutRoutes from './routes/checkout.ts';
 import mcpRoutes from './routes/mcp.ts';
 
-useSanityClientFactory(createClient);
-
-const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' } });
+const app = Fastify({
+  logger: { level: process.env.LOG_LEVEL ?? 'info' },
+  // A download token (/downloads/:token) is a signed base64 payload, ~150 characters; the
+  // default ceiling of 100 on a route parameter would answer it with 414 before the handler.
+  maxParamLength: 512,
+});
 
 await app.register(cors, { origin: cfg.allowedRedirectOrigins.length ? cfg.allowedRedirectOrigins : true });
 
@@ -43,11 +46,12 @@ app.get('/health', async () => ({
   email: EMAIL_ENABLED ? { provider: 'brevo', from: cfg.brevo.senderEmail } : null,
   // Sign-in codes live here, so without it nobody can complete a sign-in.
   redis: REDIS_ENABLED,
-  // Off means uploaded vaults reach Sanity unscanned; see malware.ts.
+  // Off means uploaded vaults reach the store unscanned; see malware.ts.
   uploadScan: MALWARE_SCAN_ENABLED,
   // On means zips go through the store and a worker; off, POST /uploads/vault-zip does it inline.
   uploadQueue: UPLOAD_QUEUE_ENABLED,
-  catalog: SANITY_ENABLED ? { source: 'sanity', projectId: SANITY_PROJECT_ID, dataset: SANITY_DATASET, canWrite: !!SANITY_API_TOKEN } : { source: 'none' },
+  // Listings in Postgres, bytes in the vault store; both are needed for any catalog route.
+  catalog: CATALOG_ENABLED ? { source: 'postgres', store: cfg.vaultStore.bucket } : { source: 'none', supabase: !IS_DEMO, vaultStore: VAULT_STORE_ENABLED },
 }));
 
 await app.register(authRoutes); // the only unauthenticated POSTs: the caller has no session yet

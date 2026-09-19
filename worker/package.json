@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@sanity/client": "^8.6.0",
+    "@supabase/supabase-js": "^2.115.0",
     "bullmq": "^6.3.7",
     "dotenv": "^17.2.0",
     "fflate": "^0.8.3",

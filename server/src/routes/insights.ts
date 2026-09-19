@@ -18,12 +18,12 @@ import { isAdminId, requireAdmin } from '../admin.ts';
 import { requireRequester } from '../access.ts';
 import { IS_DEMO, cfg } from '../config.ts';
 import { adminOverview, salesForVaults, vaultInsights } from '../insights.ts';
-import * as catalog from '../sanity/index.ts';
+import * as catalog from '../catalog/index.ts';
 import { userFromRequest } from '../supabase.ts';
 
 export default async function insightsRoutes(app: FastifyInstance) {
   app.addHook('onRequest', async (_req, reply) => {
-    if (!catalog.SANITY_ENABLED) return reply.code(501).send({ error: 'Catalog is not configured (SANITY_PROJECT_ID / CATALOG_SOURCE).' });
+    if (!catalog.CATALOG_ENABLED) return reply.code(501).send({ error: 'Catalog is not configured: it needs Supabase and VAULT_STORE_ENDPOINT on the server.' });
   });
 
   /* ---------- seller ---------- */

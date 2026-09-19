@@ -164,6 +164,8 @@ export interface SellerStats {
   /** Bytes every listing of theirs occupies, and the ceiling it is measured against. */
   storageUsedBytes?: number;
   storageLimitBytes?: number;
+  /** The plan that ceiling comes from, e.g. "Free". */
+  storagePlan?: string;
   /** Transferred to the seller so far. Earnings and payouts are separate events. */
   paidOutCents?: number;
   /** Earned but not yet transferred. Negative after a refund on an already-paid sale. */

@@ -7,7 +7,7 @@ import { Empty, ErrorBox, Loading, StatusPill, VaultRow } from '@/components/ui'
 import { errorMessage } from '@/lib/web';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/lib/api';
-import { MAX_SELLER_STORAGE_BYTES, PLATFORM_FEE_FIXED_CENTS, PLATFORM_FEE_PERCENT_DOMESTIC, PLATFORM_FEE_PERCENT_INTERNATIONAL } from '@/lib/config';
+import { PLATFORM_FEE_FIXED_CENTS, PLATFORM_FEE_PERCENT_DOMESTIC, PLATFORM_FEE_PERCENT_INTERNATIONAL } from '@/lib/config';
 import { formatBytes, formatCount, formatDate, formatMoney, formatPrice } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 import type { Vault, VaultSales, VaultStatus } from '@/types';
@@ -210,10 +210,10 @@ function Sell() {
 
       {/* Storage is the one seller limit that is not about money, and the only way to get room
           back is to delete a listing. Shown before the listings so the fix is next to it. */}
-      {vaults.data?.length ? (
+      {vaults.data?.length && stats.data?.storageLimitBytes ? (
         <StorageMeter
-          usedBytes={stats.data?.storageUsedBytes ?? vaults.data.reduce((s, v) => s + (v.sizeBytes || 0), 0)}
-          limitBytes={stats.data?.storageLimitBytes ?? MAX_SELLER_STORAGE_BYTES}
+          usedBytes={stats.data.storageUsedBytes ?? vaults.data.reduce((s, v) => s + (v.sizeBytes || 0), 0)}
+          limitBytes={stats.data.storageLimitBytes}
         />
       ) : null}
 

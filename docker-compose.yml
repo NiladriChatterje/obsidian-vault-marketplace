@@ -1,6 +1,10 @@
 # Runs the payment server and the website together. Both read the repo-root .env.
 #   docker compose up --build
-#   web: http://localhost:3000   api: http://localhost:4000/health   minio console: http://localhost:9001
+#   web: http://localhost:3000   api: http://localhost:4000/health
+#   minio consoles: scan buffer http://localhost:9001, vault store http://localhost:9002
+#
+# The listings table lives in Supabase: apply supabase/migrations/0018_catalog_in_postgres.sql
+# to the project named in .env before the first `up` (SQL editor, or `supabase db push`).
 #
 # NEXT_PUBLIC_* are baked into the web bundle at build time (build args below); changing them
 # in .env requires `docker compose build web`. Server values are read at runtime.
@@ -21,17 +25,23 @@ services:
       MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-vaultmarket}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-vaultmarket-dev-secret}
+      # The vault store (server/src/vault-store.ts): note bodies, attachments, covers and the
+      # scanned zip, for good. The listings themselves are in Supabase (migration 0018).
+      VAULT_STORE_ENDPOINT: http://minio-store:9000
+      VAULT_STORE_ACCESS_KEY: ${VAULT_STORE_ROOT_USER:-vaultstore}
+      VAULT_STORE_SECRET_KEY: ${VAULT_STORE_ROOT_PASSWORD:-vaultstore-dev-secret}
     ports:
       - "4000:4000"
     depends_on:
       - antivirus
       - redis
       - minio
+      - minio-store
     restart: unless-stopped
 
   # The consumer of the upload queue, built from worker/ with the repo root as context (it runs
   # the api's own ingest code out of server/src). No ports: it talks to redis, minio, antivirus
-  # and Sanity, and nothing talks to it. Scale it with `docker compose up --scale worker=3`.
+  # and Supabase, and nothing talks to it. Scale it with `docker compose up --scale worker=3`.
   worker:
     build:
       context: .
@@ -43,6 +53,9 @@ services:
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-vaultmarket}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-vaultmarket-dev-secret}
+      VAULT_STORE_ENDPOINT: http://minio-store:9000
+      VAULT_STORE_ACCESS_KEY: ${VAULT_STORE_ROOT_USER:-vaultstore}
+      VAULT_STORE_SECRET_KEY: ${VAULT_STORE_ROOT_PASSWORD:-vaultstore-dev-secret}
       # Zips one worker holds at once. Each is up to 70 MB in memory and one scanner thread.
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
     depends_on:
@@ -51,6 +64,8 @@ services:
       redis:
         condition: service_started
       minio:
+        condition: service_healthy
+      minio-store:
         condition: service_healthy
     restart: unless-stopped
 
@@ -78,6 +93,28 @@ services:
       - "9001:9001"
     volumes:
       - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Where vaults live for good: the note bodies, attachments, covers and the scanned zip of every
+  # listing (server/src/vault-store.ts). A second MinIO rather than a second bucket in the first
+  # so the two can be sized, backed up and, in production, replaced (R2, OCI Object Storage)
+  # independently: the one above is a day's scratch, this one is the product. Nothing outside
+  # this network needs its S3 port; the console is published for looking at the bucket.
+  minio-store:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${VAULT_STORE_ROOT_USER:-vaultstore}
+      MINIO_ROOT_PASSWORD: ${VAULT_STORE_ROOT_PASSWORD:-vaultstore-dev-secret}
+    ports:
+      - "9002:9001"
+    volumes:
+      - minio-store-data:/data
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 10s
@@ -114,7 +151,7 @@ services:
         # Browser-facing URL of the api service (the buyer's browser calls it directly).
         NEXT_PUBLIC_SERVER_API_URL: ${NEXT_PUBLIC_SERVER_API_URL:-${SERVER_API_URL:-http://localhost:4000}}
         NEXT_PUBLIC_REDIRECT_ORIGIN: ${NEXT_PUBLIC_REDIRECT_ORIGIN:-http://localhost:3000}
-        NEXT_PUBLIC_CATALOG_SOURCE: ${NEXT_PUBLIC_CATALOG_SOURCE:-sanity}
+        NEXT_PUBLIC_CATALOG_SOURCE: ${NEXT_PUBLIC_CATALOG_SOURCE:-server}
     env_file: .env
     ports:
       - "3000:3000"
@@ -126,3 +163,4 @@ volumes:
   clamav-db:
   redis-data:
   minio-data:
+  minio-store-data:

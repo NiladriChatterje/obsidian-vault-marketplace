@@ -1,7 +1,7 @@
 /**
  * Is this zip actually an Obsidian vault? Answered in the browser, before the upload.
  *
- * The server decides the same thing in `server/src/sanity/markdown.ts` and
+ * The server decides the same thing in `server/src/catalog/markdown.ts` and
  * `routes/catalog.ts`, and that remains the authority. This exists so a seller does not
  * wait out a 70 MB upload to be told no, and so the reason lands next to the button
  * instead of arriving as a bare 400.

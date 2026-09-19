@@ -1,7 +1,8 @@
 /**
  * MCP endpoint (Streamable HTTP) at /mcp.
  * Clients authenticate with `Authorization: Bearer <token from the site's /connect page>`
- * and get read-only tools over the vaults they own. Vault contents come from Sanity.
+ * and get read-only tools over the vaults they own. Vault contents come from the catalog
+ * (Postgres index, bodies in the vault store).
  *
  * The MCP SDK speaks web-standard Request/Response, so the Fastify request is
  * bridged into one; the body is kept as the raw string it arrived as.
@@ -11,7 +12,7 @@ import type { FastifyInstance } from 'fastify';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { IS_DEMO, cfg } from '../config.ts';
-import * as catalog from '../sanity/index.ts';
+import * as catalog from '../catalog/index.ts';
 import { admin } from '../supabase.ts';
 import type { Vault } from '../types.ts';
 
@@ -177,7 +178,7 @@ export default async function mcpRoutes(app: FastifyInstance) {
     method: ['GET', 'POST', 'DELETE'],
     url: '/mcp',
     handler: async (req, reply) => {
-      if (!catalog.SANITY_ENABLED) return reply.code(501).send({ error: 'Catalog is not configured' });
+      if (!catalog.CATALOG_ENABLED) return reply.code(501).send({ error: 'Catalog is not configured' });
       const token = bearerToken(req.headers.authorization);
       if (!token) return reply.code(401).header('WWW-Authenticate', 'Bearer realm="vault-market"').send({ error: 'Missing bearer token. Create one on the Connect page.' });
       const userId = await resolveUser(token);

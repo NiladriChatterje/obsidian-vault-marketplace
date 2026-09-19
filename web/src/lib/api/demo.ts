@@ -124,7 +124,7 @@ function insightsFor(s: DemoState, vaultId: string): VaultInsights {
 }
 
 /**
- * Purchase bookkeeping exposed for the Sanity-backed catalog wrapper: vaults may
+ * Purchase bookkeeping exposed for the server-backed catalog wrapper: vaults may
  * not exist in local seed data, so ownership is tracked by id alone.
  */
 export const demoStore = {
@@ -310,7 +310,7 @@ export const demoBackend: Backend = {
     return [];
   },
   async getNote() {
-    throw new Error('Notes are only available with the Sanity catalog.');
+    throw new Error('Notes are only available with the server catalog.');
   },
   async addReview(vaultId, rating, body) {
     const s = await load();

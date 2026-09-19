@@ -1,6 +1,6 @@
 /**
  * What happens to a seller's zip once it is in hand: scanned, unpacked, checked against their
- * storage quota, and written to Sanity as a bundle of note and attachment documents.
+ * storage quota, and written to the catalog as a bundle: its index in Postgres, its bytes in the store.
  *
  * One function with two callers. `POST /uploads/vault-zip` (routes/catalog.ts) runs it inline
  * and answers the seller when it is done. The worker in `worker/` runs the very same steps on a
@@ -9,36 +9,17 @@
  * reasons, with the same words, whichever way it arrived.
  */
 import { unzipSync } from 'fflate';
-import * as catalog from './sanity/index.ts';
+import * as catalog from './catalog/index.ts';
 import { platformFee } from './config.ts';
 import { MALWARE_SCAN_ENABLED, scanForMalware } from './malware.ts';
+import { planFor } from './plans.ts';
 
 /** The authority on vault size. The clients copy it as MAX_VAULT_ZIP_BYTES to reject early. */
 export const MAX_ZIP_BYTES = 70 * 1024 * 1024;
 export const MAX_ZIP_LABEL = `${MAX_ZIP_BYTES / (1024 * 1024)} MB`;
 
-/**
- * All of one seller's vaults together. Storage is the scarce resource here, so the ceiling is
- * on what they keep listed rather than on how many listings they have. The clients copy it as
- * MAX_SELLER_STORAGE_BYTES to show a meter and to refuse an upload before it is spent.
- */
-export const MAX_SELLER_STORAGE_BYTES = 1024 * 1024 * 1024;
-export const MAX_SELLER_STORAGE_LABEL = `${MAX_SELLER_STORAGE_BYTES / (1024 * 1024 * 1024)} GB`;
-
 function mb(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/**
- * What a seller's listings occupy, counted from the vault documents themselves.
- *
- * `excludeVaultId` leaves out the listing a replacement zip is about to overwrite, because
- * saving it deletes the old contents. Excluding by id is safe: only the seller's own vaults
- * are summed in the first place, so an id that is not theirs changes nothing.
- */
-export async function storageUsed(userId: string, excludeVaultId?: string): Promise<number> {
-  const mine = await catalog.getSellerVaults(userId, true);
-  return mine.filter((v) => v.id !== excludeVaultId).reduce((sum, v) => sum + (v.sizeBytes || 0), 0);
 }
 
 /**
@@ -79,7 +60,7 @@ export interface UploadLog {
 
 /**
  * Scans, unpacks, quota-checks and ingests one zip. Throws `UploadRejected` for anything the
- * seller did; lets anything else (Sanity down, a bug) propagate for the caller to report.
+ * seller did; lets anything else (Postgres or the store down, a bug) propagate for the caller to report.
  *
  * `replacingVaultId` is the listing this zip will replace, whose current size is left out of the
  * quota since saving frees it. Absent for a listing that has not been saved yet.
@@ -113,17 +94,19 @@ export async function processVaultZip(zip: Uint8Array, userId: string, log: Uplo
   if (!files.length) throw new UploadRejected(400, 'The zip is empty');
 
   // Checked against the unpacked bytes, not the zip: what the quota measures is what gets
-  // stored. Done before ingest so a vault that will not fit is never written at all.
+  // stored. The ceiling is the seller's plan, across all their listings (plans.ts). Done
+  // before ingest so a vault that will not fit is never written at all.
   const incoming = catalog.bundleBytes(files);
-  const used = await storageUsed(userId, replacingVaultId);
-  if (used + incoming > MAX_SELLER_STORAGE_BYTES) {
+  const [used, plan] = await Promise.all([catalog.storageUsed(userId, replacingVaultId), planFor(userId)]);
+  if (used + incoming > plan.quotaBytes) {
     throw new UploadRejected(
       413,
-      `That vault unpacks to ${mb(incoming)}, and only ${mb(Math.max(0, MAX_SELLER_STORAGE_BYTES - used))} of your ${MAX_SELLER_STORAGE_LABEL} is free. Delete a listing you no longer sell, or upload a smaller vault.`,
+      `That vault unpacks to ${mb(incoming)}, and only ${mb(Math.max(0, plan.quotaBytes - used))} of the ${mb(plan.quotaBytes)} on your ${plan.label} plan is free. Delete a listing you no longer sell, upload a smaller vault, or move to a bigger plan.`,
     );
   }
 
-  const summary = await catalog.ingestBundle(files, userId);
+  // The archive itself goes to the store too: it is what buyers download, exactly as scanned.
+  const summary = await catalog.ingestBundle(files, userId, zip);
   if (!summary.noteCount) throw new UploadRejected(400, 'No markdown notes found in the zip. Zip the vault folder itself.');
   return { path: summary.bundle, sizeBytes: summary.sizeBytes, noteCount: summary.noteCount, attachmentCount: summary.attachmentCount, skipped: summary.skipped, fee: platformFee(0) };
 }
