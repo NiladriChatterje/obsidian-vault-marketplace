@@ -89,7 +89,7 @@ export function Nav() {
       <div className="nav-inner">
         <Link href={home} className="brand">
           {/* Decorative: the wordmark beside it already says the name, so it is not read twice. */}
-          <img src="/logo-mark.png" alt="" className="brand-mark" width={26} height={26} />
+          <img src="/logo.svg" alt="" className="brand-mark" width={26} height={26} />
           Vault Market
           {modeLabel ? <span className="brand-mode">{modeLabel}</span> : null}
         </Link>
