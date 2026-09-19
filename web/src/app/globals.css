@@ -1,18 +1,18 @@
-/* Monochrome tokens mirrored from ../src/theme.ts */
+/* Monochrome tokens: off-white paper, black type, dark grey for what is secondary. */
 :root {
-  --bg: #0b0b0c;
-  --surface: #141416;
-  --raised: #1c1c1f;
-  --border: #26262a;
-  --text: #f4f4f5;
-  --muted: #9a9aa1;
-  --faint: #5f5f66;
-  --on-primary: #0b0b0c;
+  --bg: #f7f6f2;
+  --surface: #ffffff;
+  --raised: #efeeea;
+  --border: #e1dfd8;
+  --text: #111111;
+  --muted: #4a4a4a;
+  --faint: #8b8a85;
+  --on-primary: #f7f6f2;
   --r-sm: 4px;
   --r-md: 6px;
   --r-lg: 8px;
   --nav-h: 56px;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -254,7 +254,7 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
   .nav-toggle { display: block; }
 
   .nav-backdrop {
-    display: block; position: fixed; inset: var(--nav-h) 0 0; z-index: 39; background: rgba(0, 0, 0, 0.55);
+    display: block; position: fixed; inset: var(--nav-h) 0 0; z-index: 39; background: rgba(0, 0, 0, 0.35);
     opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0s 0.3s;
   }
   /* Closed, the pane is display: none rather than parked past the right edge: phone browsers let
@@ -339,7 +339,7 @@ pre.code { background: var(--raised); border: 1px solid var(--border); border-ra
    rejected before it is ever uploaded. Fixed so it is seen wherever the form is scrolled. */
 .toast-wrap { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; width: min(520px, calc(100% - 32px)); }
 .toast { display: flex; gap: 12px; align-items: flex-start; background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--text);
-  border-radius: var(--r-md); padding: 12px 14px; font-size: 13.5px; color: var(--text); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  border-radius: var(--r-md); padding: 12px 14px; font-size: 13.5px; color: var(--text); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
   animation: toast-in 0.18s ease-out; }
 .toast .toast-body { flex: 1; }
 .toast .toast-title { font-weight: 600; margin-bottom: 2px; }
