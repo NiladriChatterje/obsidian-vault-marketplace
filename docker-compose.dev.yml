@@ -1,8 +1,28 @@
-# Development overlay for the website: runs it out of your working tree with hot reload.
+# Development overlay: the website out of your working tree with hot reload, and every service
+# pointed at the LOCAL Supabase stack instead of the cloud project in .env.
+#   npx supabase start                                                   # once per session
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 # Edits under web/ show up in the browser without a rebuild. Plain `docker compose up`
-# still runs the production build described in docker-compose.yml.
+# still runs the production build against the Supabase project in .env.
+#
+# The Supabase values below are the CLI's fixed local-development keys, identical on every
+# machine and not secrets, so they are written here as-is. `environment` beats env_file, so
+# .env keeps the cloud keys untouched. host.docker.internal reaches the stack both from inside
+# a container and from a browser on this machine, which is why it is used for the browser too.
+x-local-supabase: &local-supabase
+  NEXT_PUBLIC_SUPABASE_URL: http://host.docker.internal:54321
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+  SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+
 services:
+  api:
+    environment:
+      <<: *local-supabase
+
+  worker:
+    environment:
+      <<: *local-supabase
+
   web:
     # Its own tag: the two stages would otherwise share vault-marketplace-web:latest, and
     # `target` only chooses what a build produces, not which image an existing container
@@ -12,7 +32,12 @@ services:
     build:
       target: dev
     environment:
+      <<: *local-supabase
       NODE_ENV: development
+      # The dev stage reads NEXT_PUBLIC_* at request time, so these need no rebuild.
+      NEXT_PUBLIC_SERVER_API_URL: http://localhost:4000
+      NEXT_PUBLIC_REDIRECT_ORIGIN: http://localhost:3000
+      NEXT_PUBLIC_CATALOG_SOURCE: server
       # Docker Desktop drops inotify events across a Windows/macOS bind mount, so the
       # watcher has to poll instead (paired with `next dev --webpack` in the dev stage).
       WATCHPACK_POLLING: "true"
