@@ -53,10 +53,46 @@ export default function PrivacyPage() {
         you. They are never shown publicly, attached to your listings or shared with buyers.
       </p>
 
+      <h3>How an uploaded vault is checked</h3>
+      <p>
+        A vault you upload is other people&rsquo;s download, so it is inspected by machine before it is stored. No person reads your notes as part of this.
+      </p>
+      <ul>
+        <li>
+          The archive goes first to a temporary holding store, where it waits its turn. It is deleted from there as soon as it has been processed, and in
+          any case within a day.
+        </li>
+        <li>
+          Every archive is deep-scanned for malware by an automated scanner (ClamAV) that opens the archive and examines every file inside it. An archive
+          that fails is refused and deleted; we keep a log entry recording your account, the time and the name of what was detected.
+        </li>
+        <li>
+          Only text files are accepted: <code>.md</code>, <code>.canvas</code>, <code>.base</code>, <code>.json</code>, <code>.yaml</code>/<code>.yml</code>,{' '}
+          <code>.toml</code> and <code>.txt</code>. Each file is checked by its contents as well as its name, so an image or program renamed to look like a
+          note is refused. A refused archive is deleted, and you are told which file was the reason.
+        </li>
+        <li>
+          An archive that passes is unpacked into our object storage: the notes, so buyers can read them and connect over MCP, and the archive itself, which is
+          what buyers download. Uploads you never attach to a listing are deleted after two days.
+        </li>
+        <li>
+          The scanner runs on our own infrastructure. Your files are not sent to any third-party scanning service.
+        </li>
+      </ul>
+      <p>
+        We also record how much storage your listings occupy and which storage plan you are on, to enforce the limit that plan allows.
+      </p>
+
       <h3>When you connect over MCP</h3>
       <p>
         Personal access tokens are stored as a SHA-256 hash. We cannot read a token back, which is why a lost token must be regenerated rather than recovered.
         Requests from your AI client are authenticated against that hash, and their content is not logged.
+      </p>
+
+      <h3>When you sign in</h3>
+      <p>
+        After your password, we email you a one-time code. The code is held for a few minutes in a short-lived store and destroyed once used or expired. The
+        email is sent through Brevo, which receives your address for that purpose only.
       </p>
 
       <h3>As you use the service</h3>
@@ -86,7 +122,11 @@ export default function PrivacyPage() {
           <strong>Supabase.</strong> Hosts accounts, purchases, orders and vault listings.
         </li>
         <li>
-          <strong>Our object storage.</strong> Holds the vault files, note contents and cover images that sellers upload.
+          <strong>Our object storage.</strong> Holds the vault files, note contents and cover images that sellers upload, and, briefly, archives waiting to
+          be scanned.
+        </li>
+        <li>
+          <strong>Brevo.</strong> Sends our transactional email: sign-in codes and account notices. It receives your email address and the message.
         </li>
         <li>
           <strong>Sellers.</strong> See aggregate sales and download counts for their own vaults only. They never see buyer names, email addresses or contact
@@ -106,6 +146,9 @@ export default function PrivacyPage() {
         </li>
         <li>Server logs are kept for a short operational period.</li>
         <li>MCP token hashes are deleted the moment you revoke a token.</li>
+        <li>Uploaded archives leave the temporary holding store as soon as they are processed, and within a day at most.</li>
+        <li>Uploads never attached to a listing are deleted after two days; a listing&rsquo;s files are deleted when the listing is.</li>
+        <li>Sign-in codes expire within minutes and are not retained.</li>
       </ul>
 
       <h2>Your choices</h2>
@@ -125,7 +168,9 @@ export default function PrivacyPage() {
         <li>Traffic is encrypted in transit.</li>
         <li>Passwords are hashed by our authentication provider and are never visible to us.</li>
         <li>Access tokens are stored hashed.</li>
+        <li>Every uploaded vault is scanned for malware and checked file by file before it is stored or offered to anyone.</li>
         <li>Vault files are served through short-lived signed links that only work for buyers.</li>
+        <li>Note bodies are returned only to the vault&rsquo;s buyers and its seller; previews are the only part shown before purchase.</li>
       </ul>
 
       <h2>Children</h2>

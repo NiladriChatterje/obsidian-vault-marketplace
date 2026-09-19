@@ -17,7 +17,7 @@ export const BUSINESS = {
   /** Courts named in the terms. */
   jurisdiction: 'the courts of Kolkata, India',
   /** Shown at the top of each policy; bump when the text changes. */
-  lastUpdated: '16 September 2026',
+  lastUpdated: '19 September 2026',
   /** Working days to answer a support request. */
   responseDays: 3,
   /** Working days for an approved refund to reach the buyer. */
