@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { formatCount, formatPrice } from '@/lib/format';
 import type { Vault, VaultStatus } from '@/types';
 
@@ -94,6 +94,41 @@ export function VaultRow({
 export function StatusPill({ status }: { status: VaultStatus }) {
   const label = { published: 'Live', draft: 'Draft', unlisted: 'Unlisted' }[status];
   return <span className={`pill${status === 'published' ? ' live' : ''}`}>{label}</span>;
+}
+
+/**
+ * A small icon button that puts `text` on the clipboard and shows a tick for a moment. Sits in
+ * the corner of a `.copyable` block, typically over a `pre.code` holding a token or a snippet.
+ */
+export function CopyButton({ text, label = 'Copy to clipboard' }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 1600);
+    return () => clearTimeout(t);
+  }, [copied]);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+    } catch {
+      // Clipboard access refused (insecure context or permission): the text is still selectable by hand.
+    }
+  };
+  return (
+    <button type="button" className={`copy-btn${copied ? ' copied' : ''}`} onClick={copy} aria-label={copied ? 'Copied' : label} title={copied ? 'Copied' : label}>
+      {copied ? (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      ) : (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="9" y="9" width="11" height="11" rx="2" />
+          <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+        </svg>
+      )}
+    </button>
+  );
 }
 
 export function Loading({ label = 'Loading…' }: { label?: string }) {

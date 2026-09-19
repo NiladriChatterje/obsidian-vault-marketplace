@@ -194,6 +194,13 @@ p { margin: 0; }
    a snippet meant to be copied reads better wrapped than hidden off the edge. */
 pre.code { background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px; margin: 0; font-size: 12.5px; line-height: 1.5;
   white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; }
+/* A code block with a copy button in its corner; the padding keeps the text from running under it. */
+.copyable { position: relative; }
+.copyable pre.code { padding-right: 44px; }
+.copy-btn { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--muted); cursor: pointer; padding: 0; }
+.copy-btn:hover { color: var(--text); border-color: var(--text); }
+.copy-btn.copied { color: var(--text); border-color: var(--text); }
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); }
 .tabs button { background: none; border: 0; padding: 8px 12px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .tabs button.active { color: var(--text); border-bottom-color: var(--text); }

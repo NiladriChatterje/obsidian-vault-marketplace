@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
-import { Empty, ErrorBox, Loading } from '@/components/ui';
+import { CopyButton, Empty, ErrorBox, Loading } from '@/components/ui';
 import { createMcpToken, hasMcpToken, revokeMcpToken } from '@/lib/mcp-token';
 import { errorMessage } from '@/lib/web';
 import { API_URL } from '@/lib/config';
@@ -123,7 +123,10 @@ function Connect() {
         {error ? <div className="error">{error}</div> : null}
         {token ? (
           <>
-            <pre className="code">{token}</pre>
+            <div className="copyable">
+              <pre className="code">{token}</pre>
+              <CopyButton text={token} label="Copy token" />
+            </div>
             <p className="help">Copy it now. For security only a hash is stored, so it cannot be shown again. Generate a new one any time.</p>
           </>
         ) : existing.data ? (
