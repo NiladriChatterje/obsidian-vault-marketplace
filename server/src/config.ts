@@ -98,7 +98,7 @@ export const cfg = {
 
   /** Storage plans (plans.ts), in MB. The row a seller has may carry its own figure. */
   plans: {
-    freeMb: Number(env('PLAN_FREE_MB', '600')),
+    freeMb: Number(env('PLAN_FREE_MB', '500')),
     plusMb: Number(env('PLAN_PLUS_MB', '2048')),
     proMb: Number(env('PLAN_PRO_MB', '5120')),
   },

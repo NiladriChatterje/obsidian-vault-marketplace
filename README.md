@@ -56,7 +56,7 @@ Uploading a zip does the conversion (`server/src/vault-upload.ts`): scan, unpack
 
 **Access rules.** Note bodies are paid content. The app and site never touch Postgres's catalog tables or the store directly; they call the payment server, which holds the service role and the store keys, serves listings and note metadata publicly, and returns a note body only if it is a preview or the caller owns the vault (purchase row or seller). The MCP route uses the same module. `NEXT_PUBLIC_CATALOG_SOURCE=local` switches the app back to the built-in demo data.
 
-**Storage plans.** A seller's listings together may not exceed their plan: Free 600 MB, Plus 2 GB, Pro 5 GB (`PLAN_*_MB`), measured unpacked. `GET /me/stats` reports the limit and the plan; the upload refuses a vault that would not fit. Until subscriptions are sold, an operator grants a plan with `POST /admin/sellers/:userId/plan { plan }`. A lapsed plan blocks new uploads; it never deletes anything.
+**Storage plans.** A seller's listings together may not exceed their plan: Free 500 MB, Plus 2 GB, Pro 5 GB (`PLAN_*_MB`), measured unpacked. The seller dashboard shows the meter from the first visit, before anything is uploaded. `GET /me/stats` reports the limit and the plan; the upload refuses a vault that would not fit. Until subscriptions are sold, an operator grants a plan with `POST /admin/sellers/:userId/plan { plan }`. A lapsed plan blocks new uploads; it never deletes anything.
 
 The tables start empty. Fill them by uploading a vault through `/sell`, which is the same path a real seller takes.
 

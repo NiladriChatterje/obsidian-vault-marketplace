@@ -210,10 +210,11 @@ function Sell() {
 
       {/* Storage is the one seller limit that is not about money, and the only way to get room
           back is to delete a listing. Shown before the listings so the fix is next to it. */}
-      {vaults.data?.length && stats.data?.storageLimitBytes ? (
+      {stats.data?.storageLimitBytes ? (
         <StorageMeter
-          usedBytes={stats.data.storageUsedBytes ?? vaults.data.reduce((s, v) => s + (v.sizeBytes || 0), 0)}
+          usedBytes={stats.data.storageUsedBytes ?? (vaults.data ?? []).reduce((s, v) => s + (v.sizeBytes || 0), 0)}
           limitBytes={stats.data.storageLimitBytes}
+          plan={stats.data.storagePlan}
         />
       ) : null}
 
@@ -299,16 +300,23 @@ function Perk({ title, body }: { title: string; body: string }) {
  * How much of the seller's storage allowance their listings hold. The bar turns to the warning
  * treatment near the top so the squeeze is visible before an upload is refused.
  */
-function StorageMeter({ usedBytes, limitBytes }: { usedBytes: number; limitBytes: number }) {
+/**
+ * How much of their plan's allowance a seller's listings occupy. Shown even before the first
+ * listing, so the allowance is known before it is spent; the server reports both numbers.
+ */
+function StorageMeter({ usedBytes, limitBytes, plan }: { usedBytes: number; limitBytes: number; plan?: string }) {
   const pct = limitBytes > 0 ? Math.min(100, Math.round((usedBytes / limitBytes) * 100)) : 0;
   const freeBytes = Math.max(0, limitBytes - usedBytes);
   const tight = pct >= 85;
   return (
     <section className="card stack" style={{ gap: 8 }}>
       <div className="row between wrap">
-        <h3>Storage</h3>
+        <h3>
+          Storage
+          {plan ? <span className="muted small" style={{ fontWeight: 400, marginLeft: 8 }}>{plan} plan · {formatBytes(limitBytes)}</span> : null}
+        </h3>
         <span className="muted small">
-          {formatBytes(usedBytes)} of {formatBytes(limitBytes)} used
+          {formatBytes(usedBytes)} of {formatBytes(limitBytes)} used ({pct}%)
         </span>
       </div>
       <div className="meter" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Storage used">
@@ -316,8 +324,10 @@ function StorageMeter({ usedBytes, limitBytes }: { usedBytes: number; limitBytes
       </div>
       <p className="muted small">
         {tight
-          ? `Only ${formatBytes(freeBytes)} left. Delete a listing you no longer sell to make room for another.`
-          : `${formatBytes(freeBytes)} free. Vaults are measured unpacked, so a listing takes more room than its zip.`}
+          ? `Only ${formatBytes(freeBytes)} left. Delete a listing you no longer sell to make room for another, or move to a bigger plan.`
+          : usedBytes === 0
+            ? `${formatBytes(limitBytes)} to fill with your listings. Vaults are measured unpacked, so a listing takes more room than its zip.`
+            : `${formatBytes(freeBytes)} free. Vaults are measured unpacked, so a listing takes more room than its zip.`}
       </p>
     </section>
   );
