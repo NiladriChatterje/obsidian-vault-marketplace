@@ -169,7 +169,7 @@ function Connect() {
         </p>
       </section>
 
-      <section className="card stack">
+      <section className="card stack" id="obsidian-plugin">
         <h3>3. Or install them straight into Obsidian</h3>
         <p className="help">
           The Vault Market plugin writes a vault you own into a folder of your own vault and updates it in place when the seller ships a new version. It only replaces files you have
