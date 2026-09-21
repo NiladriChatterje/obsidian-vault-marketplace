@@ -9,51 +9,14 @@
  */
 import { McpServer, createMcpHandler, type McpHttpHandler } from '@modelcontextprotocol/server';
 import type { FastifyInstance } from 'fastify';
-import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { IS_DEMO, cfg } from '../config.ts';
+import { cfg } from '../config.ts';
 import * as catalog from '../catalog/index.ts';
-import { admin } from '../supabase.ts';
+import { bearerToken, ownedVaults, requireOwnedVault, resolveTokenUser } from '../token-access.ts';
 import type { Vault } from '../types.ts';
 
 type OwnedVault = Pick<Vault, 'id' | 'title' | 'tagline' | 'version' | 'noteCount' | 'entryNote' | 'updatedAt'>;
 type Notes = Map<string, string>;
-
-/* ---------- auth ---------- */
-
-function bearerToken(auth: string | undefined): string | null {
-  const m = /^Bearer\s+(.+)$/i.exec(auth ?? '');
-  return m?.[1]?.trim() || null;
-}
-
-/** Maps a token to a user id, or null. Demo mode accepts any token. */
-async function resolveUser(token: string): Promise<string | null> {
-  if (IS_DEMO) return 'demo-user';
-  const hash = createHash('sha256').update(token).digest('hex');
-  const { data, error } = await admin().from('mcp_tokens').select('user_id').eq('token_hash', hash).maybeSingle();
-  if (error) throw new Error(error.message);
-  return data?.user_id ?? null;
-}
-
-/* ---------- vault access ---------- */
-
-async function ownedVaults(userId: string): Promise<OwnedVault[]> {
-  if (IS_DEMO) return (await catalog.listVaults({ limit: 100 })).items; // demo purchases live in the browser
-  const { data, error } = await admin().from('purchases').select('vault_id').eq('buyer_id', userId);
-  if (error) throw new Error(error.message);
-  const [bought, mine] = await Promise.all([
-    catalog.getVaultsByIds((data ?? []).map((p: { vault_id: string }) => p.vault_id)),
-    catalog.getSellerVaults(userId, true),
-  ]);
-  const seen = new Set<string>();
-  return [...bought, ...mine].filter((v) => (seen.has(v.id) ? false : (seen.add(v.id), true)));
-}
-
-async function requireVault(userId: string, vaultId: string): Promise<OwnedVault> {
-  const v = (await ownedVaults(userId)).find((x) => x.id === vaultId);
-  if (!v) throw new Error(`You do not own a vault with id ${vaultId}. Call list_vaults first.`);
-  return v;
-}
 
 const cache = new Map<string, Notes>();
 const CACHE_LIMIT = 8;
@@ -100,7 +63,7 @@ function buildServer(userId: string): McpServer {
     },
     async ({ vault_id, folder }) => {
       try {
-        const notes = await loadNotes(await requireVault(userId, vault_id));
+        const notes = await loadNotes(await requireOwnedVault(userId, vault_id));
         const prefix = folder ? folder.replace(/^\/+|\/+$/g, '') + '/' : '';
         const paths = [...notes.keys()].filter((p) => p.startsWith(prefix)).sort();
         if (!paths.length) return text(prefix ? `No notes under ${prefix}` : 'This vault has no notes.');
@@ -116,7 +79,7 @@ function buildServer(userId: string): McpServer {
     { title: 'Read a note', description: 'Returns the full markdown of one note by path.', inputSchema: z.object({ vault_id: z.string(), path: z.string().describe('Path from list_notes, e.g. "Templates/Daily note.md"') }) },
     async ({ vault_id, path }) => {
       try {
-        const notes = await loadNotes(await requireVault(userId, vault_id));
+        const notes = await loadNotes(await requireOwnedVault(userId, vault_id));
         const clean = path.replace(/^\/+/, '');
         const body = notes.get(clean) ?? notes.get(`${clean}.md`);
         if (body === undefined) return fail(new Error(`No note at ${clean}`));
@@ -136,7 +99,7 @@ function buildServer(userId: string): McpServer {
     },
     async ({ vault_id, query, limit }) => {
       try {
-        const notes = await loadNotes(await requireVault(userId, vault_id));
+        const notes = await loadNotes(await requireOwnedVault(userId, vault_id));
         const q = query.toLowerCase();
         const hits: string[] = [];
         for (const [p, body] of notes) {
@@ -181,7 +144,7 @@ export default async function mcpRoutes(app: FastifyInstance) {
       if (!catalog.CATALOG_ENABLED) return reply.code(501).send({ error: 'Catalog is not configured' });
       const token = bearerToken(req.headers.authorization);
       if (!token) return reply.code(401).header('WWW-Authenticate', 'Bearer realm="vault-market"').send({ error: 'Missing bearer token. Create one on the Connect page.' });
-      const userId = await resolveUser(token);
+      const userId = await resolveTokenUser(token);
       if (!userId) return reply.code(401).header('WWW-Authenticate', 'Bearer realm="vault-market"').send({ error: 'Invalid or revoked token. Generate a new one on the Connect page.' });
 
       const headers = new Headers();

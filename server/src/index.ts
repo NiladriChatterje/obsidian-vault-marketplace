@@ -27,6 +27,7 @@ import insightsRoutes from './routes/insights.ts';
 import payoutRoutes from './routes/payouts.ts';
 import checkoutRoutes from './routes/checkout.ts';
 import mcpRoutes from './routes/mcp.ts';
+import syncRoutes from './routes/sync.ts';
 
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL ?? 'info' },
@@ -62,6 +63,7 @@ await app.register(adminPayoutRoutes);
 await app.register(insightsRoutes); // who bought what: seller insights and the admin dashboard
 await app.register(dodoWebhookRoutes); // same, for Dodo's Standard Webhooks signature
 await app.register(mcpRoutes); // own plugin scope: raw JSON for the MCP SDK
+await app.register(syncRoutes); // the Obsidian plugin: install and update a vault in place
 
 app.setErrorHandler((err: Error & { statusCode?: number }, req, reply) => {
   req.log.error(err);

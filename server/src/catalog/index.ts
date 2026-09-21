@@ -10,7 +10,7 @@
  * Multi-step writes that must not half-happen (attaching an upload to a listing, the paged
  * list) are SQL functions in supabase/migrations/0018; this module calls them by name.
  */
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { decodeCursor, encodeCursor } from '../cursor.ts';
 import { IS_DEMO, cfg } from '../config.ts';
 import { admin } from '../supabase.ts';
@@ -24,6 +24,9 @@ export const CATALOG_ENABLED = !IS_DEMO && store.VAULT_STORE_ENABLED;
 type Row = Record<string, any>;
 
 const VAULT_SELECT = '*, seller:profiles(id, username, display_name, avatar_url)';
+
+/** Content hash of one stored file. The Obsidian plugin hashes the buyer's copy the same way. */
+const sha256 = (data: Uint8Array | Buffer): string => createHash('sha256').update(data).digest('hex');
 
 function fail(error: { message: string } | null): void {
   if (error) throw new Error(error.message);
@@ -193,6 +196,48 @@ export async function getAllNoteContents(vaultId: string): Promise<{ path: strin
   const paths = (data ?? []).map((r) => r.path as string);
   const bodies = await store.readObjects(paths.map((p) => store.fileKey(bundle, p)));
   return paths.map((path, i) => ({ path, content: bodies[i]?.toString('utf8') ?? '' }));
+}
+
+/**
+ * Every file of a vault with a content hash: what the Obsidian plugin diffs against before it
+ * writes anything (routes/sync.ts). Notes and attachments together, since a vault is both.
+ *
+ * Bundles ingested before 0019 have no stored hash; theirs are computed from the store here and
+ * not written back, so an old listing still syncs and a re-upload ends the cost.
+ */
+export async function vaultManifest(vaultId: string): Promise<{ path: string; hash: string; sizeBytes: number }[]> {
+  const bundle = await bundleOf(vaultId);
+  if (!bundle) return [];
+  const [notes, attachments] = await Promise.all([
+    admin().from('notes').select('path, hash, size_bytes').eq('bundle', bundle),
+    admin().from('attachments').select('path, hash, size_bytes').eq('bundle', bundle),
+  ]);
+  fail(notes.error);
+  fail(attachments.error);
+  const rows = [...(notes.data ?? []), ...(attachments.data ?? [])] as Row[];
+  const missing = rows.filter((r) => !r.hash);
+  if (missing.length) {
+    const bodies = await store.readObjects(missing.map((r) => store.fileKey(bundle, r.path)));
+    missing.forEach((r, i) => (r.hash = bodies[i] ? sha256(bodies[i]!) : ''));
+  }
+  return rows
+    .map((r) => ({ path: r.path as string, hash: r.hash as string, sizeBytes: r.size_bytes ?? 0 }))
+    .sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/**
+ * The bodies for the paths the plugin decided it needs. A path that is not there comes back
+ * missing rather than as an error; a vault may hold only text (catalog/file-policy.ts), so
+ * utf-8 is the whole story.
+ */
+export async function readVaultFiles(vaultId: string, paths: string[]): Promise<{ path: string; content: string }[]> {
+  const bundle = await bundleOf(vaultId);
+  if (!bundle) return [];
+  const bodies = await store.readObjects(paths.map((p) => store.fileKey(bundle, p)));
+  return paths
+    .map((path, i) => ({ path, body: bodies[i] }))
+    .filter((f) => f.body)
+    .map((f) => ({ path: f.path, content: f.body!.toString('utf8') }));
 }
 
 /** Case-insensitive substring search over titles, paths and bodies. Owners only; the route checks. */
@@ -410,11 +455,12 @@ export async function ingestBundle(files: BundleFile[], uploaderUserId: string, 
         tags: meta.tags,
         links: meta.links,
         is_preview: /^(readme|home|start here|index)\.md$/i.test(path),
+        hash: sha256(file.data),
         size_bytes: file.data.byteLength,
         position: notes.length,
       });
     } else {
-      attachments.push({ bundle, path, mime_type: store.contentTypeFor(path), size_bytes: file.data.byteLength });
+      attachments.push({ bundle, path, mime_type: store.contentTypeFor(path), hash: sha256(file.data), size_bytes: file.data.byteLength });
     }
     sizeBytes += file.data.byteLength;
   }

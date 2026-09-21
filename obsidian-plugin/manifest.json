@@ -1,0 +1,9 @@
+{
+  "id": "vault-market",
+  "name": "Vault Market",
+  "version": "1.0.0",
+  "minAppVersion": "1.5.0",
+  "description": "Install the Obsidian vaults you bought on Vault Market, and update them in place without losing your own edits.",
+  "author": "Vault Market",
+  "isDesktopOnly": false
+}

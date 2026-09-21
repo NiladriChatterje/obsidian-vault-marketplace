@@ -60,6 +60,14 @@ Uploading a zip does the conversion (`server/src/vault-upload.ts`): scan, unpack
 
 The tables start empty. Fill them by uploading a vault through `/sell`, which is the same path a real seller takes.
 
+## Installing into Obsidian (obsidian-plugin/)
+
+A zip is a one-time event: when a seller ships v2, the buyer has to unzip it somewhere and reconcile it by hand against months of their own notes, so most never update. The plugin in `obsidian-plugin/` makes an update something a buyer will actually accept. It writes a vault they own into a folder of their own vault and, on the next version, replaces only the files they never touched.
+
+It keeps, per install, the hash of every file as the seller shipped it — the *base* — so an update is a three-way comparison per path: base, what is on disk now, and what the seller publishes today. Untouched files are overwritten; where both sides changed a note the seller’s version is written beside the buyer’s as `<name> (v2 from seller).md` and nothing of theirs is lost; a note the seller deleted goes only if the buyer never edited it. Bodies are fetched only for paths that actually moved.
+
+The server side is `server/src/routes/sync.ts` (`GET /sync/vaults`, `GET /sync/vaults/:id/manifest`, `POST /sync/vaults/:id/files`), authenticated with the same read-only personal token as MCP (`server/src/token-access.ts`, generated on the site’s Connect page). The manifest is answered from the `hash` column added in `supabase/migrations/0019_file_hashes.sql`; bundles ingested before it get theirs computed from the store on demand.
+
 ## Payment server (Fastify)
 
 `server/` is a small Node service that owns every secret. The app and the site call it with the buyer's Supabase token. Dodo Payments is the merchant of record and the only payment rail.
@@ -309,15 +317,20 @@ server/                    Fastify (own package.json)
 worker/                    Upload worker: consumes the queue, runs server/src/vault-upload.ts (own Dockerfile, repo-root context)
   src/index.ts             The BullMQ Worker: buffer -> scan -> catalog, retries vs. final refusals; sweeps unsaved uploads
   src/routes/mcp.ts        MCP endpoint over purchased vaults
+  src/routes/sync.ts       Manifest + file reads for the Obsidian plugin: install and update in place
+  src/token-access.ts      The Connect-page token: who is calling, and which vaults they own (MCP and sync)
   src/orders.ts            Order + purchase bookkeeping, provider-neutral, refunds
   src/dodo.ts              Dodo Payments client, product sync, webhook verification
   src/routes/dodo.ts       POST /webhooks/dodo - the only way a Dodo purchase is granted
-supabase/                  migrations/0001_init.sql … 0018_catalog_in_postgres.sql
+obsidian-plugin/           The Obsidian community plugin (own package.json, esbuild -> main.js)
+  main.ts                  Install a bought vault into a folder; update it with a three-way merge that never clobbers your edits
+  manifest.json            What Obsidian reads: id, version, minAppVersion
+supabase/                  migrations/0001_init.sql … 0019_file_hashes.sql
 ```
 
 ## Launch checklist
 
 - Seller agreement and buyer license text (personal, non-transferable).
 - Content moderation: a `reports` table and an admin flag to unlist a vault.
-- Email receipts (Dodo issues the tax invoice itself), update notifications when a seller ships a new version.
+- Email receipts (Dodo issues the tax invoice itself), update notifications when a seller ships a new version (the plugin already applies them; buyers still have to ask).
 - Store keywords: obsidian vault, obsidian templates, second brain, zettelkasten, PKM, note templates.

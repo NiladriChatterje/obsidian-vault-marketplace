@@ -169,8 +169,20 @@ function Connect() {
         </p>
       </section>
 
+      <section className="card stack">
+        <h3>3. Or install them straight into Obsidian</h3>
+        <p className="help">
+          The Vault Market plugin writes a vault you own into a folder of your own vault and updates it in place when the seller ships a new version. It only replaces files you have
+          not edited yourself; where you both changed a note, the seller&rsquo;s version is written beside yours instead of over it.
+        </p>
+        <p className="help">
+          Install the plugin, open its settings and paste the same token above, with{' '}
+          <span className="mono">{API_URL}</span> as the API URL. Then run <span className="mono">Vault Market: install or update a vault</span> from the command palette.
+        </p>
+      </section>
+
       <section className="stack">
-        <h3>Vaults available over MCP</h3>
+        <h3>Vaults you can connect</h3>
         {library.error ? <ErrorBox message={library.error} onRetry={library.refresh} /> : null}
         {library.loading && !library.data ? <Loading /> : null}
         {library.data && library.data.length === 0 ? (
