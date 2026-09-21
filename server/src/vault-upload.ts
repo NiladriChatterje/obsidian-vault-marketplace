@@ -90,9 +90,13 @@ export async function processVaultZip(zip: Uint8Array, userId: string, log: Uplo
   } catch {
     throw new UploadRejected(400, 'That file is not a valid zip archive');
   }
+  // Windows tooling (PowerShell's Compress-Archive) writes entry names with backslashes, against
+  // the zip spec. Normalise before anything reads a path: the common-root strip, the folder split
+  // and the object key all assume '/', so a backslash zip would otherwise strip no root at all
+  // and store the whole thing as single files named "vault\Templates\Daily note.md".
   const files = Object.entries(entries)
-    .filter(([path, data]) => !path.endsWith('/') && data.byteLength > 0)
-    .map(([path, data]) => ({ path, data }));
+    .map(([path, data]) => ({ path: path.replace(/\\/g, '/'), data }))
+    .filter((f) => !f.path.endsWith('/') && f.data.byteLength > 0);
   if (!files.length) throw new UploadRejected(400, 'The zip is empty');
 
   // Every file that would be stored is judged by its bytes (catalog/file-policy.ts): a vault
