@@ -88,6 +88,8 @@ export interface Vault {
   filePath?: string | null;
   /** Path of the note buyers should open first, e.g. "Home.md". */
   entryNote?: string | null;
+  /** Delivered through the Obsidian plugin only: buyers are issued no zip download link. */
+  pluginOnly: boolean;
   status: VaultStatus;
   downloads: number;
   ratingAvg: number;
@@ -113,6 +115,7 @@ export type VaultInput = Pick<
   screenshots?: string[];
   filePath?: string | null;
   entryNote?: string | null;
+  pluginOnly?: boolean;
   sizeBytes?: number;
   status?: VaultStatus;
 };

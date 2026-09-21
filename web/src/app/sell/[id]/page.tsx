@@ -32,6 +32,7 @@ export default function ListingEditorPage() {
   const [pluginsText, setPluginsText] = useState('');
   const [noteCount, setNoteCount] = useState('');
   const [version, setVersion] = useState('1.0');
+  const [pluginOnly, setPluginOnly] = useState(false);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [filePath, setFilePath] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -78,6 +79,7 @@ export default function ListingEditorPage() {
         setPluginsText(v.plugins.join(', '));
         setNoteCount(v.noteCount ? String(v.noteCount) : '');
         setVersion(v.version);
+        setPluginOnly(!!v.pluginOnly);
         setCoverUrl(v.coverUrl ?? null);
         setFilePath(v.filePath ?? null);
         setFileName(v.filePath ? v.filePath.split('/').pop() ?? 'vault.zip' : null);
@@ -207,6 +209,7 @@ export default function ListingEditorPage() {
         plugins: parseTags(pluginsText).map((p) => p.replace(/\b\w/g, (c) => c.toUpperCase())),
         noteCount: Number(noteCount) || 0,
         version: version.trim() || '1.0',
+        pluginOnly,
         coverUrl,
         filePath,
         sizeBytes,
@@ -362,6 +365,13 @@ export default function ListingEditorPage() {
             <input className="input" value={version} onChange={(e) => setVersion(e.target.value)} placeholder="1.0" />
           </Field>
         </div>
+        <label className="row" style={{ gap: 8, alignItems: 'center' }}>
+          <input type="checkbox" checked={pluginOnly} onChange={(e) => setPluginOnly(e.target.checked)} /> Deliver through the Obsidian plugin only
+        </label>
+        <p className="help">
+          Buyers install and update this vault from inside Obsidian and are given no .zip. It does not stop anyone determined — the notes are still files on their disk — but there is no
+          ready-made archive to repost, and every copy carries a mark tying it to the account it was served to. You can still download your own.
+        </p>
       </section>
 
       {error ? <div className="error">{error}</div> : null}

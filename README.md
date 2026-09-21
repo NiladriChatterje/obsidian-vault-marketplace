@@ -66,6 +66,10 @@ A zip is a one-time event: when a seller ships v2, the buyer has to unzip it som
 
 It keeps, per install, the hash of every file as the seller shipped it — the *base* — so an update is a three-way comparison per path: base, what is on disk now, and what the seller publishes today. Untouched files are overwritten; where both sides changed a note the seller’s version is written beside the buyer’s as `<name> (v2 from seller).md` and nothing of theirs is lost; a note the seller deleted goes only if the buyer never edited it. Bodies are fetched only for paths that actually moved.
 
+Two things ride on that path. A seller may mark a listing **plugin-only** (`vaults.plugin_only`, migration 0020): buyers are issued no zip link, so there is no ready-made archive in a Downloads folder to repost. It is friction, not prevention — the notes are still files on their disk — and the seller keeps their own download. The other is a **per-buyer fingerprint** (`server/src/fingerprint.ts`): notes served to the plugin carry a 64-bit HMAC over (vault, buyer) written as zero-width characters, so a leaked copy can be traced back with `POST /admin/fingerprint/trace`. Both are off by default; the fingerprint needs `FINGERPRINT_SECRET`, which must never be rotated once set.
+
+The fingerprint changes what a body is, so it changes what a hash is, and the two move together: the manifest promises the hash of the marked note the plugin will actually write. Without it the manifest is one index scan; with it the bodies are read once per (vault version, buyer) and cached, so the update that follows still costs nothing.
+
 The server side is `server/src/routes/sync.ts` (`GET /sync/vaults`, `GET /sync/vaults/:id/manifest`, `POST /sync/vaults/:id/files`), authenticated with the same read-only personal token as MCP (`server/src/token-access.ts`, generated on the site’s Connect page). The manifest is answered from the `hash` column added in `supabase/migrations/0019_file_hashes.sql`; bundles ingested before it get theirs computed from the store on demand.
 
 ## Payment server (Fastify)
@@ -318,6 +322,7 @@ worker/                    Upload worker: consumes the queue, runs server/src/va
   src/index.ts             The BullMQ Worker: buffer -> scan -> catalog, retries vs. final refusals; sweeps unsaved uploads
   src/routes/mcp.ts        MCP endpoint over purchased vaults
   src/routes/sync.ts       Manifest + file reads for the Obsidian plugin: install and update in place
+  src/fingerprint.ts       The per-buyer mark stamped into notes served to the plugin, and how to trace one
   src/token-access.ts      The Connect-page token: who is calling, and which vaults they own (MCP and sync)
   src/orders.ts            Order + purchase bookkeeping, provider-neutral, refunds
   src/dodo.ts              Dodo Payments client, product sync, webhook verification
@@ -325,7 +330,7 @@ worker/                    Upload worker: consumes the queue, runs server/src/va
 obsidian-plugin/           The Obsidian community plugin (own package.json, esbuild -> main.js)
   main.ts                  Install a bought vault into a folder; update it with a three-way merge that never clobbers your edits
   manifest.json            What Obsidian reads: id, version, minAppVersion
-supabase/                  migrations/0001_init.sql … 0019_file_hashes.sql
+supabase/                  migrations/0001_init.sql … 0020_plugin_only.sql
 ```
 
 ## Launch checklist

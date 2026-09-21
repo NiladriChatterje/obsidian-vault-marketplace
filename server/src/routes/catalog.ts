@@ -39,6 +39,7 @@ import { IS_DEMO, cfg, minPriceCents } from '../config.ts';
 import { sellerBalance } from '../payout-ledger.ts';
 import { hasPayoutDetails } from '../seller-payouts.ts';
 import { signDownload, verifyDownload } from '../download.ts';
+import { FINGERPRINT_ENABLED, extractMark, traceLeak } from '../fingerprint.ts';
 import { isPlanId, planFor, setPlan } from '../plans.ts';
 import { UPLOAD_QUEUE_ENABLED, enqueueScan, uploadJobStatus } from '../upload-queue.ts';
 import { incomingKey, objectSize, ownsKey, presignUpload, removeObject } from '../upload-store.ts';
@@ -146,6 +147,11 @@ export default async function catalogRoutes(app: FastifyInstance) {
     const v = await catalog.getVault(req.params.id);
     if (!v) return reply.code(404).send({ error: 'Vault not found' });
     if (!(await ownsVault(r, v))) return reply.code(403).send({ error: 'Buy this vault to download it.' });
+    // The seller keeps their own download; it is their file. Everyone else installs it through
+    // the plugin, so there is no zip sitting in a Downloads folder ready to be reposted.
+    if (v.pluginOnly && v.sellerId !== r.id) {
+      return reply.code(403).send({ error: 'This vault installs through the Vault Market plugin for Obsidian, so it has no zip download. Open Obsidian and run "Vault Market: install or update a vault".' });
+    }
     return { url: `${cfg.apiUrl}/downloads/${signDownload(v.id, r.id)}`, expiresInSeconds: 300 };
   });
 
@@ -398,6 +404,28 @@ export default async function catalogRoutes(app: FastifyInstance) {
   });
 
   /* ---------- operators ---------- */
+
+  // Paste a note out of a leaked vault and learn which account it was served to. The mark is
+  // derived, never stored, so this walks that vault's buyers and compares (fingerprint.ts).
+  app.post<{ Body: { vaultId?: unknown; text?: unknown } }>('/admin/fingerprint/trace', async (req, reply) => {
+    if (!(await requireAdmin(req, reply))) return;
+    const { vaultId, text } = req.body ?? {};
+    if (typeof vaultId !== 'string' || !vaultId || typeof text !== 'string' || !text) {
+      return reply.code(400).send({ error: 'Send { vaultId, text } where text is the leaked note.' });
+    }
+    if (!FINGERPRINT_ENABLED) return reply.code(501).send({ error: 'Fingerprinting is off: FINGERPRINT_SECRET is not set on this server.' });
+    const mark = extractMark(text);
+    if (!mark) return { mark: null, buyer: null, note: 'No mark in that text. It was not served by the plugin, or it was stripped.' };
+    const { data, error } = await admin().from('purchases').select('buyer_id').eq('vault_id', vaultId);
+    if (error) throw new Error(error.message);
+    const buyerIds = (data ?? []).map((p: { buyer_id: string }) => p.buyer_id);
+    const vault = await catalog.getVault(vaultId);
+    const candidates = vault?.sellerId ? [...new Set([...buyerIds, vault.sellerId])] : buyerIds;
+    const userId = traceLeak(text, vaultId, candidates);
+    if (!userId) return { mark, buyer: null, note: `Mark found but it matches none of the ${candidates.length} accounts holding this vault.` };
+    const { data: profile } = await admin().from('profiles').select('username, display_name').eq('id', userId).maybeSingle();
+    return { mark, buyer: { userId, username: profile?.username ?? null, displayName: profile?.display_name ?? null, isSeller: userId === vault?.sellerId } };
+  });
 
   app.post<{ Params: { userId: string }; Body: { plan?: unknown; periodEnd?: unknown } }>('/admin/sellers/:userId/plan', async (req, reply) => {
     if (!(await requireAdmin(req, reply))) return;

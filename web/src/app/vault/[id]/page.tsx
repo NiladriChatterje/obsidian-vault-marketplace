@@ -213,13 +213,19 @@ export default function VaultPage() {
           </>
         ) : owned ? (
           <>
-            <button className="btn block" onClick={onDownload} disabled={busy}>
-              {busy ? 'Preparing…' : 'Download .zip'}
-            </button>
+            {v.pluginOnly ? null : (
+              <button className="btn block" onClick={onDownload} disabled={busy}>
+                {busy ? 'Preparing…' : 'Download .zip'}
+              </button>
+            )}
             <Link href={`/connect?vault=${v.id}`} className="btn secondary block">
-              Connect over MCP
+              {v.pluginOnly ? 'Install in Obsidian' : 'Connect over MCP'}
             </Link>
-            <p className="help">Unzip into your Obsidian vaults folder, or point your AI assistant at the MCP endpoint to read these notes.</p>
+            <p className="help">
+              {v.pluginOnly
+                ? 'This vault installs through the Vault Market plugin for Obsidian, which also keeps it up to date without touching notes you have edited. There is no .zip.'
+                : 'Unzip into your Obsidian vaults folder, or point your AI assistant at the MCP endpoint to read these notes.'}
+            </p>
           </>
         ) : (
           <>

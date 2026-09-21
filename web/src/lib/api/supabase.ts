@@ -47,6 +47,7 @@ function toVault(r: Row): Vault {
     ratingAvg: Number(r.rating_avg ?? 0),
     ratingCount: r.rating_count ?? 0,
     featured: !!r.featured,
+    pluginOnly: !!r.plugin_only,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

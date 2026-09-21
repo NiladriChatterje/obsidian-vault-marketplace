@@ -82,9 +82,11 @@ export default function LibraryPage() {
               }
               right={
                 <div className="row library-actions">
-                  <button className="btn small secondary" disabled={busyId === p.vaultId} onClick={() => download(p.vaultId)}>
-                    {busyId === p.vaultId ? 'Preparing…' : 'Download'}
-                  </button>
+                  {p.vault.pluginOnly ? null : (
+                    <button className="btn small secondary" disabled={busyId === p.vaultId} onClick={() => download(p.vaultId)}>
+                      {busyId === p.vaultId ? 'Preparing…' : 'Download'}
+                    </button>
+                  )}
                   <Link href={`/connect?vault=${p.vaultId}`} className="btn small secondary">
                     MCP
                   </Link>

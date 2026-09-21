@@ -472,6 +472,7 @@ export const demoBackend: Backend = {
       createdAt: now,
       updatedAt: now,
       ...input,
+      pluginOnly: !!input.pluginOnly,
     };
     s.vaults.push(vault);
     await persist();

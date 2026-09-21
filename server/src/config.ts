@@ -62,6 +62,14 @@ export const cfg = {
   },
 
   /**
+   * Key behind the per-buyer fingerprint stamped into notes served to the Obsidian plugin
+   * (fingerprint.ts). Empty = no fingerprinting, which is how every deployment behaves until
+   * one is set. Once set it must never be rotated: a new key is a new mark on every note, and
+   * every installed vault would see that as an update.
+   */
+  fingerprintSecret: env('FINGERPRINT_SECRET'),
+
+  /**
    * Queued uploads (upload-queue.ts, upload-store.ts, worker/). With the queue and the store
    * both set, a zip goes from the browser into the store and a worker scans and unpacks it
    * while the API answers at once. With either missing, POST /uploads/vault-zip does the whole

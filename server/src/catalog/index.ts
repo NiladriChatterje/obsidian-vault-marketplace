@@ -69,6 +69,7 @@ function toVault(r: Row, seller?: SellerSummary): Vault {
     version: r.version ?? '1.0',
     filePath: r.bundle ?? null,
     entryNote: r.entry_note ?? null,
+    pluginOnly: !!r.plugin_only,
     status: (r.status ?? 'draft') as VaultStatus,
     downloads: r.downloads ?? 0,
     ratingAvg: Number(r.rating_avg ?? 0),
@@ -296,6 +297,7 @@ export async function saveVault(input: VaultInput, seller: SellerInput, id?: str
   };
   if (input.screenshots !== undefined) fields.screenshots = input.screenshots;
   if (input.entryNote !== undefined) fields.entry_note = input.entryNote;
+  if (input.pluginOnly !== undefined) fields.plugin_only = !!input.pluginOnly;
   if (input.coverUrl !== undefined) fields.cover_key = coverKeyFrom(input.coverUrl);
 
   let vaultId = id;
