@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { CopyButton, Empty, ErrorBox, Loading } from '@/components/ui';
+import { MCP_CLIENTS, MCP_GROUPS, type McpClient, type McpTarget } from '@/lib/mcp-clients';
 import { createMcpToken, hasMcpToken, revokeMcpToken } from '@/lib/mcp-token';
 import { errorMessage } from '@/lib/web';
 import { API_URL } from '@/lib/config';
@@ -28,7 +29,10 @@ function Connect() {
   const [token, setToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [client, setClient] = useState<'claude-code' | 'claude-desktop' | 'cursor'>('claude-code');
+  const [clientId, setClientId] = useState(() => {
+    const asked = params.get('client');
+    return MCP_CLIENTS.some((c) => c.id === asked) ? asked! : 'claude-code';
+  });
 
   const endpoint = `${API_URL}/mcp`;
   const shownToken = token ?? '<your token>';
@@ -77,35 +81,7 @@ function Connect() {
 
   const highlighted = highlight ? library.data?.find((p) => p.vaultId === highlight)?.vault : undefined;
 
-  const snippets = {
-    'claude-code': `claude mcp add --transport http vault-market ${endpoint} \\
-  --header "Authorization: Bearer ${shownToken}"`,
-    'claude-desktop': JSON.stringify(
-      {
-        mcpServers: {
-          'vault-market': {
-            type: 'http',
-            url: endpoint,
-            headers: { Authorization: `Bearer ${shownToken}` },
-          },
-        },
-      },
-      null,
-      2
-    ),
-    cursor: JSON.stringify(
-      {
-        mcpServers: {
-          'vault-market': {
-            url: endpoint,
-            headers: { Authorization: `Bearer ${shownToken}` },
-          },
-        },
-      },
-      null,
-      2
-    ),
-  };
+  const client = MCP_CLIENTS.find((c) => c.id === clientId) ?? MCP_CLIENTS[0];
 
   return (
     <div className="narrow stack" style={{ margin: '0 auto', gap: 20 }}>
@@ -148,21 +124,22 @@ function Connect() {
       </section>
 
       <section className="card stack">
-        <h3>2. Add the server to your client</h3>
-        <div className="tabs">
-          {(
-            [
-              ['claude-code', 'Claude Code'],
-              ['claude-desktop', 'Claude Desktop'],
-              ['cursor', 'Cursor'],
-            ] as const
-          ).map(([k, label]) => (
-            <button key={k} className={client === k ? 'active' : ''} onClick={() => setClient(k)}>
-              {label}
-            </button>
+        <h3>2. Add the server to your assistant</h3>
+        <div className="stack" style={{ gap: 10 }}>
+          {MCP_GROUPS.map((g) => (
+            <div key={g} className="stack" style={{ gap: 6 }}>
+              <span className="label">{g}</span>
+              <div className="chips">
+                {MCP_CLIENTS.filter((c) => c.group === g).map((c) => (
+                  <button key={c.id} type="button" className={`chip${c.id === client.id ? ' selected' : ''}`} aria-pressed={c.id === client.id} onClick={() => setClientId(c.id)}>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
-        <pre className="code">{snippets[client]}</pre>
+        <ClientSetup client={client} target={{ url: endpoint, token: shownToken }} hasToken={!!token} />
         <p className="help">
           Endpoint: <span className="mono">{endpoint}</span> (Streamable HTTP). Tools: <span className="mono">list_vaults</span>, <span className="mono">list_notes</span>,{' '}
           <span className="mono">read_note</span>, <span className="mono">search_notes</span>.
@@ -205,6 +182,62 @@ function Connect() {
           ) : null
         )}
       </section>
+    </div>
+  );
+}
+
+function Snippet({ text }: { text: string }) {
+  return (
+    <div className="copyable">
+      <pre className="code">{text}</pre>
+      <CopyButton text={text} />
+    </div>
+  );
+}
+
+/** One client's instructions. Install links carry the token, so they wait until one has been generated. */
+function ClientSetup({ client, target, hasToken }: { client: McpClient; target: McpTarget; hasToken: boolean }) {
+  if (client.unsupported) return <div className="notice">{client.note}</div>;
+  const install = client.install?.(target);
+  return (
+    <div className="stack" style={{ gap: 12 }}>
+      {install ? (
+        <div className="row">
+          {hasToken ? (
+            <a className="btn small" href={install.href}>
+              {install.label}
+            </a>
+          ) : (
+            <button type="button" className="btn small" disabled title="Generate a token first">
+              {install.label}
+            </button>
+          )}
+          {!hasToken ? <span className="help">Generate a token above to enable one-click install.</span> : null}
+        </div>
+      ) : null}
+      {client.steps ? <p className="help">{client.steps}</p> : null}
+      {client.cli ? (
+        <div className="stack" style={{ gap: 6 }}>
+          <span className="label">Command</span>
+          <Snippet text={client.cli(target)} />
+        </div>
+      ) : null}
+      {client.config ? (
+        <div className="stack" style={{ gap: 6 }}>
+          <span className="label">{client.cli ? 'Or add it to the config file' : 'Config'}</span>
+          {client.files?.length ? (
+            <ul className="help" style={{ margin: 0, paddingLeft: 18 }}>
+              {client.files.map((f) => (
+                <li key={f} className="mono">
+                  {f}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <Snippet text={client.config(target)} />
+        </div>
+      ) : null}
+      {client.note ? <p className="help">{client.note}</p> : null}
     </div>
   );
 }
