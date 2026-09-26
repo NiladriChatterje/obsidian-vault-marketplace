@@ -106,6 +106,13 @@ is the switch: without it nothing is scanned, which is fine on a laptop; with it
 cannot be reached refuses the upload rather than quietly passing it on. See
 [antivirus/README.md](antivirus/README.md) for deploying it.
 
+A clean zip is then checked against the catalog before it is stored: each note is hashed
+normalised (no frontmatter, zero-width characters, case, whitespace or punctuation), and one
+query asks which listings by other sellers already hold those hashes
+(`server/src/catalog/overlap.ts`, `catalog_bundle_overlap` in 0021). When most of the notes are
+somebody else's vault the upload is refused, naming the listing; a reflow or a formatter pass
+does not change the verdict, and a fingerprinted copy also names the buyer who leaked it in the log.
+
 With `QUEUE_REDIS_URL` and the `MINIO_*` values set, uploads are queued instead of handled
 inline: the browser PUTs the zip straight into an S3-compatible store by presigned link, the API
 writes a ticket to Redis (BullMQ) and answers at once, and the worker in `worker/` pulls tickets

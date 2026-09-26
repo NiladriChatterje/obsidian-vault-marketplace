@@ -17,6 +17,7 @@ import { admin } from '../supabase.ts';
 import type { ListVaultsParams, SellerSummary, SortMode, Vault, VaultInput, VaultNote, VaultNoteContent, VaultPage, VaultStatus } from '../types.ts';
 import * as store from '../vault-store.ts';
 import { MARKDOWN_EXT, isIgnoredPath, parseNote, stripCommonRoot } from './markdown.ts';
+import { noteTextHashes } from './overlap.ts';
 
 /** Listings need both Postgres and somewhere to keep the files; demo mode has neither. */
 export const CATALOG_ENABLED = !IS_DEMO && store.VAULT_STORE_ENABLED;
@@ -423,11 +424,13 @@ async function insertChunked(table: string, rows: Row[]): Promise<void> {
 /**
  * Writes an uploaded zip's files to the store and its index to Postgres, under a new bundle id
  * with no vault yet. `attachBundle` links it when the listing is saved, so uploading before the
- * listing exists works. `zip` is the archive itself, kept as the buyer's download.
+ * listing exists works. `zip` is the archive itself, kept as the buyer's download. `textHashes`
+ * is `noteTextHashes(files)` when the caller already has it from the re-upload check (overlap.ts);
+ * left out, it is computed here, so the row is filled in either way.
  *
  * Half an ingest is worse than none: on any failure what was written is removed again.
  */
-export async function ingestBundle(files: BundleFile[], uploaderUserId: string, zip?: Uint8Array): Promise<BundleSummary> {
+export async function ingestBundle(files: BundleFile[], uploaderUserId: string, zip?: Uint8Array, textHashes = noteTextHashes(files)): Promise<BundleSummary> {
   const bundle = `b_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   const strip = stripCommonRoot(files.map((f) => f.path));
   const decoder = new TextDecoder('utf-8');
@@ -458,6 +461,7 @@ export async function ingestBundle(files: BundleFile[], uploaderUserId: string, 
         links: meta.links,
         is_preview: /^(readme|home|start here|index)\.md$/i.test(path),
         hash: sha256(file.data),
+        text_hash: textHashes.get(path) ?? null,
         size_bytes: file.data.byteLength,
         position: notes.length,
       });

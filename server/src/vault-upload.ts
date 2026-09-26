@@ -12,6 +12,7 @@ import { unzipSync } from 'fflate';
 import * as catalog from './catalog/index.ts';
 import { whyRefused } from './catalog/file-policy.ts';
 import { isIgnoredPath, stripCommonRoot } from './catalog/markdown.ts';
+import { findCopiedVault, noteTextHashes } from './catalog/overlap.ts';
 import { platformFee } from './config.ts';
 import { MALWARE_SCAN_ENABLED, scanForMalware } from './malware.ts';
 import { planFor } from './plans.ts';
@@ -110,6 +111,17 @@ export async function processVaultZip(zip: Uint8Array, userId: string, log: Uplo
     if (reason) throw new UploadRejected(422, `That zip was refused: "${path}" ${reason}. Remove it and upload again.`);
   }
 
+  // Somebody else's vault, bought and re-listed, is refused before a byte of it is stored. The
+  // hashes are normalised (catalog/overlap.ts), so an edited copy still reads as a copy, and
+  // they are handed on to ingest, so each note is hashed once. When the copied notes still
+  // carry a buyer's fingerprint the leak is named in the log; the seller only hears "refused".
+  const textHashes = noteTextHashes(files);
+  const copied = await findCopiedVault(files, textHashes, userId);
+  if (copied) {
+    log.warn({ sellerId: userId, copiesVaultId: copied.vaultId, ownerId: copied.sellerId, matched: copied.matched, total: copied.total, leakedBy: copied.leakedBy }, 'upload rejected as a copy of another listing');
+    throw new UploadRejected(422, `That zip was refused: ${copied.matched} of its ${copied.total} notes are already in "${copied.title}", a vault listed by another seller. If that vault is yours, upload it from the account that lists it.`);
+  }
+
   // Checked against the unpacked bytes, not the zip: what the quota measures is what gets
   // stored. The ceiling is the seller's plan, across all their listings (plans.ts). Done
   // before ingest so a vault that will not fit is never written at all.
@@ -123,7 +135,7 @@ export async function processVaultZip(zip: Uint8Array, userId: string, log: Uplo
   }
 
   // The archive itself goes to the store too: it is what buyers download, exactly as scanned.
-  const summary = await catalog.ingestBundle(files, userId, zip);
+  const summary = await catalog.ingestBundle(files, userId, zip, textHashes);
   if (!summary.noteCount) throw new UploadRejected(400, 'No markdown notes found in the zip. Zip the vault folder itself.');
   return { path: summary.bundle, sizeBytes: summary.sizeBytes, noteCount: summary.noteCount, attachmentCount: summary.attachmentCount, skipped: summary.skipped, fee: platformFee(0) };
 }
